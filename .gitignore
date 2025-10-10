@@ -209,3 +209,7 @@ __marimo__/
 
 #vscode settings
 .vscode/
+
+# large datasets
+RG_ArgoClim_Salinity_2019.nc.gz
+RG_ArgoClim_Temperature_2019.nc.gz
