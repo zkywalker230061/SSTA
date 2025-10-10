@@ -1,15 +1,13 @@
 """
-ARGO Plot file for literature review.
+ARGO Plot file for literature review. Used.
 
 Chengyun Zhu
-2025-09-22
+2025-10-03
 """
 
-from IPython.display import display
 
 import matplotlib.pyplot as plt
 import numpy as np
-# Import the main data fetcher:
 from argopy import DataFetcher
 
 
@@ -35,7 +33,7 @@ frigid = ArgoSet_frigid.to_xarray()
 # display(ds)
 
 # Extract pressure and temperature
-pres = tropical['PRES'].values.flatten()    # Pressure (dbar, ~depth in meters)
+pres = tropical['PRES'].values.flatten()    # Pressure (dbar)
 temp = tropical['TEMP'].values.flatten()    # Temperature (°C)
 
 # Mask NaNs
@@ -52,7 +50,7 @@ plt.grid()
 plt.show()
 
 # Extract pressure and temperature
-pres = temperate['PRES'].values.flatten()    # Pressure (dbar, ~depth in meters)
+pres = temperate['PRES'].values.flatten()    # Pressure (dbar)
 temp = temperate['TEMP'].values.flatten()    # Temperature (°C)
 
 # Mask NaNs
@@ -70,7 +68,7 @@ plt.show()
 
 
 # Extract pressure and temperature
-pres = frigid['PRES'].values.flatten()    # Pressure (dbar, ~depth in meters)
+pres = frigid['PRES'].values.flatten()    # Pressure (dbar)
 temp = frigid['TEMP'].values.flatten()    # Temperature (°C)
 
 # Mask NaNs
