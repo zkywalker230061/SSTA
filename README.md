@@ -1,5 +1,7 @@
 # SSTA
- Sea Surface Temperature Anomalies - slab mixed layer model
+Sea Surface Temperature Anomalies - slab mixed layer model
+
+MSci Project - Imperial College London, SPC-Czaja-1
 
 ### Authors: Chengyun Zhu and Christopher O'Sullivan
 
