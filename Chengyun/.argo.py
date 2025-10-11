@@ -1,5 +1,5 @@
 """
-ARGO archive.
+ARGO. Archive.
 
 Chengyun Zhu
 2025-09-30
