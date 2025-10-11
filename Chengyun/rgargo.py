@@ -13,9 +13,9 @@ import pandas as pd
 # import matplotlib.pyplot as plt
 
 
-def decode_times_manually(ds, mid_month=True):
+def decode_times_manually(ds, mid_month=False):
     """
-    Decode time variable manually.
+    Decode time variable manually for RG-ARGO dataset.
     original:
     units : months since 2004-01-01 00:00:00
     time_origin : 01-JAN-2004 00:00:00
@@ -36,20 +36,22 @@ def decode_times_manually(ds, mid_month=True):
     """
     _, reference_date = ds['TIME'].attrs['units'].split('since')
     if mid_month is False:
-        ds['TIME'] = pd.date_range(start=reference_date, periods=ds.sizes['TIME'], freq='MS')
-    if mid_month is True:
-        ds['TIME'] = (pd.date_range(start=reference_date, periods=ds.sizes['TIME'], freq='MS')
-                      + pd.Timedelta(days=15))
+        ds['time'] = pd.date_range(start=reference_date, periods=ds.sizes['TIME'], freq='MS')
+    elif mid_month is True:
+        ds['time'] = (pd.date_range(start=reference_date, periods=ds.sizes['TIME'], freq='MS')
+                      + pd.DateOffset(days=14))
     else:
         raise ValueError("mid_month must be True or False.")
+    ds['time'].attrs['calendar'] = '360_day'
+    ds['time'].attrs['axis'] = 't'
 
 
 with xr.open_dataset("../datasets/RG_ArgoClim_Temperature_2019.nc", decode_times=False) as ds_temp:
-    # decode_times_manually(ds_temp, mid_month=False)
+    decode_times_manually(ds_temp, mid_month=False)
     display(ds_temp)
     print(ds_temp.keys())
 
 # with xr.open_dataset("../datasets/RG_ArgoClim_Salinity_2019.nc", decode_times=False) as ds_salt:
-#     # decode_times_manually(ds_salt, mid_month=False)
+#     decode_times_manually(ds_salt, mid_month=False)
 #     display(ds_salt)
 #     print(ds_salt.keys())
