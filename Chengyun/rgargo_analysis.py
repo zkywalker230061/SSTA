@@ -26,5 +26,11 @@ if __name__ == "__main__":
         print(ds_temp.keys())
         # plot temperature at surface at the start time; test
         tm2d = ds_temp['ARGO_TEMPERATURE_MEAN'].isel(PRESSURE=0)
-        # print(tm2d)
-        tm2d.plot(figsize=(10, 5), vmin=-2, vmax=30, cmap='coolwarm')
+        # display(tm2d)
+        # print(tm2d.min().item(), tm2d.max().item())
+        tm2d.plot(
+            figsize=(10, 5),
+            ylim=(-90, 90),
+            cmap='coolwarm',
+            vmin=-2, vmax=31
+        )
