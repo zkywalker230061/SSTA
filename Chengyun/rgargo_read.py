@@ -13,13 +13,13 @@ import pandas as pd
 # import matplotlib.pyplot as plt
 
 
-def decode_times_manually(ds, mid_month=False):
+def add_netcdf_time(ds, mid_month=False):
     """
-    Decode time variable manually for RG-ARGO dataset.
-    original:
-    units : months since 2004-01-01 00:00:00
-    time_origin : 01-JAN-2004 00:00:00
-    axis : T
+    Add a standard netCDF time coordinate to the dataset.
+    Original:
+        'TIME' - axis T
+    New:
+        'time' - axis t
 
     Parameters
     ----------
@@ -46,12 +46,18 @@ def decode_times_manually(ds, mid_month=False):
     ds['time'].attrs['axis'] = 't'
 
 
-with xr.open_dataset("../datasets/RG_ArgoClim_Temperature_2019.nc", decode_times=False) as ds_temp:
-    decode_times_manually(ds_temp, mid_month=False)
-    display(ds_temp)
-    print(ds_temp.keys())
+if __name__ == "__main__":
 
-# with xr.open_dataset("../datasets/RG_ArgoClim_Salinity_2019.nc", decode_times=False) as ds_salt:
-#     decode_times_manually(ds_salt, mid_month=False)
-#     display(ds_salt)
-#     print(ds_salt.keys())
+    with xr.open_dataset(
+        "../datasets/RG_ArgoClim_Temperature_2019.nc", decode_times=False
+    ) as ds_temp:
+        add_netcdf_time(ds_temp, mid_month=False)
+        display(ds_temp)
+        print(ds_temp.keys())
+
+    with xr.open_dataset(
+        "../datasets/RG_ArgoClim_Salinity_2019.nc", decode_times=False
+    ) as ds_salt:
+        add_netcdf_time(ds_salt, mid_month=False)
+        display(ds_salt)
+        print(ds_salt.keys())
