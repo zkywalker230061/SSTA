@@ -13,7 +13,7 @@ import pandas as pd
 # import matplotlib.pyplot as plt
 
 
-def add_netcdf_time(ds, mid_month=False):
+def _time_standard(ds: xr.Dataset, mid_month: bool = False) -> xr.Dataset:
     """
     Add a standard netCDF time coordinate to the dataset.
     Original:
@@ -25,9 +25,15 @@ def add_netcdf_time(ds, mid_month=False):
     ----------
     ds: xarray.Dataset
         Input dataset with time variable to decode.
-    mid_month: bool, default True
+    mid_month: bool
+        Default is False.
         If True, set time to the middle of the month.
         If False, set time to the start of the month.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with new 'time' coordinate.
 
     Raises
     ------
@@ -44,20 +50,80 @@ def add_netcdf_time(ds, mid_month=False):
         raise ValueError("mid_month must be True or False.")
     ds['time'].attrs['calendar'] = '360_day'
     ds['time'].attrs['axis'] = 't'
+    return ds
+
+
+def _longitude_180(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Convert longitude from [0, 360] to [-180, 180].
+
+    Parameters
+    ----------
+    ds: xarray.Dataset
+        Input dataset with 'LONGITUDE' coordinate.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with 'LONGITUDE' in [-180, 180] and sorted.
+    """
+    lon_atrib = ds.coords['LONGITUDE'].attrs
+    ds['LONGITUDE'] = ((ds['LONGITUDE'] + 180) % 360) - 180
+    ds = ds.sortby(ds['LONGITUDE'])
+    ds['LONGITUDE'].attrs.update(lon_atrib)
+    ds['LONGITUDE'].attrs['modulo'] = 180
+    return ds
+
+
+def load_and_prepare_dataset(
+        filepath: str,
+        time_standard: bool = True,
+        longitude_180: bool = True,
+        mid_month: bool = False
+) -> xr.Dataset | None:
+    """
+    Load, standardize time, and convert longitude for RG-ARGO dataset.
+
+    Parameters
+    ----------
+    filepath: str
+        Path to the RG-ARGO netCDF file.
+    time_standard: bool
+        Default is True.
+        If True, standardize the time coordinate.
+    longitude_180: bool
+        Default is True.
+        If True, convert longitude to [-180, 180].
+    mid_month: bool
+        Default is False.
+        If True, set time to the middle of the month when standardizing.
+        If False, set time to the start of the month.
+
+    Returns
+    -------
+    xarray.Dataset or None
+        The processed dataset, or None if loading fails.
+    """
+    try:
+        with xr.open_dataset(filepath, decode_times=False) as ds:
+            if time_standard:
+                ds = _time_standard(ds, mid_month=mid_month)
+            if longitude_180:
+                ds = _longitude_180(ds)
+            return ds
+    except (OSError, ValueError, KeyError) as e:
+        print(f"Error loading {filepath}: {e}")
+        return None
 
 
 if __name__ == "__main__":
 
-    with xr.open_dataset(
-        "../datasets/RG_ArgoClim_Temperature_2019.nc", decode_times=False
-    ) as ds_temp:
-        add_netcdf_time(ds_temp, mid_month=False)
-        display(ds_temp)
-        print(ds_temp.keys())
+    ds_temp = load_and_prepare_dataset(
+        "../datasets/RG_ArgoClim_Temperature_2019.nc",
+    )
+    display(ds_temp)
 
-    with xr.open_dataset(
-        "../datasets/RG_ArgoClim_Salinity_2019.nc", decode_times=False
-    ) as ds_salt:
-        add_netcdf_time(ds_salt, mid_month=False)
-        display(ds_salt)
-        print(ds_salt.keys())
+    ds_salt = load_and_prepare_dataset(
+        "../datasets/RG_ArgoClim_Salinity_2019.nc",
+    )
+    display(ds_salt)
