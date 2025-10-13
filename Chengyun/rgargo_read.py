@@ -128,3 +128,10 @@ if __name__ == "__main__":
         "../datasets/RG_ArgoClim_Salinity_2019.nc",
     )
     display(ds_salt)
+
+    ds_202509 = load_and_prepare_dataset(
+        "../datasets/RG_ArgoClim_202509_2019.nc",
+    )
+    display(ds_202509)
+
+    display(dir(ds_temp))
