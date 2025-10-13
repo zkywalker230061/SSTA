@@ -19,7 +19,7 @@ def _time_standard(ds: xr.Dataset, mid_month: bool = False) -> xr.Dataset:
     Original:
         'TIME' - axis T
     New:
-        'time' - axis t
+        'time' - axis t, calendar 360_day
 
     Parameters
     ----------
@@ -77,9 +77,9 @@ def _longitude_180(ds: xr.Dataset) -> xr.Dataset:
 
 def load_and_prepare_dataset(
         filepath: str,
-        time_standard: bool = True,
-        longitude_180: bool = True,
-        mid_month: bool = False
+        time_standard: bool = False,
+        time_standard_mid_month: bool = False,
+        longitude_180: bool = True
 ) -> xr.Dataset | None:
     """
     Load, standardize time, and convert longitude for RG-ARGO dataset.
@@ -89,15 +89,14 @@ def load_and_prepare_dataset(
     filepath: str
         Path to the RG-ARGO netCDF file.
     time_standard: bool
-        Default is True.
+        Default is False.
         If True, standardize the time coordinate.
+    time_standard_mid_month: bool
+        Default is False.
+        If True, standardize the time coordinate to the middle of the month.
     longitude_180: bool
         Default is True.
         If True, convert longitude to [-180, 180].
-    mid_month: bool
-        Default is False.
-        If True, set time to the middle of the month when standardizing.
-        If False, set time to the start of the month.
 
     Returns
     -------
@@ -107,7 +106,9 @@ def load_and_prepare_dataset(
     try:
         with xr.open_dataset(filepath, decode_times=False) as ds:
             if time_standard:
-                ds = _time_standard(ds, mid_month=mid_month)
+                ds = _time_standard(ds)
+            if time_standard_mid_month:
+                ds = _time_standard(ds, mid_month=True)
             if longitude_180:
                 ds = _longitude_180(ds)
             return ds
