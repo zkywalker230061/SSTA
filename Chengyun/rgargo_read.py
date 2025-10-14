@@ -118,21 +118,32 @@ def load_and_prepare_dataset(
         return None
 
 
-if __name__ == "__main__":
+def main():
+    """main function for rgargo_read.py"""
 
     ds_temp = load_and_prepare_dataset(
         "../datasets/RG_ArgoClim_Temperature_2019.nc",
+        time_standard=True,
+        longitude_180=True
     )
     display(ds_temp)
 
-    ds_salt = load_and_prepare_dataset(
-        "../datasets/RG_ArgoClim_Salinity_2019.nc",
-    )
-    display(ds_salt)
+    # ds_salt = load_and_prepare_dataset(
+    #     "../datasets/RG_ArgoClim_Salinity_2019.nc",
+    #     time_standard=True,
+    #     longitude_180=True
+    # )
+    # display(ds_salt)
 
-    ds_202509 = load_and_prepare_dataset(
-        "../datasets/RG_ArgoClim_202509_2019.nc",
-    )
-    display(ds_202509)
+    # ds_202509 = load_and_prepare_dataset(
+    #     "../datasets/RG_ArgoClim_202509_2019.nc",
+    #     time_standard=True,
+    #     longitude_180=True
+    # )
+    # display(ds_202509)
 
     display(dir(ds_temp))
+
+
+if __name__ == "__main__":
+    main()
