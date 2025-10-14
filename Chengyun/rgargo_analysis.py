@@ -13,7 +13,7 @@ from IPython.display import display
 # import matplotlib.pyplot as plt
 # import cartopy.crs as ccrs
 
-from rgargo_read import load_and_prepare_dataset, visualise_dataset
+from rgargo_read import load_and_prepare_dataset, map_visualise_dataset
 
 
 def main():
@@ -27,12 +27,20 @@ def main():
     # meant_0: Mean Temperature for 15 years at surface
     meant_0 = ds_temp['ARGO_TEMPERATURE_MEAN'].isel(PRESSURE=0)
     # print(meant_0.min().item(), meant_0.max().item())
-    visualise_dataset(meant_0, vmin=-2, vmax=31)
+    map_visualise_dataset(meant_0, vmin=-2, vmax=31)
 
     # ta_0_2004jan: Temperature Anomaly at surface in 2004-01
     ta_0_2004jan = ds_temp['ARGO_TEMPERATURE_ANOMALY'].sel(TIME=0.5).isel(PRESSURE=0)
     # print(ta_0_2004jan.min().item(), ta_0_2004jan.max().item())
-    visualise_dataset(ta_0_2004jan, vmin=-8, vmax=8)
+    map_visualise_dataset(ta_0_2004jan, vmin=-8, vmax=8)
+
+    # ta_all_2024jan_e0n0: Temperature Anomaly at all depths in 2024-01 at (0°E, 0°N)
+    ta_all_2004jan_e0n0 = ds_temp['ARGO_TEMPERATURE_ANOMALY'].sel(TIME=0.5).sel(
+        LONGITUDE=0, LATITUDE=0, method='nearest'
+    )
+    display(ta_all_2004jan_e0n0)
+    # print(ta_all_2004jan_e0n0.min().item(), ta_all_2004jan_e0n0.max().item())
+    ta_all_2004jan_e0n0.plot(y='PRESSURE', yincrease=False)
 
 
 if __name__ == "__main__":
