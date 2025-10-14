@@ -13,7 +13,6 @@ import pandas as pd
 # import matplotlib.pyplot as plt
 
 # from rgargo_plot import map_visualise_dataset, point_visualise_dataset
-from rgargo_plot import visualise_dataset
 
 
 def _time_standard(ds: xr.Dataset, mid_month: bool = False) -> xr.Dataset:
@@ -124,6 +123,8 @@ def load_and_prepare_dataset(
 def main():
     """main function for rgargo_read.py"""
 
+    from rgargo_plot import visualise_dataset
+
     ds_temp = load_and_prepare_dataset(
         "../datasets/RG_ArgoClim_Temperature_2019.nc",
         time_standard=True,
@@ -165,6 +166,18 @@ def main():
     )
     # print(ta_all_2004jan_e0n0.min().item(), ta_all_2004jan_e0n0.max().item())
     visualise_dataset(ta_all_2004jan_e0n0)
+
+    # bathymetry
+    bathymetery = ds_temp['BATHYMETRY_MASK'].sel(
+        PRESSURE=0, method='nearest'
+    )
+    visualise_dataset(bathymetery)
+
+    # mapping
+    mapping = ds_temp['MAPPING_MASK'].sel(
+        PRESSURE=0, method='nearest'
+    )
+    visualise_dataset(mapping)
 
 
 if __name__ == "__main__":
