@@ -13,6 +13,13 @@ import pandas as pd
 # import matplotlib.pyplot as plt
 
 
+DEFAULT_PLOT_SETTINGS = {
+    'figsize': (10, 5),
+    'ylim': (-90, 90),
+    'cmap': 'RdBu_r',
+}
+
+
 def _time_standard(ds: xr.Dataset, mid_month: bool = False) -> xr.Dataset:
     """
     Add a standard netCDF time coordinate to the dataset.
@@ -118,6 +125,31 @@ def load_and_prepare_dataset(
         return None
 
 
+def visualise_dataset(
+    ds: xr.Dataset,
+    *args,
+    **kwargs
+) -> None:
+    """
+    Visualise the dataset.
+
+    Parameters
+    ----------
+    ds: xarray.Dataset
+        The dataset to visualise.
+    *args, **kwargs
+        Additional arguments for the plot method.
+    """
+    display(ds)
+    if ds['LONGITUDE'].attrs.get('modulo') == 180:
+        kwargs.setdefault('xlim', (-180, 180))
+    else:
+        pass
+    for key, value in DEFAULT_PLOT_SETTINGS.items():
+        kwargs.setdefault(key, value)
+    ds.plot(*args, **kwargs)
+
+
 def main():
     """main function for rgargo_read.py"""
 
@@ -142,7 +174,17 @@ def main():
     # )
     # display(ds_202509)
 
-    display(dir(ds_temp))
+    # display(dir(ds_temp))
+
+    # meant_0: Mean Temperature for 15 years at surface
+    meant_0 = ds_temp['ARGO_TEMPERATURE_MEAN'].isel(PRESSURE=0)
+    # print(meant_0.min().item(), meant_0.max().item())
+    visualise_dataset(meant_0, vmin=-2, vmax=31)
+
+    # ta_0_2004jan: Temperature Anomaly at surface in 2004-01
+    ta_0_2004jan = ds_temp['ARGO_TEMPERATURE_ANOMALY'].sel(TIME=0.5).isel(PRESSURE=0)
+    # print(ta_0_2004jan.min().item(), ta_0_2004jan.max().item())
+    visualise_dataset(ta_0_2004jan, vmin=-8, vmax=8)
 
 
 if __name__ == "__main__":
