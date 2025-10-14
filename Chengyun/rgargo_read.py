@@ -16,6 +16,7 @@ import pandas as pd
 def _time_standard(ds: xr.Dataset, mid_month: bool = False) -> xr.Dataset:
     """
     Add a standard netCDF time coordinate to the dataset.
+    Not finished becuase data not linked to this new time coordinate yet.
     Original:
         'TIME' - axis T
     New:
