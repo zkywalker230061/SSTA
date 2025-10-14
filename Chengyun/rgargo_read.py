@@ -148,12 +148,14 @@ def main():
     # display(dir(ds_temp))
 
     # meant_0: Mean Temperature for 15 years at surface
-    meant_0 = ds_temp['ARGO_TEMPERATURE_MEAN'].isel(PRESSURE=0)
+    meant_0 = ds_temp['ARGO_TEMPERATURE_MEAN'].sel(PRESSURE=0, method='nearest')
     # print(meant_0.min().item(), meant_0.max().item())
     visualise_dataset(meant_0, vmin=-2, vmax=31)
 
     # ta_0_2004jan: Temperature Anomaly at surface in 2004-01
-    ta_0_2004jan = ds_temp['ARGO_TEMPERATURE_ANOMALY'].sel(TIME=0.5).isel(PRESSURE=0)
+    ta_0_2004jan = ds_temp['ARGO_TEMPERATURE_ANOMALY'].sel(TIME=0.5).sel(
+        PRESSURE=0, method='nearest'
+    )
     # print(ta_0_2004jan.min().item(), ta_0_2004jan.max().item())
     visualise_dataset(ta_0_2004jan, vmin=-8, vmax=8)
 

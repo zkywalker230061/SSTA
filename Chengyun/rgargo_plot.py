@@ -114,6 +114,9 @@ def visualise_dataset(
     elif ds['PRESSURE'].size != 1 and ds['LONGITUDE'].size == 1 and ds['LATITUDE'].size == 1:
         point_visualise_dataset(ds, *args, **kwargs)
     else:
+        with open("_Kal'tsit.txt", encoding="utf-8") as kaltsit:
+            print(kaltsit.read())
+            print("Something is wrong, but now you have Kal'tsit.")
         raise TypeError(
             "Dataset must be at a single pressure level for map visualisation or "
             "at a single point for point visualisation."
