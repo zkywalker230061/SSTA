@@ -13,8 +13,7 @@ from IPython.display import display
 # import matplotlib.pyplot as plt
 # import cartopy.crs as ccrs
 
-from read import load_and_prepare_dataset
-
+from Xizhe.read_chengyun import load_and_prepare_dataset
 
 if __name__ == "__main__":
 
