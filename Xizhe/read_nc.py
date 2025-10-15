@@ -33,7 +33,7 @@ def fix_rg_time(ds, mode="datetime"):
     return ds
 
 
-#Read the datasets
+#---------Read the datasets-----------------------------------------------------
 ds_temp = xr.open_dataset(
     "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc",
     engine="netcdf4",
@@ -48,19 +48,18 @@ ds_sal = xr.open_dataset(
     mask_and_scale=True,
 )
 
-# fix TIME axis manually
 ds_temp = fix_rg_time(ds_temp)
 ds_sal = fix_rg_time(ds_sal)
 
 
 #----------------------For Checking---------------------------------#
 #print(ds_sal)
-#print(ds_temp)
+print(ds_temp)
 
-print(ds_temp.PRESSURE)
+#print(ds_temp.PRESSURE)
 
 #print('salinity \n',ds_sal.ARGO_SALINITY_MEAN)
-#print('temperature \n', ds_temp.ARGO_TEMPERATURE_MEAN)
+print('temperature \n', ds_temp.ARGO_TEMPERATURE_MEAN)
 
 #print(ds_temp.TIME.dtype)
 #print(ds_temp.TIME[:200])
