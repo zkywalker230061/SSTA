@@ -11,7 +11,7 @@ T_VAR = "ARGO_TEMPERATURE_MEAN"
 S_VAR = "ARGO_SALINITY_MEAN"
 T_VAR_ANOMALY = "ARGO_TEMPERATURE_ANOMALY"
 
-def z_to_xaray(z,
+def z_to_xarray(z,
                T: xr.DataArray,
                zdim: str = ZDIM,
                ydim: str = YDIM,
@@ -69,13 +69,13 @@ def vertical_integral(
     z_next = z_sorted.shift({zdim: -1})
 
     # Get the boundaries of each segment
-    segment_top = xr.ufuncs.maximum(z_sorted, z_next)
-    segment_bottom = xr.ufuncs.minimum(z_sorted, z_next)
+    segment_top = np.maximum(z_sorted, z_next)
+    segment_bottom = np.minimum(z_sorted, z_next)
 
     # Clip data to the integration limits
     z_high = xr.zeros_like(segment_top) + top
     z_low = xr.zeros_like(segment_bottom) + bottom
-    overlap = (xr.ufuncs.minimum(segment_top, z_high) - xr.ufuncs.maximum(segment_bottom, z_low)).clip(0)
+    overlap = (np.minimum(segment_top, z_high) - np.maximum(segment_bottom, z_low)).clip(0)
 
     # Compute the trapezoidal area of each segment
     segment_area = 0.5 * (T_sorted + T_next) * overlap
