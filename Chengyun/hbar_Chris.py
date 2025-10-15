@@ -59,7 +59,9 @@ hbar_ds = hbar_all_months_dataset['MLD_PRESSURE']
 hbar_ds['LATITUDE'].attrs = ds['LATITUDE'].attrs
 hbar_ds['LONGITUDE'].attrs = ds['LONGITUDE'].attrs
 hbar_ds.attrs['units'] = 'dbar'
-hbar_ds.attrs['long_name'] = 'Mixed Layer Depth Pressure Jan 2004 - Dec 2018 (15.0 year)'
-hbar_ds.name = 'MLD_PRESSURE'
+hbar_ds.attrs['long_name'] = (
+    'Monthly Mean Mixed Layer Depth Pressure Jan 2004 - Dec 2018 (15.0 year)'
+)
+hbar_ds.name = 'MONTHLY_MEAN_MLD_PRESSURE'
 display(hbar_ds)
-hbar_ds.to_netcdf("../datasets/Mixed_Layer_Depth_Pressure.nc")
+hbar_ds.to_netcdf("../datasets/Mixed_Layer_Depth_Pressure_Monthly_Mean.nc")
