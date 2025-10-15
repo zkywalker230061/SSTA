@@ -4,22 +4,21 @@ import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 
-TEMP_DATA_PATH = "RG_ArgoClim_Temperature_2019.nc"
+TEMP_DATA_PATH = "Temperature_Monthly_Mean.nc"
 
 ds = xr.open_dataset(TEMP_DATA_PATH, decode_times=False)
-ds = ds.sel(TIME=0.5)
+ds = ds.sel(MONTH=9)
 print(ds)
 print(type(ds))
 
 
 def find_half_depth(temp_profile, pressure):
-    sst = temp_profile[0]
-    mld_t = sst - 1
+    sst = temp_profile[0]   # temperature at surface == first reading
+    mld_t = sst - 1         # temperature at mixed layer depth
 
     # find where temperature falls below mld_t
     temperatures_below_mld = np.where(temp_profile <= mld_t)[0]
-    if len(temperatures_below_mld) == 0:        # edgecase: never reach MLD. but this should be impossible
-        #print("never reached MLD. impossible?")
+    if len(temperatures_below_mld) == 0:        # indicates a continent
         return np.nan
     below_mld_index = temperatures_below_mld[0]
     if below_mld_index == 0:
@@ -33,7 +32,7 @@ def find_half_depth(temp_profile, pressure):
 # Apply this function along the depth dimension
 mld_pressure = xr.apply_ufunc(
     find_half_depth,
-    ds['ARGO_TEMPERATURE_ANOMALY'],
+    ds['MONTHLY_MEAN_TEMPERATURE'],
     ds['PRESSURE'],
     input_core_dims=[['PRESSURE'], ['PRESSURE']],
     vectorize=True,
@@ -43,5 +42,7 @@ mld_pressure = xr.apply_ufunc(
 
 ds['MLD_PRESSURE'] = mld_pressure
 
-ds['MLD_PRESSURE'].plot(x='LONGITUDE', y='LATITUDE')
+ds['MLD_PRESSURE'] = ds['MLD_PRESSURE'].where(ds['MLD_PRESSURE'] <= 500, 500)
+
+ds['MLD_PRESSURE'].plot(x='LONGITUDE', y='LATITUDE', cmap='Blues')
 plt.show()
