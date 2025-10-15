@@ -1,5 +1,5 @@
 """
-Read RG-ARGO datasets.
+Read RG-ARGO data file.
 
 Chengyun Zhu
 2025-10-10
@@ -12,13 +12,10 @@ import pandas as pd
 # import numpy as np
 # import matplotlib.pyplot as plt
 
-# from rgargo_plot import map_visualise_dataset, point_visualise_dataset
-
 
 def _time_standard(ds: xr.Dataset, mid_month: bool = False) -> xr.Dataset:
     """
     Add a standard netCDF time coordinate to the dataset.
-    Not finished becuase data not linked to this new time coordinate yet.
     Original:
         'TIME' - axis T
     New:
@@ -83,7 +80,7 @@ def load_and_prepare_dataset(
         time_standard: bool = False,
         time_standard_mid_month: bool = False,
         longitude_180: bool = True
-) -> xr.Dataset | None:
+):
     """
     Load, standardize time, and convert longitude for RG-ARGO dataset.
 
@@ -120,65 +117,21 @@ def load_and_prepare_dataset(
         return None
 
 
-def main():
-    """main function for rgargo_read.py"""
-
-    from rgargo_plot import visualise_dataset
+if __name__ == "__main__":
 
     ds_temp = load_and_prepare_dataset(
         "../datasets/RG_ArgoClim_Temperature_2019.nc",
-        time_standard=True,
-        longitude_180=True
     )
     display(ds_temp)
 
-    # ds_salt = load_and_prepare_dataset(
-    #     "../datasets/RG_ArgoClim_Salinity_2019.nc",
-    #     time_standard=True,
-    #     longitude_180=True
-    # )
-    # display(ds_salt)
-
-    # ds_202509 = load_and_prepare_dataset(
-    #     "../datasets/RG_ArgoClim_202509_2019.nc",
-    #     time_standard=True,
-    #     longitude_180=True
-    # )
-    # display(ds_202509)
-
-    # display(dir(ds_temp))
-
-    # meant_0: Mean Temperature for 15 years at surface
-    meant_0 = ds_temp['ARGO_TEMPERATURE_MEAN'].sel(PRESSURE=0, method='nearest')
-    # print(meant_0.min().item(), meant_0.max().item())
-    visualise_dataset(meant_0, vmin=-2, vmax=31)
-
-    # ta_0_2004jan: Temperature Anomaly at surface in 2004-01
-    ta_0_2004jan = ds_temp['ARGO_TEMPERATURE_ANOMALY'].sel(TIME=0.5).sel(
-        PRESSURE=0, method='nearest'
+    ds_salt = load_and_prepare_dataset(
+        "../datasets/RG_ArgoClim_Salinity_2019.nc",
     )
-    # print(ta_0_2004jan.min().item(), ta_0_2004jan.max().item())
-    visualise_dataset(ta_0_2004jan, vmin=-8, vmax=8)
+    display(ds_salt)
 
-    # ta_all_2024jan_e0n0: Temperature Anomaly at all depths in 2024-01 at (0°E, 0°N)
-    ta_all_2004jan_e0n0 = ds_temp['ARGO_TEMPERATURE_ANOMALY'].sel(TIME=0.5).sel(
-        LONGITUDE=0, LATITUDE=0, method='nearest'
+    ds_202509 = load_and_prepare_dataset(
+        "../datasets/RG_ArgoClim_202509_2019.nc",
     )
-    # print(ta_all_2004jan_e0n0.min().item(), ta_all_2004jan_e0n0.max().item())
-    visualise_dataset(ta_all_2004jan_e0n0)
+    display(ds_202509)
 
-    # bathymetry
-    bathymetery = ds_temp['BATHYMETRY_MASK'].sel(
-        PRESSURE=0, method='nearest'
-    )
-    visualise_dataset(bathymetery)
-
-    # mapping
-    mapping = ds_temp['MAPPING_MASK'].sel(
-        PRESSURE=0, method='nearest'
-    )
-    visualise_dataset(mapping)
-
-
-if __name__ == "__main__":
-    main()
+    display(dir(ds_temp))

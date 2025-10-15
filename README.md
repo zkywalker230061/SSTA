@@ -3,7 +3,7 @@ Sea Surface Temperature Anomalies - slab mixed layer model
 
 MSci Project - Imperial College London, SPC-Czaja-1
 
-### Authors: Chengyun Zhu and Christopher O'Sullivan
+### Authors: Chengyun Zhu, Christopher O'Sullivan, Jason Yiya, Xizhe Xie
 
 Shield: [![CC BY-NC-SA 4.0][cc-by-nc-sa-shield]][cc-by-nc-sa]
 
@@ -17,4 +17,4 @@ This work is licensed under a
 [cc-by-nc-sa-shield]: https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg
 
 
-[//]: #![image](.readme_archive/sml.png)
+![image](.readme_archive/sml.png)
