@@ -61,7 +61,7 @@ def get_monthly_mean(
     monthly_mean_da['MONTH'].attrs['axis'] = 'M'
     monthly_mean_da.attrs['units'] = da.attrs.get('units')
     monthly_mean_da.attrs['long_name'] = f"Monthly Mean of {da.attrs.get('long_name')}"
-    monthly_mean_da.name = f"Monthly Mean of {da.name}"
+    monthly_mean_da.name = f"MONTHLY_MEAN_{da.name}"
     return monthly_mean_da
 
 
@@ -100,7 +100,7 @@ def save_monthly_mean_temperature():
 
     ta_monthly_mean = load_and_prepare_dataset(
         "../datasets/ARGO_TEMPERATURE_ANOMALY_Monthly_Mean.nc",
-    )['Monthly Mean of ARGO_TEMPERATURE_ANOMALY']
+    )['MONTHLY_MEAN_ARGO_TEMPERATURE_ANOMALY']
     # display(ta_monthly_mean)
     # visualise_dataset(
     #     ta_monthly_mean.sel(PRESSURE=0, MONTH=1, method='nearest')
@@ -121,7 +121,7 @@ def save_monthly_mean_temperature():
     t_monthly_mean.attrs['long_name'] = (
         "Monthly Mean of Temperature Jan 2004 - Dec 2018 (15.0 year)"
     )
-    t_monthly_mean.name = "Monthly Mean of Temperature"
+    t_monthly_mean.name = "MONTHLY_MEAN_TEMPERATURE"
     # display(t_monthly_mean)
     # visualise_dataset(
     #     t_monthly_mean.sel(PRESSURE=0, MONTH=1, method='nearest')
@@ -137,7 +137,7 @@ def save_monthly_mean_salinity():
 
     sa_monthly_mean = load_and_prepare_dataset(
         "../datasets/ARGO_SALINITY_ANOMALY_Monthly_Mean.nc",
-    )['Monthly Mean of ARGO_SALINITY_ANOMALY']
+    )['MONTHLY_MEAN_ARGO_SALINITY_ANOMALY']
     # display(sa_monthly_mean)
     # visualise_dataset(
     #     sa_monthly_mean.sel(PRESSURE=0, MONTH=1, method='nearest')
@@ -158,7 +158,7 @@ def save_monthly_mean_salinity():
     s_monthly_mean.attrs['long_name'] = (
         "Monthly Mean of Salinity Jan 2004 - Dec 2018 (15.0 year)"
     )
-    s_monthly_mean.name = "Monthly Mean of Salinity"
+    s_monthly_mean.name = "MONTHLY_MEAN_SALINITY"
     # display(s_monthly_mean)
     # visualise_dataset(
     #     s_monthly_mean.sel(PRESSURE=0, MONTH=1, method='nearest')

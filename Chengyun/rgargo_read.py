@@ -183,7 +183,7 @@ def main():
         "../datasets/Temperature_Monthly_Mean.nc"
     )
     visualise_dataset(
-        t_monthly_mean['Monthly Mean of Temperature'].sel(PRESSURE=0, MONTH=1, method='nearest')
+        t_monthly_mean['MONTHLY_MEAN_TEMPERATURE'].sel(PRESSURE=0, MONTH=1, method='nearest')
     )
 
 
