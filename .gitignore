@@ -210,5 +210,8 @@ __marimo__/
 #vscode settings
 .vscode/
 
+# MacOS
+.DS_Store
+
 # large datasets
 datasets/
