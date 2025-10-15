@@ -48,7 +48,7 @@ def z_to_xarray(z,
 def vertical_integral(
     T: xr.DataArray,
     z,
-    top: float = 2.5,
+    top: float = 0.0,
     bottom: float = -h_meters,
     normalise: str = "available",
     zdim: str = ZDIM,
