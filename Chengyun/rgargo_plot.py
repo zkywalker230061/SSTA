@@ -98,6 +98,12 @@ def map_visualise_dataset(
             + f" Pressure = {ds['PRESSURE'].item()} dbar, "
             + f"time = {ds['TIME'].item()} months since 2004-01-01"
         )
+    elif 'MONTH' in ds.coords:
+        plt.title(
+            f"{ds.name}: "
+            + f" Pressure = {ds['PRESSURE'].item()} dbar, "
+            + f"month = {ds['MONTH'].item()}"
+        )
     else:
         plt.title(f"{ds.name}: Pressure = {ds['PRESSURE'].item()} dbar")
 
