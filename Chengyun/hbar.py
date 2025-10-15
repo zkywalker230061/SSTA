@@ -10,7 +10,7 @@ from IPython.display import display
 import xarray as xr
 
 from rgargo_read import load_and_prepare_dataset
-from rgargo_plot import visualise_dataset
+# from rgargo_plot import visualise_dataset
 
 HBAR_TDIFF = 1
 
