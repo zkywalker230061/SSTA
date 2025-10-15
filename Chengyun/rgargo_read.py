@@ -179,6 +179,13 @@ def main():
     )
     visualise_dataset(mapping)
 
+    t_monthly_mean = load_and_prepare_dataset(
+        "../datasets/Temperature_Monthly_Mean.nc"
+    )
+    visualise_dataset(
+        t_monthly_mean['MONTHLY_MEAN_TEMPERATURE'].sel(PRESSURE=0, MONTH=1, method='nearest')
+    )
+
 
 if __name__ == "__main__":
     main()
