@@ -172,7 +172,7 @@ def main():
         cmap='Blues',
         vmin=0, vmax=MAX_DEPTH
     )
-    h.to_netcdf("../datasets/Mixed_Layer_Depth_Pressure (2004-2018).nc")
+    # h.to_netcdf("../datasets/Mixed_Layer_Depth_Pressure (2004-2018).nc")
 
     # check
     m, lon, lat = 1, -47, 56
