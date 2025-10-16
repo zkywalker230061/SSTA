@@ -103,55 +103,55 @@ def _full_field(mean_data: xr.DataArray, anom_data: xr.DataArray, time=None) -> 
 
 
 
-def mean_temperature_Tm(ds_temp: xr.Dataset, h_m: float = H_M, time=None) -> xr.DataArray:
-    """
-    Mixed-layer mean temperature (0–h_m m) using true meters from TEOS-10.
-    Returns (LATITUDE, LONGITUDE) if 'time' given; else (TIME, LATITUDE, LONGITUDE).
-    """
-    T_mean = ds_temp["ARGO_TEMPERATURE_MEAN"]          # (P, Y, X)
-    T_anom = ds_temp["ARGO_TEMPERATURE_ANOMALY"]       # (T, P, Y, X)
-    T_full = _full_field(T_mean, T_anom, time=time)         # (T?, P, Y, X)
+# def mean_temperature_Tm(ds_temp: xr.Dataset, h_m: float = H_M, time=None) -> xr.DataArray:
+#     """
+#     Mixed-layer mean temperature (0–h_m m) using true meters from TEOS-10.
+#     Returns (LATITUDE, LONGITUDE) if 'time' given; else (TIME, LATITUDE, LONGITUDE).
+#     """
+#     T_mean = ds_temp["ARGO_TEMPERATURE_MEAN"]          # (P, Y, X)
+#     T_anom = ds_temp["ARGO_TEMPERATURE_ANOMALY"]       # (T, P, Y, X)
+#     T_full = _full_field(T_mean, T_anom, time=time)         # (T?, P, Y, X)
 
-    z = depth_from_pressure(ds_temp["PRESSURE"], ds_temp["LATITUDE"])  # (LATITUDE, PRESSURE)
-    Tm = vertical_integral(
-        V=T_full,
-        z_mid=z,
-        top=0.0,
-        bottom=float(h_m),
-        zdim="PRESSURE",
-        normalise="available",
-        min_cover=0.25 * float(h_m),   # require at least 25% coverage; tweak if you prefer
-        out_name=f"T_mean_0to{int(h_m)}m",
-    )
-    Tm.attrs.setdefault("units", T_mean.attrs.get("units", "degC"))
-    Tm.attrs["note"] = "Mean of (ARGO_TEMPERATURE_MEAN + ANOMALY) over 0–h using TEOS-10 depths"
-    return Tm
+#     z = depth_from_pressure(ds_temp["PRESSURE"], ds_temp["LATITUDE"])  # (LATITUDE, PRESSURE)
+#     Tm = vertical_integral(
+#         V=T_full,
+#         z_mid=z,
+#         top=0.0,
+#         bottom=float(h_m),
+#         zdim="PRESSURE",
+#         normalise="available",
+#         min_cover=0.25 * float(h_m),   # require at least 25% coverage; tweak if you prefer
+#         out_name=f"T_mean_0to{int(h_m)}m",
+#     )
+#     Tm.attrs.setdefault("units", T_mean.attrs.get("units", "degC"))
+#     Tm.attrs["note"] = "Mean of (ARGO_TEMPERATURE_MEAN + ANOMALY) over 0–h using TEOS-10 depths"
+#     return Tm
 
 
-def mean_salinity_Ts(ds_sal: xr.Dataset, h_m: float = H_M, time=None) -> xr.DataArray:
-    """
-    Mixed-layer mean salinity (0–h_m m) using true meters from TEOS-10.
-    Returns (LATITUDE, LONGITUDE) if 'time' given; else (TIME, LATITUDE, LONGITUDE).
-    """
-    S_mean = ds_sal["ARGO_SALINITY_MEAN"]              # (P, Y, X)
-    S_anom = ds_sal["ARGO_SALINITY_ANOMALY"]           # (T, P, Y, X)
-    S_full = _full_field(S_mean, S_anom, time=time)         # (T?, P, Y, X)
+# def mean_salinity_Ts(ds_sal: xr.Dataset, h_m: float = H_M, time=None) -> xr.DataArray:
+#     """
+#     Mixed-layer mean salinity (0–h_m m) using true meters from TEOS-10.
+#     Returns (LATITUDE, LONGITUDE) if 'time' given; else (TIME, LATITUDE, LONGITUDE).
+#     """
+#     S_mean = ds_sal["ARGO_SALINITY_MEAN"]              # (P, Y, X)
+#     S_anom = ds_sal["ARGO_SALINITY_ANOMALY"]           # (T, P, Y, X)
+#     S_full = _full_field(S_mean, S_anom, time=time)         # (T?, P, Y, X)
 
-    z = depth_from_pressure(ds_temp["PRESSURE"], ds_temp["LATITUDE"])  # (LATITUDE, PRESSURE)
+#     z = depth_from_pressure(ds_temp["PRESSURE"], ds_temp["LATITUDE"])  # (LATITUDE, PRESSURE)
 
-    Sm = vertical_integral(
-        V=S_full,
-        z_mid=z,
-        top=0.0,
-        bottom=float(h_m),
-        zdim="PRESSURE",
-        normalise="available",
-        min_cover=0.25 * float(h_m),
-        out_name=f"S_mean_0to{int(h_m)}m",
-    )
-    Sm.attrs.setdefault("units", S_mean.attrs.get("units", "psu"))
-    Sm.attrs["note"] = "Mean of (ARGO_SALINITY_MEAN + ANOMALY) over 0–h using TEOS-10 depths"
-    return Sm
+#     Sm = vertical_integral(
+#         V=S_full,
+#         z_mid=z,
+#         top=0.0,
+#         bottom=float(h_m),
+#         zdim="PRESSURE",
+#         normalise="available",
+#         min_cover=0.25 * float(h_m),
+#         out_name=f"S_mean_0to{int(h_m)}m",
+#     )
+#     Sm.attrs.setdefault("units", S_mean.attrs.get("units", "psu"))
+#     Sm.attrs["note"] = "Mean of (ARGO_SALINITY_MEAN + ANOMALY) over 0–h using TEOS-10 depths"
+#     return Sm
 
 
 
@@ -194,13 +194,13 @@ def mean_salinity_Ts(ds_sal: xr.Dataset, h_m: float = H_M, time=None) -> xr.Data
 
 
 
+if __name__ == "__main__":
+    p = ds_temp['PRESSURE']
+    lat = ds_temp['LATITUDE']
 
-p = ds_temp['PRESSURE']
-lat = ds_temp['LATITUDE']
+    depth = depth_from_pressure(p,lat)
 
-depth = depth_from_pressure(p,lat)
-
-print(depth)
-print(len(depth))
-print(depth.shape)
-print(len(depth[0]))
+    print(depth)
+    print(len(depth))
+    print(depth.shape)
+    print(len(depth[0]))
