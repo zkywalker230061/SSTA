@@ -166,7 +166,7 @@ def main():
         cmap='Blues',
         vmin=0, vmax=MAX_DEPTH
     )
-    hbar.to_netcdf("../datasets/Mixed_Layer_Depth_Pressure_Monthly_Mean.nc")
+    # hbar.to_netcdf("../datasets/Mixed_Layer_Depth_Pressure_Monthly_Mean.nc")
 
     # check
     m, lon, lat = 1, -47, 56
