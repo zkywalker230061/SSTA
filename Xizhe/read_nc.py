@@ -53,13 +53,13 @@ ds_sal = fix_rg_time(ds_sal)
 
 
 #----------------------For Checking---------------------------------#
-#print(ds_sal)
-print(ds_temp)
+print(ds_sal)
+#print(ds_temp)
 
 #print(ds_temp.PRESSURE)
 
-#print('salinity \n',ds_sal.ARGO_SALINITY_MEAN)
-print('temperature \n', ds_temp.ARGO_TEMPERATURE_MEAN)
+print('salinity \n',ds_sal.ARGO_SALINITY_MEAN)
+#print('temperature \n', ds_temp.ARGO_TEMPERATURE_MEAN)
 
 #print(ds_temp.TIME.dtype)
 #print(ds_temp.TIME[:200])
