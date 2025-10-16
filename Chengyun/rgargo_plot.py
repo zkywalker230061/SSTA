@@ -144,7 +144,10 @@ def visualise_dataset(
     TypeError
         If the dataset is not for map visualisation or point visualisation.
     """
-    if ds['PRESSURE'].size == 1 and ds['LONGITUDE'].size != 1 and ds['LATITUDE'].size != 1:
+    if 'PRESSURE' not in ds.coords:
+        map_visualise_dataset(ds, **kwargs)
+
+    elif ds['PRESSURE'].size == 1 and ds['LONGITUDE'].size != 1 and ds['LATITUDE'].size != 1:
         map_visualise_dataset(ds, **kwargs)
     elif ds['PRESSURE'].size != 1 and ds['LONGITUDE'].size == 1 and ds['LATITUDE'].size == 1:
         point_visualise_dataset(ds, **kwargs)
