@@ -4,13 +4,16 @@ import re
 
 def fix_rg_time(ds, mode="datetime"):
     """
+    mode = 'NONE'.  -> TIME keep its original form for exporting files. 
     mode='datetime' -> TIME as numpy datetime64[ns] (recommended)
     mode='period'   -> TIME as pandas PeriodIndex (monthly)
     mode='int'      -> TIME as integer months since reference (0..179)
     """
     if "TIME" not in ds.coords:
         return ds
-
+    if mode == "NONE":
+        return ds
+    
     units = ds.TIME.attrs.get("units", "")
     m = re.match(r"months\s+since\s+(\d{4}-\d{2}-\d{2})", units, re.I)
     if not m:
@@ -34,15 +37,19 @@ def fix_rg_time(ds, mode="datetime"):
 
 
 #---------Read the datasets-----------------------------------------------------
+temp_file_path = "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
+salinity_file_path = "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Salinity_2019.nc"
+file_path = ''
+
 ds_temp = xr.open_dataset(
-    "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc",
+    temp_file_path,
     engine="netcdf4",
     decode_times=False,   # disable decoding to avoid error
     mask_and_scale=True,
 )
 
 ds_sal = xr.open_dataset(
-    "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Salinity_2019.nc",
+    salinity_file_path,
     engine="netcdf4",
     decode_times=False,
     mask_and_scale=True,
@@ -53,13 +60,15 @@ ds_sal = fix_rg_time(ds_sal)
 
 
 #----------------------For Checking---------------------------------#
-print(ds_sal)
+#print(ds_sal)
 #print(ds_temp)
 
 #print(ds_temp.PRESSURE)
 
-print('salinity \n',ds_sal.ARGO_SALINITY_MEAN)
+#print('salinity \n',ds_sal.ARGO_SALINITY_MEAN)
 #print('temperature \n', ds_temp.ARGO_TEMPERATURE_MEAN)
 
 #print(ds_temp.TIME.dtype)
 #print(ds_temp.TIME[:200])
+
+
