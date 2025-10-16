@@ -182,9 +182,30 @@ def main():
     t_monthly_mean = load_and_prepare_dataset(
         "../datasets/Temperature_Monthly_Mean.nc"
     )
-    visualise_dataset(
-        t_monthly_mean['MONTHLY_MEAN_TEMPERATURE'].sel(PRESSURE=0, MONTH=1, method='nearest')
+    # visualise_dataset(
+    #     t_monthly_mean['MONTHLY_MEAN_TEMPERATURE'].sel(PRESSURE=0, MONTH=1, method='nearest')
+    # )
+
+    hbar = load_and_prepare_dataset(
+        "../datasets/Mixed_Layer_Depth_Pressure_Monthly_Mean.nc"
     )
+    display(hbar)
+    visualise_dataset(
+        hbar['MONTHLY_MEAN_MLD_PRESSURE'].sel(MONTH=1, method='nearest'),
+        cmap='Blues',
+        vmin=0, vmax=500
+    )
+
+    check = {
+        'MONTH': 1,
+        'LONGITUDE': -47,
+        'LATITUDE': 56,
+        'method': 'nearest'
+    }
+    visualise_dataset(
+        t_monthly_mean['MONTHLY_MEAN_TEMPERATURE'].sel(**check)
+    )
+    print(hbar['MONTHLY_MEAN_MLD_PRESSURE'].sel(**check).item())
 
 
 if __name__ == "__main__":
