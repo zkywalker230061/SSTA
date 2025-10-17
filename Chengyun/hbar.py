@@ -13,7 +13,7 @@ import numpy as np
 from rgargo_read import load_and_prepare_dataset
 from rgargo_plot import visualise_dataset
 
-HBAR_TDIFF = 0.8
+HBAR_TDIFF = 0.2
 MAX_DEPTH = float(500)  # 1000
 
 
@@ -46,59 +46,41 @@ def find_half_depth(temp_profile, pressure):
     if np.isnan(t_0):
         return -np.inf
 
-    # t_mld_min = t_0 - HBAR_TDIFF
-    # t_mld_max = t_0 + HBAR_TDIFF
-    # pressures_below_t_0 = np.where(temp_profile <= t_mld_min)[0]
-    # pressures_above_t_0 = np.where(temp_profile >= t_mld_max)[0]
+    t_mld_min = t_0 - HBAR_TDIFF
+    t_mld_max = t_0 + HBAR_TDIFF
+    pressures_below_t_0 = np.where(temp_profile <= t_mld_min)[0]
+    pressures_above_t_0 = np.where(temp_profile >= t_mld_max)[0]
 
-    # def return_t_max():
-    #     temperature_max = np.where(temp_profile == np.nanmax(temp_profile))[0]
-    #     mld_t_max = pressure[temperature_max[0]]
-    #     if mld_t_max <= MAX_DEPTH:
-    #         return mld_t_max
-    #     return MAX_DEPTH
-
-    # # only t above t_mld_max
-    # if len(pressures_below_t_0) == 0 and len(pressures_above_t_0) != 0:
-    #     above_mld_index = pressures_above_t_0[0]
-    #     below_mld_index = above_mld_index - 1
-    #     t_mld = t_mld_max
-    # # only t below t_mld_min
-    # elif len(pressures_below_t_0) != 0 and len(pressures_above_t_0) == 0:
-    #     below_mld_index = pressures_below_t_0[0]
-    #     above_mld_index = below_mld_index - 1
-    #     t_mld = t_mld_min
-    # # both found, check which is closer to surface
-    # elif len(pressures_below_t_0) != 0 and len(pressures_above_t_0) != 0:
-    #     if pressures_above_t_0[0] < pressures_below_t_0[0]:
-    #         above_mld_index = pressures_above_t_0[0]
-    #         below_mld_index = above_mld_index - 1
-    #         t_mld = t_mld_max
-    #     else:
-    #         below_mld_index = pressures_below_t_0[0]
-    #         above_mld_index = below_mld_index - 1
-    #         t_mld = t_mld_min
-    # # neither found, return depth of max temperature
-    # else:
-    #     return return_t_max()
-
-    # mld = np.interp(
-    #     t_mld,
-    #     [temp_profile[above_mld_index], temp_profile[below_mld_index]],
-    #     [pressure[above_mld_index], pressure[below_mld_index]]
-    # )
-    # if mld <= MAX_DEPTH:
-    #     return mld
-    # return MAX_DEPTH
-
-    t_mld = t_0 - HBAR_TDIFF
-    pressures_below_t_0 = np.where(temp_profile <= t_mld)[0]
-
-    if len(pressures_below_t_0) == 0:
+    def return_t_max():
+        temperature_max = np.where(temp_profile == np.nanmax(temp_profile))[0]
+        mld_t_max = pressure[temperature_max[0]]
+        if mld_t_max <= MAX_DEPTH:
+            return mld_t_max
         return MAX_DEPTH
 
-    below_mld_index = pressures_below_t_0[0]
-    above_mld_index = below_mld_index - 1
+    # only t above t_mld_max
+    if len(pressures_below_t_0) == 0 and len(pressures_above_t_0) != 0:
+        above_mld_index = pressures_above_t_0[0]
+        below_mld_index = above_mld_index - 1
+        t_mld = t_mld_max
+    # only t below t_mld_min
+    elif len(pressures_below_t_0) != 0 and len(pressures_above_t_0) == 0:
+        below_mld_index = pressures_below_t_0[0]
+        above_mld_index = below_mld_index - 1
+        t_mld = t_mld_min
+    # both found, check which is closer to surface
+    elif len(pressures_below_t_0) != 0 and len(pressures_above_t_0) != 0:
+        if pressures_above_t_0[0] < pressures_below_t_0[0]:
+            above_mld_index = pressures_above_t_0[0]
+            below_mld_index = above_mld_index - 1
+            t_mld = t_mld_max
+        else:
+            below_mld_index = pressures_below_t_0[0]
+            above_mld_index = below_mld_index - 1
+            t_mld = t_mld_min
+    # neither found, return depth of max temperature
+    else:
+        return return_t_max()
 
     mld = np.interp(
         t_mld,
@@ -108,6 +90,24 @@ def find_half_depth(temp_profile, pressure):
     if mld <= MAX_DEPTH:
         return mld
     return MAX_DEPTH
+
+    # t_mld = t_0 - HBAR_TDIFF
+    # pressures_below_t_0 = np.where(temp_profile <= t_mld)[0]
+
+    # if len(pressures_below_t_0) == 0:
+    #     return MAX_DEPTH
+
+    # below_mld_index = pressures_below_t_0[0]
+    # above_mld_index = below_mld_index - 1
+
+    # mld = np.interp(
+    #     t_mld,
+    #     [temp_profile[above_mld_index], temp_profile[below_mld_index]],
+    #     [pressure[above_mld_index], pressure[below_mld_index]]
+    # )
+    # if mld <= MAX_DEPTH:
+    #     return mld
+    # return MAX_DEPTH
 
 
 def get_monthly_mld(
@@ -168,7 +168,7 @@ def main():
     hbar.name = 'MONTHLY_MEAN_MLD_PRESSURE'
     # display(hbar)
     visualise_dataset(
-        hbar.sel(MONTH=1, method='nearest'),
+        hbar.sel(MONTH=9, method='nearest'),
         cmap='Blues',
         vmin=0, vmax=MAX_DEPTH
     )
