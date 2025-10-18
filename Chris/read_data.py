@@ -4,7 +4,7 @@ import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 
-TEMP_DATA_PATH = "RG_ArgoClim_Temperature_2019.nc"
+TEMP_DATA_PATH = "../datasets/RG_ArgoClim_Temperature_2019.nc"
 
 dataset = xr.open_dataset(TEMP_DATA_PATH, decode_times=False)
 print(dataset)
