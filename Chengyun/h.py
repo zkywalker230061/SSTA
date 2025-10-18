@@ -99,7 +99,6 @@ def find_surface_density_anomaly_mean(ds: xr.Dataset) -> None:
     ds : xr.Dataset
         The input dataset containing density anomaly and pressure data.
     """
-    # sort pressure and density to be in order of increasing pressure
     ds_surface = ds.sel(PRESSURE=slice(0, 10))
     sigma0_surface_mean = ds_surface.DENSITY_ANOMALY.mean(dim='PRESSURE')
     ds['SURFACE_DENSITY_ANOMALY_MEAN'] = sigma0_surface_mean
