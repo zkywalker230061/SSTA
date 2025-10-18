@@ -1,6 +1,8 @@
 """
 Finding hbar from Salinity_Monthly_Mean.nc.
 
+NOTE: ANY DENSITY IN THIS FILE IS POTENTIAL DENSITY.
+
 Method by Chris O.S., tweaked by Chengyun.
 2024-10-18
 """

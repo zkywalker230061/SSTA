@@ -1,6 +1,8 @@
 """
 Finding h from RG_ArgoClim_Temperature.nc.
 
+NOTE: ANY DENSITY IN THIS FILE IS POTENTIAL DENSITY.
+
 Method by Chris O.S., tweaked by Chengyun.
 2024-10-18
 """
