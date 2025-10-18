@@ -5,7 +5,7 @@ Chengyun Zhu
 2025-10-12
 """
 
-# from IPython.display import display
+from IPython.display import display
 
 # import xarray as xr
 # import pandas as pd
@@ -169,12 +169,88 @@ def save_monthly_mean_salinity():
     s_monthly_mean.to_netcdf("../datasets/Salinity_Monthly_Mean.nc")
 
 
+def save_temperature():
+    """Save temperature dataset."""
+
+    t_15years_mean = load_and_prepare_dataset(
+        "../datasets/RG_ArgoClim_Temperature_2019.nc",
+    )['ARGO_TEMPERATURE_MEAN']
+    # display(t_15years_mean)
+    # visualise_dataset(
+    #     t_15years_mean.sel(PRESSURE=0, method='nearest')
+    # )
+    ta = load_and_prepare_dataset(
+        "../datasets/RG_ArgoClim_Temperature_2019.nc",
+    )['ARGO_TEMPERATURE_ANOMALY']
+    # display(ta)
+    # visualise_dataset(
+    #     ta.sel(PRESSURE=0, TIME=0.5, method='nearest')
+    # )
+
+    # add two toghether
+    t_15years_mean = t_15years_mean.expand_dims(TIME=180)
+    t = t_15years_mean + ta
+
+    t.attrs['units'] = ta.attrs.get('units')
+    t.attrs['long_name'] = (
+        "Monthly Temperature Jan 2004 - Dec 2018 (15.0 year)"
+    )
+    t.name = "TEMPERATURE"
+    display(t)
+    # visualise_dataset(
+    #     t.sel(PRESSURE=0, TIME=0.5, method='nearest')
+    # )
+    # visualise_dataset(
+    #     t.sel(TIME=0.5, LONGITUDE=0, LATITUDE=0, method='nearest')
+    # )
+    t.to_netcdf("../datasets/Temperature (2004-2018).nc")
+
+
+def save_salinity():
+    """Save salinity dataset."""
+
+    s_15years_mean = load_and_prepare_dataset(
+        "../datasets/RG_ArgoClim_Salinity_2019.nc",
+    )['ARGO_SALINITY_MEAN']
+    # display(s_15years_mean)
+    # visualise_dataset(
+    #     s_15years_mean.sel(PRESSURE=0, method='nearest')
+    # )
+    sa = load_and_prepare_dataset(
+        "../datasets/RG_ArgoClim_Salinity_2019.nc",
+    )['ARGO_SALINITY_ANOMALY']
+    # display(sa)
+    # visualise_dataset(
+    #     sa.sel(PRESSURE=0, TIME=0.5, method='nearest')
+    # )
+
+    # add two toghether
+    s_15years_mean = s_15years_mean.expand_dims(TIME=180)
+    s = s_15years_mean + sa
+
+    s.attrs['units'] = sa.attrs.get('units')
+    s.attrs['long_name'] = (
+        "Monthly Salinity Jan 2004 - Dec 2018 (15.0 year)"
+    )
+    s.name = "SALINITY"
+    display(s)
+    # visualise_dataset(
+    #     s.sel(PRESSURE=0, TIME=0.5, method='nearest')
+    # )
+    # visualise_dataset(
+    #     s.sel(TIME=0.5, LONGITUDE=0, LATITUDE=0, method='nearest')
+    # )
+    s.to_netcdf("../datasets/Salinity (2004-2018).nc")
+
+
 def main():
     """Main function for rgargo_analysis.py."""
     # save_monthly_mean_anomalies()
 
     # save_monthly_mean_temperature()
     # save_monthly_mean_salinity()
+    # save_temperature()
+    # save_salinity()
 
 
 if __name__ == "__main__":

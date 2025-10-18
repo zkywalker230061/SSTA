@@ -43,17 +43,8 @@ def map_visualise_dataset(
         The dataset to visualise.
     **kwargs
         Additional arguments for the plot method.
-
-    Raises
-    ------
-    TypeError
-        If the dataset is not at a single pressure level.
     """
     display(ds)
-    if ds['PRESSURE'].size != 1:
-        raise TypeError(
-            "Map visualisation requires the dataset to be at a single pressure level."
-        )
     if ds['LONGITUDE'].attrs.get('modulo') == 180:
         kwargs.setdefault('xlim', (-180, 180))
     else:
@@ -92,20 +83,14 @@ def map_visualise_dataset(
         gl.xlabel_style = {'size': 15, 'color': 'gray'}
 
     plt.colorbar(label=ds.attrs.get('units'))
+    title_str = ds.name
+    if 'PRESSURE' in ds.coords:
+        title_str += f", Pressure = {ds['PRESSURE'].item()} dbar"
     if 'TIME' in ds.coords:
-        plt.title(
-            f"{ds.name}: "
-            + f" Pressure = {ds['PRESSURE'].item()} dbar, "
-            + f"time = {ds['TIME'].item()} months since 2004-01-01"
-        )
+        title_str += f", Time = {ds['TIME'].item()} months since 2004-01-01"
     elif 'MONTH' in ds.coords:
-        plt.title(
-            f"{ds.name}: "
-            + f" Pressure = {ds['PRESSURE'].item()} dbar, "
-            + f"month = {ds['MONTH'].item()}"
-        )
-    else:
-        plt.title(f"{ds.name}: Pressure = {ds['PRESSURE'].item()} dbar")
+        title_str += f", Month = {ds['MONTH'].item()}"
+    plt.title(title_str)
 
     plt.show()
 
@@ -159,7 +144,10 @@ def visualise_dataset(
     TypeError
         If the dataset is not for map visualisation or point visualisation.
     """
-    if ds['PRESSURE'].size == 1 and ds['LONGITUDE'].size != 1 and ds['LATITUDE'].size != 1:
+    if 'PRESSURE' not in ds.coords:
+        map_visualise_dataset(ds, **kwargs)
+
+    elif ds['PRESSURE'].size == 1 and ds['LONGITUDE'].size != 1 and ds['LATITUDE'].size != 1:
         map_visualise_dataset(ds, **kwargs)
     elif ds['PRESSURE'].size != 1 and ds['LONGITUDE'].size == 1 and ds['LATITUDE'].size == 1:
         point_visualise_dataset(ds, **kwargs)

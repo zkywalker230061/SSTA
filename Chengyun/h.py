@@ -1,5 +1,5 @@
 """
-Finding hbar from Temperature_Monthly_Mean.nc.
+Finding h from RG_ArgoClim_Temperature.nc.
 
 Method by Chris O.S., tweaked by Chengyun.
 2024-10-15
@@ -130,11 +130,11 @@ def get_monthly_mld(
         The dataset with an added variable 'MLD_PRESSURE' representing the mixed layer depth.
     """
     if month is not None:
-        ds = ds.sel(MONTH=month)
+        ds = ds.isel(TIME=month)
     # Apply this function along the depth dimension
     mld = xr.apply_ufunc(
         find_half_depth,
-        ds['MONTHLY_MEAN_TEMPERATURE'], ds['PRESSURE'],
+        ds['TEMPERATURE'], ds['PRESSURE'],
         input_core_dims=[['PRESSURE'], ['PRESSURE']], vectorize=True
     )
 
@@ -147,41 +147,41 @@ def get_monthly_mld(
 def main():
     """Main function to find hbar."""
 
-    t_monthly_mean = load_and_prepare_dataset(
-        "../datasets/Temperature_Monthly_Mean.nc"
+    t = load_and_prepare_dataset(
+        "../datasets/Temperature (2004-2018).nc"
     )
-    display(t_monthly_mean)
+    display(t)
 
     monthly_datasets = []
-    for month in range(1, 13):
-        monthly_datasets.append(get_monthly_mld(t_monthly_mean, month))
-    hbar_ds = xr.concat(monthly_datasets, "MONTH")
-    hbar = hbar_ds['MLD_PRESSURE']
+    for month in range(0, 180):
+        monthly_datasets.append(get_monthly_mld(t, month))
+    h_ds = xr.concat(monthly_datasets, "TIME")
+    h = h_ds['MLD_PRESSURE']
 
     # restore attributes
-    hbar['LATITUDE'].attrs = t_monthly_mean['LATITUDE'].attrs
-    hbar['LONGITUDE'].attrs = t_monthly_mean['LONGITUDE'].attrs
-    hbar.attrs['units'] = 'dbar'
-    hbar.attrs['long_name'] = (
-        'Monthly Mean Mixed Layer Depth Pressure Jan 2004 - Dec 2018 (15.0 year)'
+    h['LATITUDE'].attrs = t['LATITUDE'].attrs
+    h['LONGITUDE'].attrs = t['LONGITUDE'].attrs
+    h.attrs['units'] = 'dbar'
+    h.attrs['long_name'] = (
+        'Monthly Mixed Layer Depth Pressure Jan 2004 - Dec 2018 (15.0 year)'
     )
-    hbar.name = 'MONTHLY_MEAN_MLD_PRESSURE'
-    # display(hbar)
+    h.name = 'MLD_PRESSURE'
+    # display(h)
     visualise_dataset(
-        hbar.sel(MONTH=9, method='nearest'),
+        h.sel(TIME=1, method='nearest'),
         cmap='Blues',
         vmin=0, vmax=MAX_DEPTH
     )
-    # hbar.to_netcdf("../datasets/Mixed_Layer_Depth_Pressure_Monthly_Mean.nc")
+    # h.to_netcdf("../datasets/Mixed_Layer_Depth_Pressure (2004-2018).nc")
 
     # check
     m, lon, lat = 1, -47, 56
     visualise_dataset(
-        t_monthly_mean['MONTHLY_MEAN_TEMPERATURE'].sel(
-            MONTH=m, LONGITUDE=lon, LATITUDE=lat, method='nearest'
+        t['TEMPERATURE'].sel(
+            TIME=m, LONGITUDE=lon, LATITUDE=lat, method='nearest'
         )
     )
-    print(hbar.sel(MONTH=m, LONGITUDE=lon, LATITUDE=lat, method='nearest').item())
+    print(h.sel(TIME=m, LONGITUDE=lon, LATITUDE=lat, method='nearest').item())
 
 
 if __name__ == "__main__":
