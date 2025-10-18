@@ -12,14 +12,14 @@ ds = xr.open_dataset(TEMP_DATA_PATH, decode_times=False)
 def get_monthly_hbar(ds, month, make_plots=True):
     ds = ds.sel(MONTH=month)
 
-    def find_half_depth(temp_profile, pressure):
+    def find_mld_by_temperature(temp_profile, pressure):
         # sort pressure and temperature to be in order of increasing pressure (they should be already, but just in case)
         indices_increasing_pressure = np.argsort(pressure)
         pressure = pressure[indices_increasing_pressure]
         temp_profile = temp_profile[indices_increasing_pressure]
 
         sst = temp_profile[0]  # temperature at surface == first in list after sorting
-        mld_t = sst - 1  # temperature at mixed layer depth
+        mld_t = sst - 0.2  # temperature at mixed layer depth
 
         # find where temperature falls below mld_t
         temperatures_below_mld = np.where(temp_profile <= mld_t)[0]
@@ -33,7 +33,7 @@ def get_monthly_hbar(ds, month, make_plots=True):
                          [pressure[above_mld_index], pressure[below_mld_index]])
 
     # Apply this function along the depth dimension
-    mld_pressure = xr.apply_ufunc(find_half_depth, ds['MONTHLY_MEAN_TEMPERATURE'], ds['PRESSURE'], input_core_dims=[['PRESSURE'], ['PRESSURE']], vectorize=True)
+    mld_pressure = xr.apply_ufunc(find_mld_by_temperature, ds['MONTHLY_MEAN_TEMPERATURE'], ds['PRESSURE'], input_core_dims=[['PRESSURE'], ['PRESSURE']], vectorize=True)
 
     ds.drop_vars(["PRESSURE"])  # don't need pressure anymore
     ds['MLD_PRESSURE'] = mld_pressure   # save to dataset
