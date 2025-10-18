@@ -28,7 +28,8 @@ def get_monthly_hbar(ds, month, make_plots=True):
     ds['NEAR_SURFACE_POTENTIAL_DENSITY_MEAN'] = sigma0_near_surface_mean
 
     def find_mld_by_density(potential_density_profile, pressure, potential_density_near_surface_mean):
-        threshold = potential_density_near_surface_mean * THRESHOLD
+        #threshold = potential_density_near_surface_mean * THRESHOLD
+        threshold = potential_density_near_surface_mean + 0.03
         above_threshold_depths = np.where(potential_density_profile >= threshold)[0]
 
         # catch case where threshold is not crossed (should be only over land)
@@ -51,5 +52,5 @@ monthly_datasets = []
 for month in range(1, 13):
     monthly_datasets.append(get_monthly_hbar(ds, month, make_plots=True))
 hbar_all_months_dataset = xr.concat(monthly_datasets, "MONTH")
-hbar_all_months_dataset.to_netcdf("../datasets/mld_by_density.nc")
+hbar_all_months_dataset.to_netcdf("../datasets/mld_by_potential_density.nc")
 print(hbar_all_months_dataset)
