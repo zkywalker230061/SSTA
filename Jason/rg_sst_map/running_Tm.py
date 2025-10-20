@@ -16,8 +16,16 @@ import matplotlib.pyplot as plt
 
 
 #---1. -------------------------------------------
+
+# Adjust File Path accordingly
+# Temp File Path Below 
+# "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
+# Salinity File Path Below 
+# "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Salinity_2019.nc"
+
+
 ds_temp = xr.open_dataset(
-    "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc",
+    "C:\Msci Project\RG_ArgoClim_Temperature_2019.nc",
     engine="netcdf4",
     decode_times=False,
     mask_and_scale=True,

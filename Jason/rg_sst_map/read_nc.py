@@ -40,8 +40,13 @@ def fix_rg_time(ds, mode="datetime"):
 #---------Read the datasets-----------------------------------------------------
 
 # Julia File Path 
-temp_file_path = "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
-salinity_file_path = "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Salinity_2019.nc"
+# temp_file_path = "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
+# salinity_file_path = "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Salinity_2019.nc"
+
+# Jason File Path 
+temp_file_path = "C:\Msci Project\RG_ArgoClim_Temperature_2019.nc"
+salinity_file_path = "C:\Msci Project\RG_ArgoClim_Salinity_2019.nc"
+updated_h_file_path = "C:\Msci Project\Mixed_Layer_Depth_Pressure (2004-2018).nc"
 
 
 ds_temp = xr.open_dataset(
@@ -58,12 +63,18 @@ ds_sal = xr.open_dataset(
     mask_and_scale=True,
 )
 
-
+height_grid = xr.open_dataset(
+    updated_h_file_path,
+    engine="netcdf4",
+    decode_times=False,
+    mask_and_scale=True
+)
 
 ds_temp = fix_rg_time(ds_temp)
 ds_sal = fix_rg_time(ds_sal)
 
-
+print(height_grid["MLD_PRESSURE"])
+print(ds_temp["ARGO_TEMPERATURE_ANOMALY"])
 #----------------------For Checking---------------------------------#
 #print(ds_sal)
 #print(ds_temp)
