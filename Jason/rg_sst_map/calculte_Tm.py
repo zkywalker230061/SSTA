@@ -48,14 +48,17 @@ def z_to_xarray(z,
 def vertical_integral(
     T: xr.DataArray,
     z,
-    top: float = 0.0,
-    bottom: float = -h_meters,
+    bottom: xr.DataArray,
     normalise: str = "available",
     zdim: str = ZDIM,
 ) -> xr.DataArray:
     """
     Calculate the vertical integral of a 1D field using the trapezoidal rule.
     """
+
+    # Define top layer point for each grid point
+    top = xr.zeros_like(bottom)
+
     # Ensure both inputs T and Z hae the vertical dimensions last in their order of dimensions
     if zdim not in T.dims:
         raise ValueError(f"{zdim} not in T.dims")
@@ -86,15 +89,15 @@ def vertical_integral(
     if normalise == "available":
         out = (num / den).where(den != 0)
     elif normalise == "full":
-        out = (num / (top - bottom)).where(den >= (top - bottom))
+        out = (num / (bottom - top)).where(den >= (bottom - top))
     else:
         raise ValueError("normalise must be 'available' or 'full'")
     
     # GPT aided
-    out = out.rename(f"T_upper{int(abs(bottom))}")
-    out.attrs.update({
-    "long_name": f"Upper {int(abs(bottom))} m mean temperature (trapezoidal)",
-    "units": T.attrs.get("units", "degC")
-    })
+    # out = out.rename(f"T_upper{int(np.max(bottom))}")
+    # out.attrs.update({
+    # "long_name": f"Upper {int(np.max(bottom))} m mean temperature (trapezoidal)",
+    # "units": T.attrs.get("units", "degC")
+    # })
 
     return out
