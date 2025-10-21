@@ -40,7 +40,7 @@ z_new = z_to_xarray(depth, S_full)
 #print(z_new)
 
 #----4. Vertical Integration -------------------------------
-vertical = vertical_integral(S_full,-z_new)          #??????i changed here to -z_new
+vertical = vertical_integral(S_full,z_new)          #??????i changed here to -z_new
 
 
 
@@ -58,7 +58,7 @@ if __name__ == "__main__":
     plt.figure(figsize=(10,5))
     pc = plt.pcolormesh(
         t0["LONGITUDE"], t0["LATITUDE"], t0,
-        cmap="RdYlBu_r", shading="auto", vmin=30, vmax=38
+        cmap="RdYlBu_r", shading="auto", vmin=30, vmax=40
     )
     plt.colorbar(pc, label="Mean Salinity (Scale 78)")
     plt.title("Upper 100 m Mean Salinity - Jan 2006")
