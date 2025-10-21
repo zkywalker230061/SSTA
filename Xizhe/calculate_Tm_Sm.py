@@ -9,8 +9,6 @@ import xarray as xr
 import gsw
 import re
 from typing import Optional
-from calculate_Tm_Jason import z_to_xarray, vertical_integral
-#from Jason.rg_sst_map.calculte_Tm import vertical_integral 
 
 # H_M=100
 

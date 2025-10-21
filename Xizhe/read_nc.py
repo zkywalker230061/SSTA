@@ -36,34 +36,64 @@ def fix_rg_time(ds, mode="datetime"):
         ds.TIME.attrs.update({"units": units, "note": "integer months since reference"})
     return ds
 
+def fix_longitude_coord(ds):
+    """
+    Convert longitude from [0, 360] to [-180, 180].
 
+    Parameters
+    ----------
+    ds: xarray.Dataset
+        Input dataset with 'LONGITUDE' coordinate.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with 'LONGITUDE' in [-180, 180] and sorted.
+    """
+    lon_atrib = ds.coords['LONGITUDE'].attrs
+    ds['LONGITUDE'] = ((ds['LONGITUDE'] + 180) % 360) - 180
+    ds = ds.sortby(ds['LONGITUDE'])
+    ds['LONGITUDE'].attrs.update(lon_atrib)
+    ds['LONGITUDE'].attrs['modulo'] = 180
+    return ds
 #---------Read the datasets-----------------------------------------------------
 
 # Julia File Path 
-temp_file_path = "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
-salinity_file_path = "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Salinity_2019.nc"
+# temp_file_path = "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
+# salinity_file_path = "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Salinity_2019.nc"
+
+# Jason File Path 
+# temp_file_path = "C:\Msci Project\RG_ArgoClim_Temperature_2019.nc"
+# salinity_file_path = "C:\Msci Project\RG_ArgoClim_Salinity_2019.nc"
+# updated_h_file_path = "C:\Msci Project\Mixed_Layer_Depth_Pressure (2004-2018).nc"
 
 
-ds_temp = xr.open_dataset(
-    temp_file_path,
-    engine="netcdf4",
-    decode_times=False,   # disable decoding to avoid error
-    mask_and_scale=True,
-)
+# ds_temp = xr.open_dataset(
+#     temp_file_path,
+#     engine="netcdf4",
+#     decode_times=False,   # disable decoding to avoid error
+#     mask_and_scale=True,
+# )
 
-ds_sal = xr.open_dataset(
-    salinity_file_path,
-    engine="netcdf4",
-    decode_times=False,
-    mask_and_scale=True,
-)
+# ds_sal = xr.open_dataset(
+#     salinity_file_path,
+#     engine="netcdf4",
+#     decode_times=False,
+#     mask_and_scale=True,
+# )
 
+# height_grid = xr.open_dataset(
+#     updated_h_file_path,
+#     engine="netcdf4",
+#     decode_times=False,
+#     mask_and_scale=True
+# )
 
+# ds_temp = fix_rg_time(ds_temp)
+# ds_sal = fix_rg_time(ds_sal)
 
-ds_temp = fix_rg_time(ds_temp)
-ds_sal = fix_rg_time(ds_sal)
-
-
+# print(height_grid["MLD_PRESSURE"])
+# print(ds_temp["ARGO_TEMPERATURE_ANOMALY"])
 #----------------------For Checking---------------------------------#
 #print(ds_sal)
 #print(ds_temp)
@@ -75,5 +105,3 @@ ds_sal = fix_rg_time(ds_sal)
 
 #print(ds_temp.TIME.dtype)
 #print(ds_temp.TIME[:200])
-
-
