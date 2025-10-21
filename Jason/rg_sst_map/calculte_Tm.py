@@ -48,7 +48,7 @@ def z_to_xarray(z,
 def vertical_integral(
     T: xr.DataArray,
     z,
-    bottom: xr.DataArray,
+    depth_h: xr.DataArray,
     normalise: str = "available",
     zdim: str = ZDIM,
 ) -> xr.DataArray:
@@ -57,7 +57,7 @@ def vertical_integral(
     """
 
     # Define top layer point for each grid point
-    top = xr.zeros_like(bottom)
+    sea_surface = xr.zeros_like(depth_h)
 
     # Ensure both inputs T and Z hae the vertical dimensions last in their order of dimensions
     if zdim not in T.dims:
@@ -72,13 +72,13 @@ def vertical_integral(
     z_next = z_sorted.shift({zdim: -1})
 
     # Get the boundaries of each segment
-    segment_top = np.maximum(z_sorted, z_next)
-    segment_bottom = np.minimum(z_sorted, z_next)
+    segment_shallower = np.minimum(z_sorted, z_next)
+    segment_deeper = np.maximum(z_sorted, z_next)
 
     # Clip data to the integration limits
-    z_high = xr.zeros_like(segment_top) + top
-    z_low = xr.zeros_like(segment_bottom) + bottom
-    overlap = (np.minimum(segment_top, z_high) - np.maximum(segment_bottom, z_low)).clip(0)
+    z_high = xr.zeros_like(segment_deeper) + depth_h
+    z_low = xr.zeros_like(segment_shallower) + sea_surface
+    overlap = (np.minimum(segment_deeper, z_high) - np.maximum(segment_shallower, z_low)).clip(0)
 
     # Compute the trapezoidal area of each segment
     segment_area = 0.5 * (T_sorted + T_next) * overlap
@@ -89,7 +89,7 @@ def vertical_integral(
     if normalise == "available":
         out = (num / den).where(den != 0)
     elif normalise == "full":
-        out = (num / (bottom - top)).where(den >= (bottom - top))
+        out = (num / (depth_h - sea_surface)).where(den >= (depth_h - sea_surface))
     else:
         raise ValueError("normalise must be 'available' or 'full'")
     
