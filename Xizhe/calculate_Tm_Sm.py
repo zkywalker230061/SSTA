@@ -1,8 +1,4 @@
 ################################################
-# Assume h = 100 m
-# T_m(x,y,t) = (1/h) ∫_0^h T(x,y,z,t) dz
-# S_m(x,y,t) = (1/h) ∫_0^h S(x,y,z,t) dz
-# Using gsw to convert pressure to depth
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -62,7 +58,7 @@ from typing import Optional
 # ds_sal = fix_rg_time(ds_sal)
 
 #-----2. Convert Pressure (dbar) to Depth (m)---------------------------------------------------------------------------
-def depth_from_pressure(p: xr.DataArray, lat: xr.DataArray) -> xr.DataArray:
+def depth_dbar_to_meter(p: xr.DataArray, lat: xr.DataArray) -> xr.DataArray:
     """
     TEOS-10 pressure->depth for every latitude.
     Inputs:
@@ -83,6 +79,27 @@ def depth_from_pressure(p: xr.DataArray, lat: xr.DataArray) -> xr.DataArray:
         attrs={"units": "m", "positive": "down", "note": "TEOS-10 from gsw.z_from_p"},
     )
     return depth
+
+def mld_dbar_to_meter(p_mld: xr.DataArray, lat_3D: xr.DataArray) -> xr.DataArray:
+    """
+    Convert MLD pressure (dbar) with dims (TIME, LATITUDE, LONGITUDE)
+    to depth (m, positive down) with the same dims, using GSW.
+    """
+    # Broadcast latitude to match p_mld shape and order
+    # lat3d = xr.broadcast(lat_1d, p_mld)[0].transpose(*p_mld.dims)
+
+    # gsw.z_from_p returns negative below sea level; flip sign for positive-down
+    h_m = -xr.apply_ufunc(
+        gsw.z_from_p,
+        p_mld, lat_3D,
+        input_core_dims=[[], []],      # already share (TIME, LATITUDE, LONGITUDE)
+        output_core_dims=[[]],
+        dask="parallelized",
+        output_dtypes=[float],
+    )
+    h_m.name = "MLD_depth"
+    h_m.attrs.update({"units": "m", "positive": "down", "note": "TEOS-10 gsw.z_from_p"})
+    return h_m
 
 #-----3. Data = Mean + Anomaly-----------------------------------------------------------------------------------------------------
 def _full_field(mean_data: xr.DataArray, anom_data: xr.DataArray, time=None) -> xr.DataArray:
