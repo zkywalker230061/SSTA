@@ -45,7 +45,7 @@ def get_monthly_hbar(ds, month, make_plots=True):
     ds['MLD'] = ds['MLD'].where(ds['MLD'] <= 500, 500)  # for a better scale
     if make_plots:
         ds['MLD'].plot(x='LONGITUDE', y='LATITUDE', cmap='Blues')
-    plt.show()
+        plt.show()
     return ds
 
 monthly_datasets = []
