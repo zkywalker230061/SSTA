@@ -98,7 +98,7 @@ if __name__ == "__main__":
         cmap=cmap, shading="auto", vmin=-2, vmax=30
     )
     plt.colorbar(pc, label="Mean Temperature (°C, 0–100 m)")
-    plt.title(f"Mean ML Temperature - {date}")
+    plt.title(f"Mixed Layer Depth Mean Temperature - {date}")
     plt.xlabel("Longitude")
     plt.ylabel("Latitude")
     plt.tight_layout()

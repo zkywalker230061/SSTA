@@ -91,7 +91,8 @@ print('vertical_integral:\n',vertical_integral)
 #----5. Main  ------------------------------------------------------------------
 if __name__ == "__main__":
     #----Plot Map---------------------------------------------------------------
-    test_data = vertical.sel(TIME="2006-01-01")
+    date = "2006-01-01"
+    test_data = vertical.sel(TIME=date)
 
     # Copy the colormap and set NaN color
     cmap = plt.get_cmap("RdYlBu_r").copy()
@@ -103,9 +104,10 @@ if __name__ == "__main__":
         cmap=cmap, shading="auto", vmin=30, vmax=40
     )
     plt.colorbar(pc, label="Mean Salinity (Scale 78)")
-    plt.title("Upper 100 m Mean Salinity - Jan 2006")
+    plt.title(f"Mixed Layer Depth Mean Salinity {date}")
     plt.xlabel("Longitude")
     plt.ylabel("Latitude")
     plt.tight_layout()
     plt.show()
     #vertical.to_netcdf("Mean Salinity Dataset (2004-2018)")
+# %%
