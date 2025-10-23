@@ -49,7 +49,6 @@ height_grid = xr.open_dataset(
 )
 
 height_grid = height_grid["MLD_PRESSURE"]
-# print(height_grid)
 
 #%%
 #---2. Fixing Time Coordinate-----------
@@ -75,7 +74,7 @@ lat = ds_temp['LATITUDE']
 depth = depth_dbar_to_meter(p,lat)
 
 
-h_meters = 100.0
+
 ZDIM = "PRESSURE"
 YDIM = "LATITUDE"
 XDIM = "LONGITUDE"
@@ -90,18 +89,12 @@ print('z_new:\n',z_new)
 #%%
 #----4. Vertical Integration -------------------------------
 vertical = vertical_integral(T_full,z_new, h_normal)          #??????i changed here to -z_new
-#%%
+
 print('vertical_integral:\n',vertical)
-#%%
+#%% ----5. Gradient Test --------
 gradients = compute_gradients(vertical)
 print('gradients:\n',gradients)
-# #%%
-# test1= T_full.transpose(...,ZDIM)
-# test2 = h_normal.broadcast_like(test1)
 
-# print("Temp", test1)
-# print("h", test2)
-# print(h_normal)
 
 #%%
 if __name__ == "__main__":
