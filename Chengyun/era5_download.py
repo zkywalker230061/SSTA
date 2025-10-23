@@ -124,6 +124,11 @@ if __name__ == "__main__":
     era5_moda_ds = xr.open_dataset("../datasets/data_stream-moda_stepType-avgad.nc")
     era5_moda_ds = era5_argolise(era5_moda_ds)
     display(era5_moda_ds)
+    print(era5_moda_ds['avg_iews'].max().item(), era5_moda_ds['avg_inss'].max().item())
+    print(
+        abs(era5_moda_ds['avg_iews']).mean().item(),
+        abs(era5_moda_ds['avg_inss']).mean().item()
+    )
 
     TIME = 6.5
     fig = plt.figure(figsize=(10, 5))
