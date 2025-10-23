@@ -21,11 +21,10 @@ era5_ds = era5_ds.rename({"valid_time": "TIME"})
 # interpolate ERA5 onto Argo
 regridder = xe.Regridder(era5_ds, temp_ds_for_interpolation, "conservative")
 era5_ds_interpolated = regridder(era5_ds)
-argo_era5_ds = xr.merge([temp_ds, sal_ds, era5_ds_interpolated])    # combine all datasets
+#argo_era5_ds = xr.merge([temp_ds, sal_ds, era5_ds_interpolated])    # combine all datasets
 era5_ds_interpolated.to_netcdf("../datasets/era5_interpolated.nc")
-argo_era5_ds.to_netcdf("../datasets/argo_era5.nc")
+#argo_era5_ds.to_netcdf("../datasets/argo_era5.nc")
 print(era5_ds_interpolated)
-print(era5_ds)
 
 # plot to check interpolated data looks similar
 era5_ds_interpolated['avg_iews'].sel(TIME=0.5).plot(x='LONGITUDE', y='LATITUDE', cmap='viridis')
