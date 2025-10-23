@@ -1,15 +1,10 @@
 ################################################
-# Assume h = 100 m
-# T_m(x,y,t) = (1/h) ∫_0^h T(x,y,z,t) dz
-# S_m(x,y,t) = (1/h) ∫_0^h S(x,y,z,t) dz
-# Using gsw to convert pressure to depth
 import numpy as np
 import pandas as pd
 import xarray as xr
 import gsw
 import re
 from typing import Optional
-#from Jason.rg_sst_map.calculte_Tm import vertical_integral 
 
 # H_M=100
 
@@ -63,7 +58,7 @@ from typing import Optional
 # ds_sal = fix_rg_time(ds_sal)
 
 #-----2. Convert Pressure (dbar) to Depth (m)---------------------------------------------------------------------------
-def depth_from_pressure(p: xr.DataArray, lat: xr.DataArray) -> xr.DataArray:
+def depth_dbar_to_meter(p: xr.DataArray, lat: xr.DataArray) -> xr.DataArray:
     """
     TEOS-10 pressure->depth for every latitude.
     Inputs:
@@ -84,6 +79,27 @@ def depth_from_pressure(p: xr.DataArray, lat: xr.DataArray) -> xr.DataArray:
         attrs={"units": "m", "positive": "down", "note": "TEOS-10 from gsw.z_from_p"},
     )
     return depth
+
+def mld_dbar_to_meter(p_mld: xr.DataArray, lat_3D: xr.DataArray) -> xr.DataArray:
+    """
+    Convert MLD pressure (dbar) with dims (TIME, LATITUDE, LONGITUDE)
+    to depth (m, positive down) with the same dims, using GSW.
+    """
+    # Broadcast latitude to match p_mld shape and order
+    # lat3d = xr.broadcast(lat_1d, p_mld)[0].transpose(*p_mld.dims)
+
+    # gsw.z_from_p returns negative below sea level; flip sign for positive-down
+    h_m = -xr.apply_ufunc(
+        gsw.z_from_p,
+        p_mld, lat_3D,
+        input_core_dims=[[], []],      # already share (TIME, LATITUDE, LONGITUDE)
+        output_core_dims=[[]],
+        dask="parallelized",
+        output_dtypes=[float],
+    )
+    h_m.name = "MLD_depth"
+    h_m.attrs.update({"units": "m", "positive": "down", "note": "TEOS-10 gsw.z_from_p"})
+    return h_m
 
 #-----3. Data = Mean + Anomaly-----------------------------------------------------------------------------------------------------
 def _full_field(mean_data: xr.DataArray, anom_data: xr.DataArray, time=None) -> xr.DataArray:
@@ -139,40 +155,38 @@ def z_to_xarray(z,
 
 
 #-----5. Vertical Integral------------------------------------------------------------
-# Using 1D Trapezoidal rule to calculate the vertical integral
 def vertical_integral(
     T: xr.DataArray,
     z,
-    depth_h: xr.DataArray,
+    top: float = 0.0,
+    bottom: float = h_meters,
     normalise: str = "available",
     zdim: str = ZDIM,
 ) -> xr.DataArray:
     """
     Calculate the vertical integral of a 1D field using the trapezoidal rule.
     """
-
-    # Define top layer point for each grid point
-    sea_surface = xr.zeros_like(depth_h)
-
     # Ensure both inputs T and Z hae the vertical dimensions last in their order of dimensions
     if zdim not in T.dims:
         raise ValueError(f"{zdim} not in T.dims")
     
+     
     T_sorted = T.transpose(..., zdim)
-    z_sorted = z.broadcast_like(T_sorted).transpose(..., zdim)
-
+    z_sorted = xr.broadcast(z, T_sorted)[0].transpose(..., zdim)
+    
     # Creating segments of adjacent levels
     T_next = T_sorted.shift({zdim: -1})
     z_next = z_sorted.shift({zdim: -1})
 
     # Get the boundaries of each segment
-    segment_shallower = np.minimum(z_sorted, z_next)
-    segment_deeper = np.maximum(z_sorted, z_next)
+    segment_top = np.minimum(z_sorted, z_next)
+    segment_bottom = np.maximum(z_sorted, z_next)
 
     # Clip data to the integration limits
-    z_high = xr.zeros_like(segment_deeper) + depth_h
-    z_low = xr.zeros_like(segment_shallower) + sea_surface
-    overlap = (np.minimum(segment_deeper, z_high) - np.maximum(segment_shallower, z_low)).clip(0)
+    
+    z_low = xr.zeros_like(segment_top) + top
+    z_high = xr.zeros_like(segment_top) + bottom
+    overlap = (np.minimum(segment_bottom, z_high) - np.maximum(segment_top, z_low)).clip(0)
 
     # Compute the trapezoidal area of each segment
     segment_area = 0.5 * (T_sorted + T_next) * overlap
@@ -183,10 +197,17 @@ def vertical_integral(
     if normalise == "available":
         out = (num / den).where(den != 0)
     elif normalise == "full":
-        out = (num / (depth_h - sea_surface)).where(den >= (depth_h - sea_surface))
+        out = (num / (bottom-top)).where(den >= (bottom-top))
     else:
         raise ValueError("normalise must be 'available' or 'full'")
     
+    # GPT aided
+    out = out.rename(f"T_upper{int(abs(bottom))}")
+    out.attrs.update({
+    "long_name": f"Upper {int(abs(bottom))} m mean temperature (trapezoidal)",
+    "units": T.attrs.get("units", "degC")
+    })
+
     return out
 
 

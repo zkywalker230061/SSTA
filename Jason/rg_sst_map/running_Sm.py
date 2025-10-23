@@ -3,12 +3,17 @@ Julia Xie, JY
 """
 
 from read_nc import fix_rg_time
-from calculate_Tm_Sm import depth_from_pressure, _full_field, z_to_xarray, vertical_integral
+from calculate_Tm_Sm import depth_dbar_to_meter, _full_field, z_to_xarray, vertical_integral
 import xarray as xr
 import matplotlib.pyplot as plt
 
 
 #---1. -------------------------------------------
+
+temp_file_path = r"C:\Users\jason\MSciProject\RG_ArgoClim_Temperature_2019.nc"
+salinity_file_path = r"C:\Users\jason\MSciProject\RG_ArgoClim_Salinity_2019.nc"
+updated_h_file_path = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure (2004-2018).nc"
+
 # ds_temp = xr.open_dataset(
 #     "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc",
 #     engine="netcdf4",
@@ -17,7 +22,7 @@ import matplotlib.pyplot as plt
 # )
 
 ds_sal = xr.open_dataset(
-    "C:\Msci Project\RG_ArgoClim_Salinity_2019.nc",
+    salinity_file_path,
     engine="netcdf4",
     decode_times=False,
     mask_and_scale=True,
@@ -33,7 +38,7 @@ S_full = _full_field(S_mean, S_anom)
 #----2. gsw--------------------------------------------
 p = ds_sal['PRESSURE']
 lat = ds_sal['LATITUDE']
-depth = depth_from_pressure(p,lat)
+depth = depth_dbar_to_meter(p,lat)
 
 #-----3. z to x array-----------------------------------------
 z_new = z_to_xarray(depth, S_full)
