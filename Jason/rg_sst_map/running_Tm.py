@@ -1,10 +1,10 @@
 """
-Jilia Xie
+Julia Xie
 """
 
 #%%
 from read_nc import fix_rg_time, fix_longitude_coord
-from calculate_Tm_Sm import depth_from_pressure, _full_field
+from calculate_Tm_Sm import depth_dbar_to_meter, _full_field
 from calculate_Tm_Sm import z_to_xarray
 from calculate_Tm import vertical_integral
 import numpy as np
@@ -73,7 +73,7 @@ print('h_normal:\n',h_normal)
 #----3. gsw--------------------------------------------
 p = ds_temp['PRESSURE']
 lat = ds_temp['LATITUDE']
-depth = depth_from_pressure(p,lat)
+depth = depth_dbar_to_meter(p,lat)
 
 
 h_meters = 100.0
