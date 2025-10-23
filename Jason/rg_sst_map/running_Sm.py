@@ -134,7 +134,7 @@ if __name__ == "__main__":
     plt.figure(figsize=(10,5))
     pc = plt.pcolormesh(
         t0["LONGITUDE"], t0["LATITUDE"], np.ma.masked_invalid(t0),
-        cmap=cmap, shading="auto", vmin = -1e-5, vmax=1e-5
+        cmap=cmap, shading="auto", vmin = -1e-6, vmax=1e-6
     )
     plt.colorbar(pc, label=f"Salinity Gradient (/m)")
     plt.title(f"Mixed Layer Salinity Gradient (Lon)- {date}")
