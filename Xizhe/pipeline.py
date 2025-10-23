@@ -41,7 +41,7 @@ TEMPERATURE = DataChoice(
     label="Mean Temperature (°C)",
     plot_cmap="RdYlBu_r",
     plot_vmin=-2,
-    plot_vmax=40,
+    plot_vmax=35,
     output_filename="Mean_Temp_(2004_2018).nc",
     plot_title="Mean Temperature Using h Field"
 )
@@ -53,7 +53,7 @@ SALINITY = DataChoice(
     label="Mean Salinity",
     plot_cmap="RdYlBu_r",
     plot_vmin=30,
-    plot_vmax=40,
+    plot_vmax=45,
     output_filename="Mean_Sal_(2004_2018).nc",
     plot_title="Mean Salinity Using h Field"
 )
@@ -83,13 +83,11 @@ def load_pressure_data(path: str, varname: str, *, compute_time_mode: str = "dat
     depth_m   = mld_dbar_to_meter(pressure, lat_3D)
     depth_m   = fix_longitude_coord(depth_m)
 
-    #print('depth_bar:\n',depth_bar, depth_bar.shape)
-    #print(lat_3D)
+    # print('depth_bar:\n',depth_bar, depth_bar.shape)
+    # print(lat_3D)
     # print('depth_m:\n',depth_m)
     # print('depth_m after fix_longitude:\n', depth_m)
     return depth_m
-
-test = load_pressure_data(PRESSURE_PATH, PRESSURE_VARNAME, compute_time_mode='datetime')
 
 #%%
 

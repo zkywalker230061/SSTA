@@ -1,18 +1,13 @@
 """
-Jilia Xie
+Julia Xie
 """
 
 #%%
 from read_nc import fix_rg_time, fix_longitude_coord
-from calculate_Tm_Sm import depth_dbar_to_meter, _full_field, z_to_xarray, vertical_integral
+from calculate_Tm_Sm import depth_dbar_to_meter, _full_field, z_to_xarray, vertical_integral, mld_dbar_to_meter
 import numpy as np
 import pandas as pd
 import xarray as xr
-import gsw
-import re
-from tqdm import tqdm
-from typing import Optional
-from dask.diagnostics import ProgressBar
 import matplotlib.pyplot as plt
 
 #%%
@@ -39,21 +34,22 @@ ds_temp = xr.open_dataset(
 #     mask_and_scale=True,
 # )
 
-height_grid = xr.open_dataset(
+ds_depth = xr.open_dataset(
     updated_h_file_path,
     engine="netcdf4",
     decode_times=False,
     mask_and_scale=True
 )
 
-height_grid = height_grid["MLD_PRESSURE"]
-# print(height_grid)
-
 #%%
 #---2. Fixing Time Coordinate----------------------------------------------
 ds_temp = fix_rg_time(ds_temp)
-h_normal = fix_rg_time(height_grid)
+ds_depth = fix_rg_time(ds_depth)
 # ds_sal = fix_rg_time(ds_sal)
+pressure = ds_depth["MLD_PRESSURE"]
+lat_3D = xr.broadcast(ds_depth["LATITUDE"], pressure)[0].transpose(*pressure.dims)
+depth_m = mld_dbar_to_meter(pressure, lat_3D)
+depth_m = fix_longitude_coord(depth_m)
 
 T_mean = ds_temp["ARGO_TEMPERATURE_MEAN"]          # (P, Y, X)
 T_anom = ds_temp["ARGO_TEMPERATURE_ANOMALY"]
@@ -62,7 +58,7 @@ T_full = fix_longitude_coord(T_full)
 
 print('T_full:\n',T_full)
 print(T_full.shape)
-print('h_normal:\n',h_normal)
+print('depth in meter:\n',depth_m)
 
 #%%
 #----3. GSW-----------------------------------------------------------------
@@ -83,13 +79,14 @@ z_new = z_to_xarray(depth, T_full)
 
 #%%
 #----4. Vertical Integration ---------------------------------------------
-vertical = vertical_integral(T_full,z_new, h_normal)          #??????i changed here to -z_new
+vertical = vertical_integral(T_full,z_new, depth_m)          #??????i changed here to -z_new
 print('vertical_integral:\n',vertical_integral)
 
 #%%
 if __name__ == "__main__":
     #----Plot Map----------------------------------------------------
-    test_data = vertical.sel(TIME="2009-10-01")
+    date = "2005-01-01"
+    test_data = vertical.sel(TIME=f"{date}")
 
     # Copy the colormap and set NaN color
     cmap = plt.get_cmap("RdYlBu_r").copy()
@@ -101,9 +98,10 @@ if __name__ == "__main__":
         cmap=cmap, shading="auto", vmin=-2, vmax=30
     )
     plt.colorbar(pc, label="Mean Temperature (°C, 0–100 m)")
-    plt.title("Upper 100 m Mean Temperature - Jan 2006")
+    plt.title(f"Mean ML Temperature - {date}")
     plt.xlabel("Longitude")
     plt.ylabel("Latitude")
     plt.tight_layout()
     plt.show()
     # vertical.to_netcdf("Mean Temperature Dataset (2004-2018)")
+# %%
