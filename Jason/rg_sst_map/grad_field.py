@@ -18,7 +18,10 @@ def compute_gradients(
     #lon_rad = np.deg2rad(field['Longitude'])
 
     # Calculate the spacing in meters
-    dlat = np.gradient(lat_rad) * R
+    dlat = (np.pi/180) * R
+    
+    
+
     # Focusing on lat for now
 
     # Masks for neighbouring points
@@ -63,7 +66,6 @@ def compute_gradients(
     grad = grad.where(~end_run_2pt, ((field - f_prev) / dlat))
 
     # Single points left as NaN
-
     return grad
 
 
