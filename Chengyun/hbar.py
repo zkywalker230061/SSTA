@@ -90,10 +90,7 @@ def find_half_depth(density_anomaly_profile, pressure, density_anomaly_surface_m
     return MAX_DEPTH
 
 
-def find_surface_density_anomaly_mean(
-    ds: xr.Dataset,
-    iteration: bool = True
-) -> None:
+def find_surface_density_anomaly_mean(ds: xr.Dataset) -> None:
     """
     Find the mean density anomaly near the surface (top 10 dbar). TEMPORARY FUNCTION.
 
@@ -101,27 +98,47 @@ def find_surface_density_anomaly_mean(
     ----------
     ds : xr.Dataset
         The input dataset containing density anomaly and pressure data.
-    iteration : bool
-        Default is True.
-        If True, use iterative method. If False, use direct slicing.
     """
-    if iteration:
-        sigma0_surface_mean = ds.DENSITY_ANOMALY.isel(PRESSURE=0)
-        i = 0
-        for lon, lat in zip(ds.LONGITUDE.values, ds.LATITUDE.values):
-            while (
-                abs(ds.DENSITY_ANOMALY.sel(LONGITUDE=lon, LATITUDE=lat).isel(PRESSURE=i+1) - sigma0_surface_mean.sel(LONGITUDE=lon, LATITUDE=lat)) < HBAR_DDIFF
-                and i + 1 < ds.sizes['PRESSURE']
-            ):
-                sigma0_surface_mean = (
-                    ds.DENSITY_ANOMALY.isel(PRESSURE=slice(0, i+1)).mean(dim='PRESSURE')
-                )
-                i += 1
-        ds['SURFACE_DENSITY_ANOMALY_MEAN'] = sigma0_surface_mean
-    else:
-        ds_surface = ds.sel(PRESSURE=slice(0, 10))
-        sigma0_surface_mean = ds_surface.DENSITY_ANOMALY.mean(dim='PRESSURE')
-        ds['SURFACE_DENSITY_ANOMALY_MEAN'] = sigma0_surface_mean
+    ds_surface = ds.sel(PRESSURE=slice(0, 10))
+    sigma0_surface_mean = ds_surface.DENSITY_ANOMALY.mean(dim='PRESSURE')
+    ds['SURFACE_DENSITY_ANOMALY_MEAN'] = sigma0_surface_mean
+
+
+def find_depth_iteration(density_anomaly_profile, pressure):
+    """
+    Find the mixed layer depth (hbar) from a density anomaly profile using iterative method.
+    Parameters
+    ----------
+    density_anomaly_profile : np.ndarray
+        1D array of density anomaly values at different pressures.
+    pressure : np.ndarray
+        1D array of pressure values corresponding to the density profile.
+
+    Returns
+    -------
+    float
+        The pressure at the mixed layer depth (hbar).
+        Returns MAX_DEPTH if not found, or -inf for land.
+    """
+    sigma0_surface_mean = density_anomaly_profile[:1].mean()
+
+    # land
+    if np.isnan(sigma0_surface_mean):
+        return -np.inf
+
+    i = 1
+    while (
+        abs(density_anomaly_profile[i+1] - sigma0_surface_mean) < HBAR_DDIFF
+        and i <= len(pressure)-1
+    ):
+        sigma0_surface_mean = (
+            density_anomaly_profile[:i+1].mean()
+        )
+        i += 1
+    mld = pressure[i]
+    if mld <= MAX_DEPTH:
+        return mld
+    return MAX_DEPTH
 
 
 def get_monthly_mld(
@@ -155,13 +172,18 @@ def get_monthly_mld(
     ds['DENSITY_ANOMALY'] = sigma0
     ds['DENSITY_ANOMALY'].attrs = {"units": "kg/m^3"}
 
-    find_surface_density_anomaly_mean(ds)
+    # find_surface_density_anomaly_mean(ds)
+    # mld = xr.apply_ufunc(
+    #     find_half_depth,
+    #     ds['DENSITY_ANOMALY'], ds['PRESSURE'], ds['SURFACE_DENSITY_ANOMALY_MEAN'],
+    #     input_core_dims=[['PRESSURE'], ['PRESSURE'], []], vectorize=True
+    # )
 
-    # Apply this function along the depth dimension
     mld = xr.apply_ufunc(
-        find_half_depth,
-        ds['DENSITY_ANOMALY'], ds['PRESSURE'], ds['SURFACE_DENSITY_ANOMALY_MEAN'],
-        input_core_dims=[['PRESSURE'], ['PRESSURE'], []], vectorize=True
+        find_depth_iteration,
+        ds['DENSITY_ANOMALY'], ds['PRESSURE'],
+        input_core_dims=[['PRESSURE'], ['PRESSURE']],
+        vectorize=True
     )
 
     ds.drop_vars(["PRESSURE"])  # don't need pressure anymore
@@ -198,7 +220,7 @@ def main():
     hbar.name = 'MONTHLY_MEAN_MLD_PRESSURE'
     # display(hbar)
     visualise_dataset(
-        hbar.sel(MONTH=9, method='nearest'),
+        hbar.sel(MONTH=1, method='nearest'),
         cmap='Blues',
         vmin=0, vmax=MAX_DEPTH
     )
