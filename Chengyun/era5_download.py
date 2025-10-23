@@ -11,6 +11,9 @@ import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
+# import xesmf as xe
+
+# from rgargo_read import load_and_prepare_dataset
 
 
 def era5_argolise(ds: xr.Dataset) -> xr.Dataset:
@@ -75,6 +78,12 @@ def era5_argolise(ds: xr.Dataset) -> xr.Dataset:
         'time_origin': '01-JAN-2004 00:00:00',
         'axis': 'T'
     })
+    # argo_ds = load_and_prepare_dataset(
+    #     "../datasets/Temperature (2004-2018).nc"
+    # )
+    # regridder = xe.Regridder(ds, argo_ds, "conservative")
+    # ds_interpolated = regridder(ds)
+    # return ds_interpolated
     return ds
 
 
@@ -86,7 +95,7 @@ if __name__ == "__main__":
     # request = {
     #     "product_type": [
     #         "monthly_averaged_reanalysis",
-    #         "monthly_averaged_ensemble_members"
+    #         # "monthly_averaged_ensemble_members"
     #     ],
     #     "variable": [
     #         "mean_eastward_turbulent_surface_stress",
@@ -109,7 +118,7 @@ if __name__ == "__main__":
     #         "10", "11", "12"
     #     ],
     #     "time": ["00:00"],
-    #     "grid": "1.0/1.0",
+    #     # "grid": "1.0/1.0",
     #     "data_format": "netcdf",
     #     "download_format": "unarchived",
     #     "area": [79.5, -179.5, -64.5, 179.5]
@@ -121,9 +130,10 @@ if __name__ == "__main__":
     # era5_edmo_ds = xr.open_dataset("../datasets/data_stream-edmo_stepType-avgad.nc")
     # era5_edmo_ds = era5_argolise(era5_edmo_ds)
     # display(era5_edmo_ds)
-    era5_moda_ds = xr.open_dataset("../datasets/data_stream-moda_stepType-avgad.nc")
+    era5_moda_ds = xr.open_dataset("../datasets/ERA5_Mean_Turbulent_Surface_Stress.nc")
     era5_moda_ds = era5_argolise(era5_moda_ds)
     display(era5_moda_ds)
+
     print(era5_moda_ds['avg_iews'].max().item(), era5_moda_ds['avg_inss'].max().item())
     print(
         abs(era5_moda_ds['avg_iews']).mean().item(),

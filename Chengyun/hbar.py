@@ -120,6 +120,12 @@ def find_depth_iteration(density_anomaly_profile, pressure):
         The pressure at the mixed layer depth (hbar).
         Returns MAX_DEPTH if not found, or -inf for land.
     """
+
+    # sort pressure and temperature to be in order of increasing pressure
+    indices_increasing_pressure = np.argsort(pressure)
+    pressure = pressure[indices_increasing_pressure]
+    density_anomaly_profile = density_anomaly_profile[indices_increasing_pressure]
+
     sigma0_surface_mean = density_anomaly_profile[:1].mean()
 
     # land
