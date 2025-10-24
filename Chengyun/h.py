@@ -104,6 +104,49 @@ def find_surface_density_anomaly_mean(ds: xr.Dataset) -> None:
     ds['SURFACE_DENSITY_ANOMALY_MEAN'] = sigma0_surface_mean
 
 
+def find_depth_iteration(density_anomaly_profile, pressure):
+    """
+    Find the mixed layer depth (hbar) from a density anomaly profile using iterative method.
+    Parameters
+    ----------
+    density_anomaly_profile : np.ndarray
+        1D array of density anomaly values at different pressures.
+    pressure : np.ndarray
+        1D array of pressure values corresponding to the density profile.
+
+    Returns
+    -------
+    float
+        The pressure at the mixed layer depth (hbar).
+        Returns MAX_DEPTH if not found, or -inf for land.
+    """
+
+    # sort pressure and temperature to be in order of increasing pressure
+    indices_increasing_pressure = np.argsort(pressure)
+    pressure = pressure[indices_increasing_pressure]
+    density_anomaly_profile = density_anomaly_profile[indices_increasing_pressure]
+
+    sigma0_surface_mean = density_anomaly_profile[:1].mean()
+
+    # land
+    if np.isnan(sigma0_surface_mean):
+        return -np.inf
+
+    i = 1
+    while (
+        abs(density_anomaly_profile[i+1] - sigma0_surface_mean) < HBAR_DDIFF
+        and i <= len(pressure)-1
+    ):
+        sigma0_surface_mean = (
+            density_anomaly_profile[:i+1].mean()
+        )
+        i += 1
+    mld = pressure[i]
+    if mld <= MAX_DEPTH:
+        return mld
+    return MAX_DEPTH
+
+
 def get_monthly_mld(
     ds: xr.Dataset,
     month: int | None = None
@@ -136,13 +179,18 @@ def get_monthly_mld(
     ds['DENSITY_ANOMALY'].attrs = {"units": "kg/m^3"}
 
     find_surface_density_anomaly_mean(ds)
-
-    # Apply this function along the depth dimension
     mld = xr.apply_ufunc(
         find_half_depth,
         ds['DENSITY_ANOMALY'], ds['PRESSURE'], ds['SURFACE_DENSITY_ANOMALY_MEAN'],
         input_core_dims=[['PRESSURE'], ['PRESSURE'], []], vectorize=True
     )
+
+    # mld = xr.apply_ufunc(
+    #     find_depth_iteration,
+    #     ds['DENSITY_ANOMALY'], ds['PRESSURE'],
+    #     input_core_dims=[['PRESSURE'], ['PRESSURE']],
+    #     vectorize=True
+    # )
 
     ds.drop_vars(["PRESSURE"])  # don't need pressure anymore
     ds['MLD_PRESSURE'] = mld   # save to dataset
@@ -154,10 +202,10 @@ def main():
     """Main function to find hbar."""
 
     t = load_and_prepare_dataset(
-        "../datasets/Temperature (2004-2018).nc"
+        "../datasets/Temperature-(2004-2018).nc"
     )
     s = load_and_prepare_dataset(
-        "../datasets/Salinity (2004-2018).nc"
+        "../datasets/Salinity-(2004-2018).nc"
     )
     ds = xr.merge([t, s])
     display(ds)
@@ -178,11 +226,11 @@ def main():
     h.name = 'MLD_PRESSURE'
     # display(h)
     visualise_dataset(
-        h.sel(TIME=1, method='nearest'),
+        h.sel(TIME=3, method='nearest'),
         cmap='Blues',
         vmin=0, vmax=MAX_DEPTH
     )
-    # h.to_netcdf("../datasets/Mixed_Layer_Depth_Pressure (2004-2018).nc")
+    # h.to_netcdf("../datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc")
 
     # check
     m, lon, lat = 1, -47, 56
