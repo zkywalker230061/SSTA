@@ -20,6 +20,7 @@ This work is licensed under a
 The Slab Mixed Layer Model:
 ![image](.readme_archive/sml.png)
 
-Some results for Monthly Mean Mixed Layer Depth ($\bar{h}$) from RG-ARGO climatology:
-![image](.readme_archive/hbar_jan.png)
-![image](.readme_archive/hbar_sep.png)
+Results for Monthly Mean Mixed Layer Depth ($\bar{h}$) from RG-ARGO climatology:
+
+![](.readme_archive/hbar.mp4)
+<video src=".readme_archive/hbar.mp4?" loop="loop" controls preload></video>
