@@ -22,5 +22,4 @@ The Slab Mixed Layer Model:
 
 Results for Monthly Mean Mixed Layer Depth ($\bar{h}$) from RG-ARGO climatology:
 
-![](.readme_archive/hbar.mp4)
-<video src=".readme_archive/hbar.mp4?" loop="loop" controls preload></video>
+<video src=".readme_archive/hbar.mp4" loop="loop" controls preload></video>
