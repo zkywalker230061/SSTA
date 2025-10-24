@@ -198,7 +198,7 @@ def get_monthly_mld(
 
 
 def main():
-    """Main function to find hbar."""
+    """Main function to find h."""
 
     t = load_and_prepare_dataset(
         "../datasets/Temperature-(2004-2018).nc"
