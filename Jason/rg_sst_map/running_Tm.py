@@ -1,5 +1,5 @@
 """
-Julia Xie
+JY
 """
 
 #%%
@@ -7,7 +7,7 @@ from read_nc import fix_rg_time, fix_longitude_coord
 from calculate_Tm_Sm import depth_dbar_to_meter, _full_field
 from calculate_Tm_Sm import z_to_xarray
 from calculate_Tm import vertical_integral
-from grad_field import compute_gradients
+from grad_field import compute_gradient_lat, compute_gradient_lon
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -92,14 +92,19 @@ vertical = vertical_integral(T_full,z_new, h_normal)          #??????i changed h
 
 print('vertical_integral:\n',vertical)
 #%% ----5. Gradient Test --------
-gradients = compute_gradients(vertical)
-print('gradients:\n',gradients)
+gradient_lat = compute_gradient_lat(vertical)
+print('gradient_lat:\n',gradient_lat)
+gradient_lon = compute_gradient_lon(vertical)
+print('gradient_lon:\n',gradient_lon)
+
+
 
 
 #%%
 if __name__ == "__main__":
-    #----Plot Map----------------------------------------------------
-    t0 = gradients.sel(TIME="2009-10-01")
+    #----Plot Temperature Map----------------------------------------------------
+    date = "2015-10-01"
+    t0 = vertical.sel(TIME=f"{date}")
 
     # Copy the colormap and set NaN color
     cmap = plt.get_cmap("RdYlBu_r").copy()
@@ -110,11 +115,50 @@ if __name__ == "__main__":
         t0["LONGITUDE"], t0["LATITUDE"], np.ma.masked_invalid(t0),
         cmap=cmap, shading="auto"
     )
-    plt.colorbar(pc, label="Mean Temperature (°C, 0–100 m)")
-    plt.title("Upper 100 m Mean Temperature Gradient (Lat)- Jan 2006")
+    plt.colorbar(pc, label="Mean Temperature (°C)")
+    plt.title(f"Mixed Layer Temperature - {date}")
+    plt.xlabel("Longitude")
+    plt.ylabel("Latitude")
+    plt.tight_layout()
+    plt.show()
+    #----Plot Gradient Map (Lon)----------------------------------------------------
+    t0 = gradient_lat.sel(TIME=f"{date}")
+
+    # Copy the colormap and set NaN color
+    cmap = plt.get_cmap("RdYlBu_r").copy()
+    cmap.set_bad(color="black")   # or "white", "black", (0.5,0.5,0.5,1), etc.
+
+    plt.figure(figsize=(10,5))
+    pc = plt.pcolormesh(
+        t0["LONGITUDE"], t0["LATITUDE"], np.ma.masked_invalid(t0),
+        cmap=cmap, shading="auto", vmin= -1e-5, vmax=1e-5
+    )
+    plt.colorbar(pc, label="Temperature Gradient (°C/m)")
+    plt.title(f"Mixed Layer Temperature Gradient (Lat)- {date}")
+    plt.xlabel("Longitude")
+    plt.ylabel("Latitude")
+    plt.tight_layout()
+    plt.show()
+
+    #----Plot Gradient Map (Lon)----------------------------------------------------
+    t0 = gradient_lon.sel(TIME=f"{date}")
+
+    # Copy the colormap and set NaN color
+    cmap = plt.get_cmap("RdYlBu_r").copy()
+    cmap.set_bad(color="black")   # or "white", "black", (0.5,0.5,0.5,1), etc.
+
+    plt.figure(figsize=(10,5))
+    pc = plt.pcolormesh(
+        t0["LONGITUDE"], t0["LATITUDE"], np.ma.masked_invalid(t0),
+        cmap=cmap, shading="auto", vmin = -1e-5, vmax=1e-5
+    )
+    plt.colorbar(pc, label="Temperature Gradient (°C/m)")
+    plt.title(f"Mixed Layer Temperature Gradient (Lon)- {date}")
     plt.xlabel("Longitude")
     plt.ylabel("Latitude")
     plt.tight_layout()
     plt.show()
     # vertical.to_netcdf("Mean Temperature Dataset (2004-2018)")
 
+
+# %%
