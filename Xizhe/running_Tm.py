@@ -5,6 +5,7 @@ Julia Xie
 #%%
 from read_nc import fix_rg_time, fix_longitude_coord
 from calculate_Tm_Sm import depth_dbar_to_meter, _full_field, z_to_xarray, vertical_integral, mld_dbar_to_meter
+from grad_field import compute_gradient_lat, compute_gradient_lon
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -81,6 +82,10 @@ z_new = z_to_xarray(depth, T_full)
 #----4. Vertical Integration ---------------------------------------------
 vertical = vertical_integral(T_full,z_new, depth_m)          #??????i changed here to -z_new
 print('vertical_integral:\n',vertical_integral)
+gradient_lat = compute_gradient_lat(vertical)
+print('gradient_lat:\n',gradient_lat)
+gradient_lon = compute_gradient_lon(vertical)
+print('gradient_lon:\n',gradient_lon)
 
 #%%
 if __name__ == "__main__":
@@ -104,4 +109,40 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.show()
     # vertical.to_netcdf("Mean Temperature Dataset (2004-2018)")
-# %%
+
+    # %%
+    #----Gradient Latitude and Longtitude Plot-----------------------
+    t0 = gradient_lat.sel(TIME=f"{date}")
+
+    # Copy the colormap and set NaN color
+    cmap = plt.get_cmap("RdYlBu_r").copy()
+    cmap.set_bad(color="black")   # or "white", "black", (0.5,0.5,0.5,1), etc.
+
+    plt.figure(figsize=(10,5))
+    pc = plt.pcolormesh(
+        t0["LONGITUDE"], t0["LATITUDE"], np.ma.masked_invalid(t0),
+        cmap=cmap, shading="auto", vmin= -1e-5, vmax=1e-5
+    )
+    plt.colorbar(pc, label="Temperature Gradient (°C/m)")
+    plt.title(f"Mixed Layer Temperature Gradient (Lat)- {date}")
+    plt.xlabel("Longitude")
+    plt.ylabel("Latitude")
+    plt.tight_layout()
+    plt.show()
+
+    t0 = gradient_lon.sel(TIME=f"{date}")
+
+    cmap = plt.get_cmap("RdYlBu_r").copy()
+    cmap.set_bad(color="black")   # or "white", "black", (0.5,0.5,0.5,1), etc.
+
+    plt.figure(figsize=(10,5))
+    pc = plt.pcolormesh(
+        t0["LONGITUDE"], t0["LATITUDE"], np.ma.masked_invalid(t0),
+        cmap=cmap, shading="auto", vmin = -1e-5, vmax=1e-5
+    )
+    plt.colorbar(pc, label="Temperature Gradient (°C/m)")
+    plt.title(f"Mixed Layer Temperature Gradient (Lon)- {date}")
+    plt.xlabel("Longitude")
+    plt.ylabel("Latitude")
+    plt.tight_layout()
+    plt.show()
