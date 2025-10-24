@@ -30,7 +30,7 @@ def save_monthly_mld():
     mld_monthly_mean = get_monthly_mean(mld)
     # display(mld_monthly_mean)
     visualise_dataset(
-        mld_monthly_mean.sel(MONTH=3, method='nearest'),
+        mld_monthly_mean.sel(MONTH=1, method='nearest'),
         cmap='Blues',
         vmin=0, vmax=MAX_DEPTH
     )

@@ -58,32 +58,31 @@ def find_half_depth(density_anomaly_profile, pressure, density_anomaly_surface_m
 
     # only sigma below sigma_mld_min
     if len(pressures_below_sigma_0) != 0 and len(pressures_above_sigma_0) == 0:
-        below_mld_index = pressures_below_sigma_0[0]
-        above_mld_index = below_mld_index - 1
+        index2 = pressures_below_sigma_0[0]
+        index1 = index2 - 1
         sigma_mld = sigma_mld_min
     # only sigma above sigma_mld_max
     elif len(pressures_below_sigma_0) == 0 and len(pressures_above_sigma_0) != 0:
-        above_mld_index = pressures_above_sigma_0[0]
-        below_mld_index = above_mld_index - 1
+        index2 = pressures_above_sigma_0[0]
+        index1 = index2 - 1
         sigma_mld = sigma_mld_max
     # both found, check which is closer to surface
     elif len(pressures_below_sigma_0) != 0 and len(pressures_above_sigma_0) != 0:
         if pressures_above_sigma_0[0] < pressures_below_sigma_0[0]:
-            above_mld_index = pressures_above_sigma_0[0]
-            below_mld_index = above_mld_index - 1
+            index2 = pressures_above_sigma_0[0]
+            index1 = index2 - 1
             sigma_mld = sigma_mld_max
         else:
-            below_mld_index = pressures_below_sigma_0[0]
-            above_mld_index = below_mld_index - 1
+            index2 = pressures_below_sigma_0[0]
+            index1 = index2 - 1
             sigma_mld = sigma_mld_min
-    # neither found, return depth of max temperature
     else:
         return MAX_DEPTH
 
     mld = np.interp(
         sigma_mld,
-        [density_anomaly_profile[above_mld_index], density_anomaly_profile[below_mld_index]],
-        [pressure[above_mld_index], pressure[below_mld_index]]
+        [density_anomaly_profile[index1], density_anomaly_profile[index2]],
+        [pressure[index1], pressure[index2]]
     )
     if mld <= MAX_DEPTH:
         return mld
@@ -230,7 +229,7 @@ def main():
         cmap='Blues',
         vmin=0, vmax=MAX_DEPTH
     )
-    # h.to_netcdf("../datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc")
+    h.to_netcdf("../datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc")
 
     # check
     m, lon, lat = 1, -47, 56
