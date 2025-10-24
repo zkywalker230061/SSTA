@@ -91,7 +91,7 @@ print('vertical_integral:\n',vertical_integral)
 #----5. Main  ------------------------------------------------------------------
 if __name__ == "__main__":
     #----Plot Map---------------------------------------------------------------
-    date = "2006-01-01"
+    date = "2014-10-01"
     test_data = vertical.sel(TIME=date)
 
     # Copy the colormap and set NaN color
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     plt.figure(figsize=(10,5))
     pc = plt.pcolormesh(
         test_data["LONGITUDE"], test_data["LATITUDE"], np.ma.masked_invalid(test_data),
-        cmap=cmap, shading="auto", vmin=30, vmax=40
+        cmap=cmap, shading="auto", vmin=31, vmax=38
     )
     plt.colorbar(pc, label="Mean Salinity (Scale 78)")
     plt.title(f"Mixed Layer Depth Mean Salinity {date}")

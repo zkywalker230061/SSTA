@@ -85,7 +85,7 @@ print('vertical_integral:\n',vertical_integral)
 #%%
 if __name__ == "__main__":
     #----Plot Map----------------------------------------------------
-    date = "2005-01-01"
+    date = "2014-10-01"
     test_data = vertical.sel(TIME=f"{date}")
 
     # Copy the colormap and set NaN color
@@ -95,10 +95,10 @@ if __name__ == "__main__":
     plt.figure(figsize=(10,5))
     pc = plt.pcolormesh(
         test_data["LONGITUDE"], test_data["LATITUDE"], np.ma.masked_invalid(test_data),
-        cmap=cmap, shading="auto", vmin=-2, vmax=30
+        cmap=cmap, shading="auto", vmin=-5, vmax=35
     )
-    plt.colorbar(pc, label="Mean Temperature (°C, 0–100 m)")
-    plt.title(f"Mixed Layer Depth Mean Temperature - {date}")
+    plt.colorbar(pc, label="Mean Temperature (°C)")
+    plt.title(f"Mixed Layer Depth Mean Temperature {date}")
     plt.xlabel("Longitude")
     plt.ylabel("Latitude")
     plt.tight_layout()
