@@ -90,7 +90,7 @@ print('gradient_lon:\n',gradient_lon)
 #%%
 if __name__ == "__main__":
     #----Plot Map----------------------------------------------------
-    date = "2014-10-01"
+    date = "2014-03-01"
     test_data = vertical.sel(TIME=f"{date}")
 
     # Copy the colormap and set NaN color

@@ -56,3 +56,14 @@ def fix_longitude_coord(ds):
     ds['LONGITUDE'].attrs.update(lon_atrib)
     ds['LONGITUDE'].attrs['modulo'] = 180
     return ds
+
+
+if __name__ == "__main__":
+    file_path = '/Users/xxz/Desktop/SSTA/datasets/windstress.nc'
+    ds = xr.open_dataset(
+        file_path, 
+        engine="netcdf4",
+        decode_times=False,
+        mask_and_scale=True)
+    print(ds)
+    print(ds['avg_iews'].values)

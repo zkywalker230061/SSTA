@@ -37,7 +37,7 @@ ds_sal = xr.open_dataset(
     "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Salinity_2019.nc",
     engine="netcdf4",
     decode_times=False,
-    mask_and_scale=True,
+    mask_and_scale=True
 )
 
 height_grid = xr.open_dataset(
