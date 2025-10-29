@@ -1,14 +1,16 @@
 import numpy as np
 import xarray as xr
+from calculate_Tm_Sm import vertical_integral
+from grad_field import compute_gradient_lat, compute_gradient_lon
+from read_nc import fix_rg_time
 
-c_o = 4100                          #specific heat capacity of seawater = 4100 Jkg^-1K^-1
-omega = 2*np.pi/(24*3600)           #Earth's angular velocity
-phi = 'LATITUDE'
+c_o = 4100                         #specific heat capacity of seawater = 4100 Jkg^-1K^-1
+omega = 2*np.pi/(24*3600)         #Earth's angular velocity
 #f = 2*omega*np.sin(phi)            #Coriolis Parameter
 
 
-def ekmann_current (tau_x, tau_y, dTm_dy, dTm_dx,f):
-    Q_ek = c_o (tau_x*dTm_dy/f - tau_y*dTm_dx/f)
+def ekmann_current (tau_x, tau_y, dTm_dx, dTm_dy,f):
+    Q_ek = c_o *(tau_x*dTm_dy/f - tau_y*dTm_dx/f)
     return Q_ek
 
 def month_idx (time_da: xr.DataArray) -> xr.DataArray:
@@ -39,8 +41,24 @@ def get_monthly_mean(da: xr.DataArray,) -> xr.DataArray:
     # monthly_mean_da.name = f"MONTHLY_MEAN_{da.name}"
     return monthly_mean_da
 
+# def get_anomaly(full_field, monthly_mean):
+#     anom = full_field - monthly_mean
+#     return anom
+
 def get_anomaly(full_field, monthly_mean):
-    anom = full_field - monthly_mean
+    """
+    Calculates the anomaly of a full time-series DataArray
+    by subtracting its corresponding monthly mean.
+    """
+    if 'TIME' not in full_field.dims:
+        raise ValueError("The full_field DataArray must have a TIME dimension.")
+    
+    # Get the month index (1-12) for each item in the full_field
+    m = month_idx(full_field['TIME'])
+    
+    # Group the full_field by its month index and then subtract
+    # the corresponding monthly_mean. This preserves the original 3D shape.
+    anom = full_field.groupby(m) - monthly_mean
     return anom
 
 def coriolis_parameter(lat_ds):
@@ -108,26 +126,71 @@ def repeat_monthly_field(ds, var_name, n_repeats=15):
 
 if __name__ == "__main__":
     file_path = '/Users/xxz/Desktop/SSTA/datasets/windstress.nc'
+    grad_lat_file_path = '/Users/xxz/Desktop/SSTA/datasets/gradient_lat_test.nc'
+    grad_lon_file_path = '/Users/xxz/Desktop/SSTA/datasets/gradient_lon_test.nc'
+
     ds = xr.open_dataset(
         file_path, 
         engine="netcdf4",
         decode_times=False,
         mask_and_scale=True)
     
+    ds_grad_lat = xr.open_dataset(
+        grad_lat_file_path, 
+        engine="netcdf4",
+        decode_times=False,
+        mask_and_scale=True)
+    
+    ds_grad_lon = xr.open_dataset(
+        grad_lon_file_path, 
+        engine="netcdf4",
+        decode_times=False,
+        mask_and_scale=True)
+    
+    
+
     ds_tau_x = ds['avg_iews']
     ds_tau_y = ds['avg_inss']
 
     monthly_mean_tau_x = get_monthly_mean(ds_tau_x)
     monthly_mean_tau_y = get_monthly_mean(ds_tau_y)
 
-    full_field_monthly_mean_tau_x = repeat_monthly_field(monthly_mean_tau_x, 'avg_iews')
-    full_field_monthly_mean_tau_y = repeat_monthly_field(monthly_mean_tau_y, 'avg_inss')
+    #print ('monthly_mean_tau_x: \n', monthly_mean_tau_x)
 
-    tau_x_anom = get_anomaly(full_field_monthly_mean_tau_x, monthly_mean_tau_x)
-    tau_y_anom = get_anomaly(full_field_monthly_mean_tau_y, monthly_mean_tau_y)
+    # full_field_monthly_mean_tau_x = repeat_monthly_field(monthly_mean_tau_x, 'avg_iews')
+    # full_field_monthly_mean_tau_y = repeat_monthly_field(monthly_mean_tau_y, 'avg_inss')
 
+    # tau_x_anom = get_anomaly(ds_tau_x, full_field_monthly_mean_tau_x)
+    # tau_y_anom = get_anomaly(ds_tau_y, full_field_monthly_mean_tau_y)
+
+    tau_x_anom = get_anomaly(ds_tau_x, monthly_mean_tau_x)
+    tau_y_anom = get_anomaly(ds_tau_y, monthly_mean_tau_y)
+
+    lat = ds["LATITUDE"]
+    # f = coriolis_parameter(lat)
+
+    f = coriolis_parameter(lat).broadcast_like(tau_x_anom)
+    f = fix_rg_time(f, mode='datetime')
+
+    print('tau_x_anom.dims',tau_x_anom.dims)
+    print('tau_y_anom.dims', tau_y_anom.dims)
+    print(ds_grad_lat["variable"].dims)
+    print(ds_grad_lon["variable"].dims)
+    print(f.dims)
+    print (f)
+    
+    Q_ek_anom = ekmann_current(
+        tau_x_anom,       # This is the tau_x DataArray
+        tau_y_anom,       # This is the tau_y DataArray
+        ds_grad_lon['variable'],      # This is dTm_dx (longitude gradient)
+        ds_grad_lat['variable'],      # This is dTm_dy (latitude gradient)
+        f                         # This is the coriolis parameter (already a DataArray)
+    )
 
     print(
+        #'ekmann current anomaly:', Q_ek_anom
+        # ds_grad_lat,
+
         #  'original dataset:\n', ds,
         #'\n ds_tau_x: \n', ds_tau_x,
         #'\n ds_tau_y: \n', ds_tau_y,
@@ -135,8 +198,8 @@ if __name__ == "__main__":
         # '\n monthly mean tau_y: \n', monthly_mean_tau_y.shape,
         # '\n Full Field Monthly mean tau_x: \n', full_field_monthly_mean_tau_x,
         # '\n Full Field monthly mean tau_y: \n', full_field_monthly_mean_tau_y,
-        '\ntau x anomaly: \n', tau_x_anom['avg_iews'].values,
-        '\n tau y anomaly: \n', tau_y_anom['avg_inss'].values,
+        # '\ntau x anomaly: \n', tau_x_anom['avg_iews'].values,
+        # '\n tau y anomaly: \n', tau_y_anom['avg_inss'].values,
         #ds["avg_iews"]
     )
 
