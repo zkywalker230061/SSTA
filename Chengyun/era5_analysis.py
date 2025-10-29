@@ -59,10 +59,36 @@ def save_monthly_mean_wind_stress():
     )
 
 
+def save_monthly_mean_heat_flux():
+    """Save the monthly mean of the ERA5 heat flux dataset."""
+
+    ds_era5 = load_and_prepare_dataset(
+        "../datasets/ERA5-ARGO_Mean_Surface_Heat_Flux.nc",
+    )
+    lh = ds_era5['avg_slhtf']
+    sh = ds_era5['avg_ishf']
+    sw = ds_era5['avg_snswrf']
+    lw = ds_era5['avg_snlwrf']
+    lh_monthly_mean = get_monthly_mean(lh)
+    sh_monthly_mean = get_monthly_mean(sh)
+    sw_monthly_mean = get_monthly_mean(sw)
+    lw_monthly_mean = get_monthly_mean(lw)
+
+    ds_monthly_mean = lh_monthly_mean.to_dataset(name='MONTHLY_MEAN_avg_slhtf')
+    ds_monthly_mean['MONTHLY_MEAN_avg_ishf'] = sh_monthly_mean
+    ds_monthly_mean['MONTHLY_MEAN_avg_snswrf'] = sw_monthly_mean
+    ds_monthly_mean['MONTHLY_MEAN_avg_snlwrf'] = lw_monthly_mean
+    display(ds_monthly_mean)
+    ds_monthly_mean.to_netcdf(
+        "../datasets/ERA5-ARGO_Mean_Surface_Heat_Flux-Seasonal_Cycle_Mean.nc"
+    )
+
+
 def main():
     """Main function for era5_analysis.py"""
 
     save_monthly_mean_wind_stress()
+    save_monthly_mean_heat_flux()
 
 
 if __name__ == "__main__":
