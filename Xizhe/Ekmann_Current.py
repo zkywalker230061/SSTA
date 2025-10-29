@@ -1,18 +1,143 @@
 import numpy as np
-
+import xarray as xr
 
 c_o = 4100                          #specific heat capacity of seawater = 4100 Jkg^-1K^-1
 omega = 2*np.pi/(24*3600)           #Earth's angular velocity
 phi = 'LATITUDE'
-f = 2*omega*np.sin(phi)            #Coriolis Parameter
+#f = 2*omega*np.sin(phi)            #Coriolis Parameter
 
 
-def ekmann_current (tau_x, tau_y, dTm_dy, dTm_dx):
+def ekmann_current (tau_x, tau_y, dTm_dy, dTm_dx,f):
     Q_ek = c_o (tau_x*dTm_dy/f - tau_y*dTm_dx/f)
     return Q_ek
 
+def month_idx (time_da: xr.DataArray) -> xr.DataArray:
+    n = time_da.sizes['TIME']
+    # Repeat 1..12 along TIME; align coords to TIME
+    month_idx = (xr.DataArray(np.arange(n) % 12 + 1, dims=['TIME'])
+                 .assign_coords(TIME=time_da))
+    month_idx.name = 'MONTH'
+    return month_idx
 
-def ekmann_current_anom(tau_x_anom, tau_y_anom, dTm_bar_dy, dTm_bar_dx):
-    Q_ek_anom = c_o(tau_x_anom*dTm_bar_dy/f - tau_y_anom*dTm_bar_dx/f)
-    return Q_ek_anom
+def get_monthly_mean(da: xr.DataArray,) -> xr.DataArray:
+    if 'TIME' not in da.dims:
+        raise ValueError("The DataArray must have a TIME dimension.")
+    
+    m = month_idx(da['TIME'])
+    monthly_mean_da = da.groupby(m).mean('TIME', keep_attrs=True)
+    # monthly_means = []
+    # for _, month_num in MONTHS.items():
+    #     monthly_means.append(
+    #         da.sel(TIME=da['TIME'][month_num-1::12]).mean(dim='TIME')
+    #     )
+    # monthly_mean_da = xr.concat(monthly_means, dim='MONTH')
+    # monthly_mean_da = monthly_mean_da.assign_coords(MONTH=list(MONTHS.values()))
+    # monthly_mean_da['MONTH'].attrs['units'] = 'month'
+    # monthly_mean_da['MONTH'].attrs['axis'] = 'M'
+    # monthly_mean_da.attrs['units'] = da.attrs.get('units')
+    # monthly_mean_da.attrs['long_name'] = f"Seasonal Cycle Mean of {da.attrs.get('long_name')}"
+    # monthly_mean_da.name = f"MONTHLY_MEAN_{da.name}"
+    return monthly_mean_da
+
+def get_anomaly(full_field, monthly_mean):
+    anom = full_field - monthly_mean
+    return anom
+
+def coriolis_parameter(lat_ds):
+    phi_rad = np.deg2rad(lat_ds)
+    f = 2 * omega * np.sin(phi_rad)
+    f.attrs['units'] = 's^-1'
+    return f
+
+def repeat_monthly_field(ds, var_name, n_repeats=15):
+    """
+    Take a dataset with a monthly 3D field (MONTH, LATITUDE, LONGITUDE)
+    and repeat it n_repeats times along the MONTH axis to create a new
+    time-like dimension of length 12 * n_repeats.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Input dataset. Must contain:
+        - coord "MONTH" of length 12
+        - coord "LATITUDE"
+        - coord "LONGITUDE"
+        - data variable `var_name` with dims ("MONTH","LATITUDE","LONGITUDE")
+    var_name : str
+        Name of the data variable to tile, e.g. "MONTHLY_MEAN_MLD_PRESSURE".
+    n_repeats : int, default 15
+        How many times to repeat the 12-month cycle.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with:
+        - new dim "TIME" of length 12 * n_repeats
+        - coords "TIME", "LATITUDE", "LONGITUDE"
+        - data variable renamed to the same var_name but
+          now on ("TIME","LATITUDE","LONGITUDE")
+    """
+
+    month_vals = ds["MONTH"].values  # e.g. [1,2,...,12]
+
+    time_coord = np.tile(month_vals, n_repeats).astype(float)
+
+    for i in range(len(time_coord)):
+        time_coord[i] = time_coord[i] + (i // 12) * 12
+
+    time_coord = time_coord - 0.5  # length = 12 * n_repeats
+
+    data_var = ds.values  # shape (12, lat, lon)
+    data_tiled = np.tile(data_var, (n_repeats, 1, 1))
+
+    out = xr.Dataset(
+        {
+            var_name: (
+                ("TIME", "LATITUDE", "LONGITUDE"),
+                data_tiled,
+            )
+        },
+        coords={
+            "TIME": time_coord,
+            "LATITUDE": ds["LATITUDE"].values,
+            "LONGITUDE": ds["LONGITUDE"].values,
+        },
+    )
+    return out
+
+
+if __name__ == "__main__":
+    file_path = '/Users/xxz/Desktop/SSTA/datasets/windstress.nc'
+    ds = xr.open_dataset(
+        file_path, 
+        engine="netcdf4",
+        decode_times=False,
+        mask_and_scale=True)
+    
+    ds_tau_x = ds['avg_iews']
+    ds_tau_y = ds['avg_inss']
+
+    monthly_mean_tau_x = get_monthly_mean(ds_tau_x)
+    monthly_mean_tau_y = get_monthly_mean(ds_tau_y)
+
+    full_field_monthly_mean_tau_x = repeat_monthly_field(monthly_mean_tau_x, 'avg_iews')
+    full_field_monthly_mean_tau_y = repeat_monthly_field(monthly_mean_tau_y, 'avg_inss')
+
+    tau_x_anom = get_anomaly(full_field_monthly_mean_tau_x, monthly_mean_tau_x)
+    tau_y_anom = get_anomaly(full_field_monthly_mean_tau_y, monthly_mean_tau_y)
+
+
+    print(
+        #  'original dataset:\n', ds,
+        #'\n ds_tau_x: \n', ds_tau_x,
+        #'\n ds_tau_y: \n', ds_tau_y,
+        # '\n Monthly mean tau_x: \n', monthly_mean_tau_x,
+        # '\n monthly mean tau_y: \n', monthly_mean_tau_y.shape,
+        # '\n Full Field Monthly mean tau_x: \n', full_field_monthly_mean_tau_x,
+        # '\n Full Field monthly mean tau_y: \n', full_field_monthly_mean_tau_y,
+        '\ntau x anomaly: \n', tau_x_anom['avg_iews'].values,
+        '\n tau y anomaly: \n', tau_y_anom['avg_inss'].values,
+        #ds["avg_iews"]
+    )
+
 

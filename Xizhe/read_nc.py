@@ -65,5 +65,8 @@ if __name__ == "__main__":
         engine="netcdf4",
         decode_times=False,
         mask_and_scale=True)
-    print(ds)
-    print(ds['avg_iews'].values)
+    #print(ds.TIME)
+    #print(ds)
+    ds= fix_rg_time(ds)
+    print (ds['TIME'])
+    #print(ds['avg_iews'].values)
