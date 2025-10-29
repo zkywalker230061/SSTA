@@ -82,12 +82,13 @@ gradient_lat = compute_gradient_lat(vertical)
 print('gradient_lat:\n',gradient_lat)
 gradient_lon = compute_gradient_lon(vertical)
 print('gradient_lon:\n',gradient_lon)
-
+grad_mag = np.sqrt(gradient_lat**2 + gradient_lon**2)
+print('grad_mag:\n',grad_mag)
 
 #%%
 if __name__ == "__main__":
     #----Plot Temperature Map----------------------------------------------------
-    date = "2015-10-01"
+    date = "2013-01-01"
     t0 = vertical.sel(TIME=f"{date}")
 
     # Copy the colormap and set NaN color
@@ -138,6 +139,25 @@ if __name__ == "__main__":
     )
     plt.colorbar(pc, label=f"Salinity Gradient (/m)")
     plt.title(f"Mixed Layer Salinity Gradient (Lon)- {date}")
+    plt.xlabel("Longitude")
+    plt.ylabel("Latitude")
+    plt.tight_layout()
+    plt.show()
+
+    #----Plot Gradient Map (Magnitude)----------------------------------------------------
+    t0 = grad_mag.sel(TIME=f"{date}")
+
+    # Copy the colormap and set NaN color
+    cmap = plt.get_cmap("RdYlBu_r").copy()
+    cmap.set_bad(color="black")   # or "white", "black", (0.5,0.5,0.5,1), etc.
+
+    plt.figure(figsize=(10,5))
+    pc = plt.pcolormesh(
+        t0["LONGITUDE"], t0["LATITUDE"], np.ma.masked_invalid(t0),
+        cmap=cmap, shading="auto", vmin = 0, vmax=3e-6
+    )
+    plt.colorbar(pc, label=f"Salinity Gradient (/m)")
+    plt.title(f"Mixed Layer Salinity Gradient Magnitude- {date}")
     plt.xlabel("Longitude")
     plt.ylabel("Latitude")
     plt.tight_layout()
