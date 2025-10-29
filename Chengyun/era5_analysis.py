@@ -19,6 +19,7 @@ from rgargo_analysis import get_monthly_mean
 
 def save_monthly_mean_wind_stress():
     """Save the monthly mean of the ERA5 wind stress dataset."""
+
     ds_era5 = load_and_prepare_dataset(
         "../datasets/ERA5-ARGO_Mean_Turbulent_Surface_Stress.nc",
     )

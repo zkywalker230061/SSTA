@@ -41,6 +41,7 @@ def _time_standard(ds: xr.Dataset, mid_month: bool = False) -> xr.Dataset:
     ValueError
         If mid_month is not True or False.
     """
+
     _, reference_date = ds['TIME'].attrs['units'].split('since')
     if mid_month is False:
         ds['time'] = pd.date_range(start=reference_date, periods=ds.sizes['TIME'], freq='MS')
@@ -68,6 +69,7 @@ def _longitude_180(ds: xr.Dataset) -> xr.Dataset:
     xarray.Dataset
         Dataset with 'LONGITUDE' in [-180, 180] and sorted.
     """
+
     lon_atrib = ds.coords['LONGITUDE'].attrs
     ds['LONGITUDE'] = ((ds['LONGITUDE'] + 180) % 360) - 180
     ds = ds.sortby(ds['LONGITUDE'])
@@ -104,6 +106,7 @@ def load_and_prepare_dataset(
     xarray.Dataset or None
         The processed dataset, or None if loading fails.
     """
+
     try:
         with xr.open_dataset(filepath, decode_times=False) as ds:
             if time_standard:
