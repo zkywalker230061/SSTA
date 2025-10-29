@@ -105,3 +105,65 @@ def load_and_prepare_dataset(
     except (OSError, ValueError, KeyError) as e:
         print(f"Error loading {filepath}: {e}")
         return None
+
+
+MONTHS = {
+    'Jan': 1, 'Feb': 2, 'Mar': 3,
+    'Apr': 4, 'May': 5, 'Jun': 6,
+    'Jul': 7, 'Aug': 8, 'Sep': 9,
+    'Oct': 10, 'Nov': 11, 'Dec': 12
+}
+
+
+def get_monthly_mean(
+    da: xr.DataArray,
+) -> xr.DataArray:
+    """
+    Get the monthly mean of the DataArray.
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+        The DataArray to process.
+
+    Returns
+    -------
+    xarray.DataArray
+        The monthly mean DataArray.
+
+    Raises
+    ------
+    ValueError
+        If the DataArray does not have a TIME dimension.
+    """
+    if 'TIME' not in da.dims:
+        raise ValueError("The DataArray must have a TIME dimension.")
+    monthly_means = []
+    for _, month_num in MONTHS.items():
+        monthly_means.append(
+            da.sel(TIME=da['TIME'][month_num-1::12]).mean(dim='TIME')
+        )
+    monthly_mean_da = xr.concat(monthly_means, dim='MONTH')
+    monthly_mean_da = monthly_mean_da.assign_coords(MONTH=list(MONTHS.values()))
+    monthly_mean_da['MONTH'].attrs['units'] = 'month'
+    monthly_mean_da['MONTH'].attrs['axis'] = 'M'
+    monthly_mean_da.attrs['units'] = da.attrs.get('units')
+    monthly_mean_da.attrs['long_name'] = f"Seasonal Cycle Mean of {da.attrs.get('long_name')}"
+    monthly_mean_da.name = f"MONTHLY_MEAN_{da.name}"
+    return monthly_mean_da
+
+
+def get_anomaly(raw_ds, variable_name, monthly_mean):
+    anomalies = []
+    for month in raw_ds.coords['TIME']:
+        month = month.values
+        compare_to_month_mean = int((month + 0.5) % 12)
+        if compare_to_month_mean == 0:
+            compare_to_month_mean = 12
+        month_mean = monthly_mean.sel(MONTH=compare_to_month_mean)
+        anomaly = raw_ds.sel(TIME=month)[variable_name] - month_mean
+        anomalies.append(anomaly)
+    anomaly_ds = xr.concat(anomalies, "TIME")
+    anomaly_ds = anomaly_ds.drop_vars("MONTH")
+    raw_ds['ANOMALY'] = anomaly_ds
+    return raw_ds
