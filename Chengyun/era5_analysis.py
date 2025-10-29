@@ -1,5 +1,5 @@
 """
-ERA5 dataset analysis. TEMPORARY FILE.
+ERA5 dataset analysis.
 
 Chengyun Zhu
 2025/10/29
@@ -8,7 +8,7 @@ Chengyun Zhu
 from IPython.display import display
 
 import numpy as np
-import xarray as xr
+# import xarray as xr
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 
@@ -17,23 +17,11 @@ from rgargo_analysis import get_monthly_mean
 # from rgargo_plot import visualise_dataset
 
 
-def main():
-    """Main function for era5_analysis.py"""
+def save_monthly_mean_wind_stress():
+    """Save the monthly mean of the ERA5 wind stress dataset."""
     ds_era5 = load_and_prepare_dataset(
-        "../datasets/era5_interpolated.nc",
+        "../datasets/ERA5-ARGO_Mean_Turbulent_Surface_Stress.nc",
     )
-    ds_era5_uninterpolated = xr.open_dataset(
-        "../datasets/ERA5_Mean_Turbulent_Surface_Stress.nc"
-    )
-    # update attributes
-    ds_era5['avg_iews'].attrs = ds_era5_uninterpolated['avg_iews'].attrs
-    ds_era5['avg_inss'].attrs = ds_era5_uninterpolated['avg_inss'].attrs
-    ds_era5['TIME'].attrs.update({
-        'units': 'months since 2004-01-01 00:00:00',
-        'time_origin': '01-JAN-2004 00:00:00',
-        'axis': 'T'
-    })
-    display(ds_era5)
     ew = ds_era5['avg_iews']
     ns = ds_era5['avg_inss']
     ew_monthly_mean = get_monthly_mean(ew)
@@ -64,10 +52,16 @@ def main():
 
     ds_monthly_mean = ew_monthly_mean.to_dataset(name='MONTHLY_MEAN_avg_iews')
     ds_monthly_mean['MONTHLY_MEAN_avg_inss'] = ns_monthly_mean
-    # display(ds_monthly_mean)
+    display(ds_monthly_mean)
     ds_monthly_mean.to_netcdf(
-        "../datasets/ERA5_Mean_Turbulent_Surface_Stress-Seasonal_Cycle_Mean.nc"
+        "../datasets/ERA5-ARGO_Mean_Turbulent_Surface_Stress-Seasonal_Cycle_Mean.nc"
     )
+
+
+def main():
+    """Main function for era5_analysis.py"""
+
+    save_monthly_mean_wind_stress()
 
 
 if __name__ == "__main__":
