@@ -56,6 +56,32 @@ def fix_longitude_coord(ds):
     ds['LONGITUDE'].attrs.update(lon_atrib)
     ds['LONGITUDE'].attrs['modulo'] = 180
     return ds
+
+
+def save_with_datetime(obj, path):
+    """
+    Save a DataArray or Dataset with TIME preserved as datetime64[ns].
+    No CF encoding or unit conversion.
+    """
+    # If DataArray, wrap it into a Dataset with a proper variable name
+    if isinstance(obj, xr.DataArray):
+        name = obj.name or "variable"
+        ds = obj.to_dataset(name=name)
+    else:
+        ds = obj
+
+    ds = ds.copy()
+
+    # Clean up any conflicting attributes or encodings
+    if "TIME" in ds.coords:
+        for k in ("units", "calendar", "decoded_from"):
+            ds["TIME"].attrs.pop(k, None)
+        ds["TIME"].encoding.clear()
+        ds["TIME"].encoding["dtype"] = "datetime64[ns]"
+        ds["TIME"].encoding["_FillValue"] = None
+
+    # Save directly — TIME stays datetime64
+    ds.to_netcdf(path)
 #---------Read the datasets-----------------------------------------------------
 
 # Julia File Path 
@@ -105,5 +131,6 @@ def fix_longitude_coord(ds):
 
 #print(ds_temp.TIME.dtype)
 #print(ds_temp.TIME[:200])
+
 
 
