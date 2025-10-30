@@ -98,6 +98,7 @@ def find_surface_density_anomaly_mean(ds: xr.Dataset) -> None:
     ds : xr.Dataset
         The input dataset containing density anomaly and pressure data.
     """
+
     ds_surface = ds.sel(PRESSURE=slice(0, 10))
     sigma0_surface_mean = ds_surface.DENSITY_ANOMALY.mean(dim='PRESSURE')
     ds['SURFACE_DENSITY_ANOMALY_MEAN'] = sigma0_surface_mean
@@ -165,6 +166,7 @@ def get_monthly_mld(
     xr.Dataset
         The dataset with an added variable 'MLD_PRESSURE' representing the mixed layer depth.
     """
+
     if month is not None:
         ds = ds.isel(TIME=month)
     sa = gsw.SA_from_SP(

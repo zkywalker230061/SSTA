@@ -46,6 +46,7 @@ def get_monthly_mean(
     ValueError
         If the DataArray does not have a TIME dimension.
     """
+
     if 'TIME' not in da.dims:
         raise ValueError("The DataArray must have a TIME dimension.")
     monthly_means = []
@@ -243,6 +244,7 @@ def save_salinity():
 
 def main():
     """Main function for rgargo_analysis.py."""
+
     save_monthly_mean_anomalies()
 
     save_monthly_mean_temperature()
