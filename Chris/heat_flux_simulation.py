@@ -9,12 +9,18 @@ from matplotlib.animation import FuncAnimation
 import matplotlib
 matplotlib.use('TkAgg')
 
+HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "../datasets/heat_flux_interpolated_all_contributions.nc"
 HEAT_FLUX_DATA_PATH = "../datasets/heat_flux_interpolated.nc"
 TEMP_DATA_PATH = "../datasets/RG_ArgoClim_Temperature_2019.nc"
 MLD_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
+USE_ALL_CONTRIBUTIONS = False
 
-heat_flux_ds = xr.open_dataset(HEAT_FLUX_DATA_PATH, decode_times=False)
-heat_flux_ds['NET_HEAT_FLUX'] = heat_flux_ds['slhf'] + heat_flux_ds['sshf']
+if USE_ALL_CONTRIBUTIONS:
+    heat_flux_ds = xr.open_dataset(HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH, decode_times=False)
+    heat_flux_ds['NET_HEAT_FLUX'] = heat_flux_ds['avg_slhtf'] + heat_flux_ds['avg_snlwrf'] + heat_flux_ds['avg_snswrf'] + heat_flux_ds['avg_ishf']
+else:
+    heat_flux_ds = xr.open_dataset(HEAT_FLUX_DATA_PATH, decode_times=True)
+    heat_flux_ds['NET_HEAT_FLUX'] = heat_flux_ds['slhf'] + heat_flux_ds['sshf']
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
 #print(temperature_ds)
 heat_flux_monthly_mean = get_monthly_mean(heat_flux_ds['NET_HEAT_FLUX'])
@@ -61,7 +67,7 @@ def update(frame):
     pcolormesh.set_array(model_anomaly_ds.isel(TIME=frame).values.ravel())
     pcolormesh.set_clim(vmin=float(model_anomaly_ds.isel(TIME=frame).min()), vmax=float(model_anomaly_ds.isel(TIME=frame).max()))
     cbar.update_normal(pcolormesh)
-    title.set_text(f'Time = {times[frame]}')
+    title.set_text(f'Months since January 2004: {times[frame]}')
     return [pcolormesh, title]
 
 animation = FuncAnimation(fig, update, frames=len(times), interval=300, blit=False)
