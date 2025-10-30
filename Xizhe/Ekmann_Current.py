@@ -3,14 +3,39 @@ import xarray as xr
 from calculate_Tm_Sm import vertical_integral
 from grad_field import compute_gradient_lat, compute_gradient_lon
 from read_nc import fix_rg_time
+import matplotlib.pyplot as plt
+
 
 c_o = 4100                         #specific heat capacity of seawater = 4100 Jkg^-1K^-1
 omega = 2*np.pi/(24*3600)         #Earth's angular velocity
 #f = 2*omega*np.sin(phi)            #Coriolis Parameter
 
 
-def ekmann_current (tau_x, tau_y, dTm_dx, dTm_dy,f):
-    Q_ek = c_o *(tau_x*dTm_dy/f - tau_y*dTm_dx/f)
+def ekman_current_anomaly(tau_x_anom, tau_y_anom, dTm_dx_monthly, dTm_dy_monthly, f_2d, fmin=1e-5):
+    """
+    Compute Q'_Ek = c_o * (τx'/f * dTmbar/dy - τy'/f * dTmbar/dx)
+    Output dims: (TIME, LATITUDE, LONGITUDE)
+    """
+    # Create month index per TIME
+    m = month_idx(tau_x_anom["TIME"])
+
+    # Select gradient of the corresponding month for each TIME (aligns MONTH -> TIME)
+    dTm_dx_t = dTm_dx_monthly.sel(MONTH=m)
+    dTm_dy_t = dTm_dy_monthly.sel(MONTH=m)
+
+    # Broadcast Coriolis parameter
+    f = f_2d.broadcast_like(tau_x_anom)
+    mask = np.abs(f) > fmin  # avoid division near equator
+
+    # Compute Q'_Ek
+    Q_ek = c_o * ((tau_x_anom * dTm_dy_t / f) - (tau_y_anom * dTm_dx_t / f))
+    Q_ek = Q_ek.where(mask)
+
+    Q_ek.name = "Q_Ek_anom"
+    Q_ek.attrs.update({
+        "description": "Ekman term anomaly using τ' and monthly mean Tm gradients",
+        "formula": "c_o * (τx'/f * dTmbar/dy - τy'/f * dTmbar/dx)",
+    })
     return Q_ek
 
 def month_idx (time_da: xr.DataArray) -> xr.DataArray:
@@ -55,15 +80,13 @@ def get_anomaly(full_field, monthly_mean):
     
     # Get the month index (1-12) for each item in the full_field
     m = month_idx(full_field['TIME'])
-    
-    # Group the full_field by its month index and then subtract
-    # the corresponding monthly_mean. This preserves the original 3D shape.
     anom = full_field.groupby(m) - monthly_mean
     return anom
 
-def coriolis_parameter(lat_ds):
-    phi_rad = np.deg2rad(lat_ds)
+def coriolis_parameter(lat):
+    phi_rad = np.deg2rad(lat)
     f = 2 * omega * np.sin(phi_rad)
+    f = xr.DataArray(f, coords={'LATITUDE': lat}, dims=['LATITUDE'])
     f.attrs['units'] = 's^-1'
     return f
 
@@ -126,69 +149,60 @@ def repeat_monthly_field(ds, var_name, n_repeats=15):
 
 if __name__ == "__main__":
     file_path = '/Users/xxz/Desktop/SSTA/datasets/windstress.nc'
-    grad_lat_file_path = '/Users/xxz/Desktop/SSTA/datasets/gradient_lat_test.nc'
-    grad_lon_file_path = '/Users/xxz/Desktop/SSTA/datasets/gradient_lon_test.nc'
+    grad_lat_file_path = '/Users/xxz/Desktop/SSTA/datasets/Mixed_Layer_Temperature_Gradient_Lat.nc'
+    grad_lon_file_path = '/Users/xxz/Desktop/SSTA/datasets/Mixed_Layer_Temperature_Gradient_Lon.nc'
 
-    ds = xr.open_dataset(
-        file_path, 
-        engine="netcdf4",
-        decode_times=False,
-        mask_and_scale=True)
+    ds = xr.open_dataset(               # (TIME: 180, LATITUDE: 145, LONGITUDE: 360)
+        file_path,                      # Data variables:
+        engine="netcdf4",                       # avg_iews   (TIME, LATITUDE, LONGITUDE) float32 38MB ...
+        decode_times=False,                     # avg_inss   (TIME, LATITUDE, LONGITUDE) float32 38MB ...       
+        mask_and_scale=True)            # * TIME       (TIME) float32 720B 0.5 1.5 2.5 3.5 ... 176.5 177.5 178.5 179.5
     
     ds_grad_lat = xr.open_dataset(
-        grad_lat_file_path, 
-        engine="netcdf4",
-        decode_times=False,
+        grad_lat_file_path,             # (MONTH: 12, LATITUDE: 145, LONGITUDE: 360)
+        engine="netcdf4",               # * MONTH      (MONTH) int64 96B 1 2 3 4 5 6 7 8 9 10 11 12
+        decode_times=False,             # Data variables: __xarray_dataarray_variable__
         mask_and_scale=True)
     
     ds_grad_lon = xr.open_dataset(
-        grad_lon_file_path, 
+        grad_lon_file_path,             # (MONTH: 12, LATITUDE: 145, LONGITUDE: 360)
         engine="netcdf4",
         decode_times=False,
         mask_and_scale=True)
     
-    
+    ds_tau_x = ds['avg_iews']           # (TIME: 180, LATITUDE: 145, LONGITUDE: 360)
+    ds_tau_y = ds['avg_inss']           # TIME  0.5 1.5 2.5 3.5 ... 176.5 177.5 178.5 179.5
+    dTm_dy_monthly = ds_grad_lat["__xarray_dataarray_variable__"]  # (MONTH, LAT, LON)
+    dTm_dx_monthly = ds_grad_lon["__xarray_dataarray_variable__"]  # (MONTH, LAT, LON)
+    # print("ds\n", ds)
+    # print('ds_grad_lat:\n', ds_grad_lat)
+    # print('ds_grad_lon:\n', ds_grad_lon)
+    # print('ds_tau_x:\n', ds_tau_x)
 
-    ds_tau_x = ds['avg_iews']
-    ds_tau_y = ds['avg_inss']
-
-    monthly_mean_tau_x = get_monthly_mean(ds_tau_x)
+    monthly_mean_tau_x = get_monthly_mean(ds_tau_x)     #(MONTH: 12, LATITUDE: 145, LONGITUDE: 360)
     monthly_mean_tau_y = get_monthly_mean(ds_tau_y)
 
-    #print ('monthly_mean_tau_x: \n', monthly_mean_tau_x)
-
-    # full_field_monthly_mean_tau_x = repeat_monthly_field(monthly_mean_tau_x, 'avg_iews')
-    # full_field_monthly_mean_tau_y = repeat_monthly_field(monthly_mean_tau_y, 'avg_inss')
-
-    # tau_x_anom = get_anomaly(ds_tau_x, full_field_monthly_mean_tau_x)
-    # tau_y_anom = get_anomaly(ds_tau_y, full_field_monthly_mean_tau_y)
-
-    tau_x_anom = get_anomaly(ds_tau_x, monthly_mean_tau_x)
+    tau_x_anom = get_anomaly(ds_tau_x, monthly_mean_tau_x)  #(TIME: 180, LATITUDE: 145, LONGITUDE: 360)
     tau_y_anom = get_anomaly(ds_tau_y, monthly_mean_tau_y)
 
-    lat = ds["LATITUDE"]
-    # f = coriolis_parameter(lat)
+    # print ('monthly_mean_tau_x: \n', monthly_mean_tau_x)
+    # print('tau_x_anom: \n', tau_x_anom)
 
-    f = coriolis_parameter(lat).broadcast_like(tau_x_anom)
-    f = fix_rg_time(f, mode='datetime')
+    lat = ds["LATITUDE"]
+    f_2d = coriolis_parameter(lat).broadcast_like(ds_tau_x)
 
     print('tau_x_anom.dims',tau_x_anom.dims)
     print('tau_y_anom.dims', tau_y_anom.dims)
-    print(ds_grad_lat["variable"].dims)
-    print(ds_grad_lon["variable"].dims)
-    print(f.dims)
-    print (f)
+    print('ds_grad_lat["__xarray_dataarray_variable__"].dims: ',ds_grad_lat["__xarray_dataarray_variable__"].dims)
+    print('ds_grad_lon["__xarray_dataarray_variable__"].dims: ', ds_grad_lon["__xarray_dataarray_variable__"].dims)
+    print('f.dims',f.dims)
+    print ('Corioslis Parameter: \n',f_2d)
     
-    Q_ek_anom = ekmann_current(
-        tau_x_anom,       # This is the tau_x DataArray
-        tau_y_anom,       # This is the tau_y DataArray
-        ds_grad_lon['variable'],      # This is dTm_dx (longitude gradient)
-        ds_grad_lat['variable'],      # This is dTm_dy (latitude gradient)
-        f                         # This is the coriolis parameter (already a DataArray)
-    )
-
+    Q_ek_anom = ekman_current_anomaly(tau_x_anom, tau_y_anom, dTm_dx_monthly, dTm_dy_monthly, f_2d)
+    Q_ek_anom.TIME.attrs["units"] = "months since 2004-01-01" 
+    Q_ek_anom = fix_rg_time(Q_ek_anom, mode="datetime")
     print(
-        #'ekmann current anomaly:', Q_ek_anom
+        'ekmann current anomaly:', Q_ek_anom
         # ds_grad_lat,
 
         #  'original dataset:\n', ds,
@@ -204,3 +218,18 @@ if __name__ == "__main__":
     )
 
 
+    date = "2004-02-01"
+    Q_plot = Q_ek_anom.sel(TIME=f"{date}")
+
+    plt.figure(figsize=(10, 5))
+    Q_plot.plot(
+        cmap="RdBu_r",
+        vmin=-np.nanpercentile(Q_plot, 99),
+        vmax=np.nanpercentile(Q_plot, 99),
+        cbar_kwargs={"label": "Q'_Ek (arbitrary units)"}
+    )
+    plt.title(f"Ekman Current Anomaly ({date})")
+    plt.xlabel("Longitude")
+    plt.ylabel("Latitude")
+    plt.tight_layout()
+    plt.show()
