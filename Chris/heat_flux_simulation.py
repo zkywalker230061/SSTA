@@ -13,7 +13,7 @@ HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "../datasets/heat_flux_interpolated_all_
 HEAT_FLUX_DATA_PATH = "../datasets/heat_flux_interpolated.nc"
 TEMP_DATA_PATH = "../datasets/RG_ArgoClim_Temperature_2019.nc"
 MLD_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
-USE_ALL_CONTRIBUTIONS = False
+USE_ALL_CONTRIBUTIONS = True
 
 if USE_ALL_CONTRIBUTIONS:
     heat_flux_ds = xr.open_dataset(HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH, decode_times=False)
@@ -41,7 +41,7 @@ for month in heat_flux_anomaly_ds.TIME.values:
         added_baseline = True
     else:
         prev = model_anomalies[-1].isel(TIME=-1)
-        cur = prev + (30.4375 * 24 * 60 * 60) * heat_flux_anomaly_ds.sel(TIME=month)['NET_HEAT_FLUX_ANOMALY'] / mld_ds.sel(TIME=month)['MLD_PRESSURE']
+        cur = prev + (30.4375 * 24 * 60 * 60) * heat_flux_anomaly_ds.sel(TIME=month)['NET_HEAT_FLUX_ANOMALY'] / (mld_ds.sel(TIME=month)['MLD_PRESSURE'] * 1025 * 4100)
         cur = cur.expand_dims(TIME=[month])
         model_anomalies.append(cur)
 model_anomaly_ds = xr.concat(model_anomalies, 'TIME')
@@ -65,9 +65,10 @@ ax.set_ylabel('Latitude')
 
 def update(frame):
     pcolormesh.set_array(model_anomaly_ds.isel(TIME=frame).values.ravel())
-    pcolormesh.set_clim(vmin=float(model_anomaly_ds.isel(TIME=frame).min()), vmax=float(model_anomaly_ds.isel(TIME=frame).max()))
+    #pcolormesh.set_clim(vmin=float(model_anomaly_ds.isel(TIME=frame).min()), vmax=float(model_anomaly_ds.isel(TIME=frame).max()))
+    pcolormesh.set_clim(vmin=-20, vmax=20)
     cbar.update_normal(pcolormesh)
-    title.set_text(f'Months since January 2004: {times[frame]}')
+    title.set_text(f'Months since January 2004: {times[frame]}; month in year: {(times[frame] + 0.5) % 12}')
     return [pcolormesh, title]
 
 animation = FuncAnimation(fig, update, frames=len(times), interval=300, blit=False)
