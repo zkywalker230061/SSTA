@@ -52,15 +52,17 @@ fig, ax = plt.subplots()
 pcolormesh = ax.pcolormesh(model_anomaly_ds.LONGITUDE.values, model_anomaly_ds.LATITUDE.values, model_anomaly_ds.isel(TIME=0), cmap='RdBu_r')
 title = ax.set_title(f'Time = {times[0]}')
 
-plt.colorbar(pcolormesh, ax=ax, label='Modelled anomaly from surface heat flux')
+cbar = plt.colorbar(pcolormesh, ax=ax, label='Modelled anomaly from surface heat flux')
 ax.set_xlabel('Longitude')
 ax.set_ylabel('Latitude')
 
 
 def update(frame):
     pcolormesh.set_array(model_anomaly_ds.isel(TIME=frame).values.ravel())
+    pcolormesh.set_clim(vmin=float(model_anomaly_ds.isel(TIME=frame).min()), vmax=float(model_anomaly_ds.isel(TIME=frame).max()))
+    cbar.update_normal(pcolormesh)
     title.set_text(f'Time = {times[frame]}')
     return [pcolormesh, title]
 
-animation = FuncAnimation(fig, update, frames=len(times), interval=300, blit=True)
+animation = FuncAnimation(fig, update, frames=len(times), interval=300, blit=False)
 plt.show()
