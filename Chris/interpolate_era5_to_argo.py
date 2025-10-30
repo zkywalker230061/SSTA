@@ -40,7 +40,6 @@ heat_flux_ds = xr.open_dataset(HEAT_FLUX_DATA_PATH)
 heat_flux_ds = reformat_era5(heat_flux_ds)
 heat_flux_ds_interpolated = interpolate_era5(heat_flux_ds, temp_ds_for_interpolation, "../datasets/heat_flux_interpolated.nc")
 
-
 # plot to check interpolated data looks similar
 # wind_stress_ds_interpolated['avg_iews'].sel(TIME=0.5).plot(x='LONGITUDE', y='LATITUDE', cmap='viridis')
 # plt.show()
