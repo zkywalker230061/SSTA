@@ -1,16 +1,20 @@
+import re
 import xarray as xr
 import pandas as pd
-import re
+
 
 def fix_rg_time(ds, mode="datetime"):
     """
+    mode = 'NONE'.  -> TIME keep its original form for exporting files. 
     mode='datetime' -> TIME as numpy datetime64[ns] (recommended)
     mode='period'   -> TIME as pandas PeriodIndex (monthly)
     mode='int'      -> TIME as integer months since reference (0..179)
     """
     if "TIME" not in ds.coords:
         return ds
-
+    if mode == "NONE":
+        return ds
+    
     units = ds.TIME.attrs.get("units", "")
     m = re.match(r"months\s+since\s+(\d{4}-\d{2}-\d{2})", units, re.I)
     if not m:
@@ -32,34 +36,37 @@ def fix_rg_time(ds, mode="datetime"):
         ds.TIME.attrs.update({"units": units, "note": "integer months since reference"})
     return ds
 
+def fix_longitude_coord(ds):
+    """
+    Convert longitude from [0, 360] to [-180, 180].
 
-#---------Read the datasets-----------------------------------------------------
-ds_temp = xr.open_dataset(
-    "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc",
-    engine="netcdf4",
-    decode_times=False,   # disable decoding to avoid error
-    mask_and_scale=True,
-)
+    Parameters
+    ----------
+    ds: xarray.Dataset
+        Input dataset with 'LONGITUDE' coordinate.
 
-ds_sal = xr.open_dataset(
-    "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Salinity_2019.nc",
-    engine="netcdf4",
-    decode_times=False,
-    mask_and_scale=True,
-)
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with 'LONGITUDE' in [-180, 180] and sorted.
+    """
+    lon_atrib = ds.coords['LONGITUDE'].attrs
+    ds['LONGITUDE'] = ((ds['LONGITUDE'] + 180) % 360) - 180
+    ds = ds.sortby(ds['LONGITUDE'])
+    ds['LONGITUDE'].attrs.update(lon_atrib)
+    ds['LONGITUDE'].attrs['modulo'] = 180
+    return ds
 
-ds_temp = fix_rg_time(ds_temp)
-ds_sal = fix_rg_time(ds_sal)
 
-
-#----------------------For Checking---------------------------------#
-#print(ds_sal)
-print(ds_temp)
-
-#print(ds_temp.PRESSURE)
-
-#print('salinity \n',ds_sal.ARGO_SALINITY_MEAN)
-print('temperature \n', ds_temp.ARGO_TEMPERATURE_MEAN)
-
-#print(ds_temp.TIME.dtype)
-#print(ds_temp.TIME[:200])
+if __name__ == "__main__":
+    file_path = '/Users/xxz/Desktop/SSTA/datasets/windstress.nc'
+    ds = xr.open_dataset(
+        file_path, 
+        engine="netcdf4",
+        decode_times=False,
+        mask_and_scale=True)
+    #print(ds.TIME)
+    #print(ds)
+    ds= fix_rg_time(ds)
+    print (ds['TIME'])
+    #print(ds['avg_iews'].values)

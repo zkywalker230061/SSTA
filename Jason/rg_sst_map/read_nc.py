@@ -1,0 +1,136 @@
+import re
+import xarray as xr
+import pandas as pd
+
+
+def fix_rg_time(ds, mode="datetime"):
+    """
+    mode = 'NONE'.  -> TIME keep its original form for exporting files. 
+    mode='datetime' -> TIME as numpy datetime64[ns] (recommended)
+    mode='period'   -> TIME as pandas PeriodIndex (monthly)
+    mode='int'      -> TIME as integer months since reference (0..179)
+    """
+    if "TIME" not in ds.coords:
+        return ds
+    if mode == "NONE":
+        return ds
+    
+    units = ds.TIME.attrs.get("units", "")
+    m = re.match(r"months\s+since\s+(\d{4}-\d{2}-\d{2})", units, re.I)
+    if not m:
+        return ds  # nothing to change
+
+    ref = pd.Timestamp(m.group(1))
+    months = ds.TIME.values.astype(int)
+
+    if mode == "datetime":
+        new = pd.to_datetime([ref + pd.DateOffset(months=int(n)) for n in months])
+        ds = ds.assign_coords(TIME=new)
+        ds.TIME.attrs.update({"standard_name": "time", "calendar": "gregorian", "decoded_from": units})
+    elif mode == "period":
+        new = pd.period_range(start=ref, periods=len(months), freq="M")
+        ds = ds.assign_coords(TIME=new)
+        ds.TIME.attrs.update({"freq": "M", "decoded_from": units})
+    elif mode == "int":
+        ds = ds.assign_coords(TIME=("TIME", months))
+        ds.TIME.attrs.update({"units": units, "note": "integer months since reference"})
+    return ds
+
+def fix_longitude_coord(ds):
+    """
+    Convert longitude from [0, 360] to [-180, 180].
+
+    Parameters
+    ----------
+    ds: xarray.Dataset
+        Input dataset with 'LONGITUDE' coordinate.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with 'LONGITUDE' in [-180, 180] and sorted.
+    """
+    lon_atrib = ds.coords['LONGITUDE'].attrs
+    ds['LONGITUDE'] = ((ds['LONGITUDE'] + 180) % 360) - 180
+    ds = ds.sortby(ds['LONGITUDE'])
+    ds['LONGITUDE'].attrs.update(lon_atrib)
+    ds['LONGITUDE'].attrs['modulo'] = 180
+    return ds
+
+
+def save_with_datetime(obj, path):
+    """
+    Save a DataArray or Dataset with TIME preserved as datetime64[ns].
+    No CF encoding or unit conversion.
+    """
+    # If DataArray, wrap it into a Dataset with a proper variable name
+    if isinstance(obj, xr.DataArray):
+        name = obj.name or "variable"
+        ds = obj.to_dataset(name=name)
+    else:
+        ds = obj
+
+    ds = ds.copy()
+
+    # Clean up any conflicting attributes or encodings
+    if "TIME" in ds.coords:
+        for k in ("units", "calendar", "decoded_from"):
+            ds["TIME"].attrs.pop(k, None)
+        ds["TIME"].encoding.clear()
+        ds["TIME"].encoding["dtype"] = "datetime64[ns]"
+        ds["TIME"].encoding["_FillValue"] = None
+
+    # Save directly — TIME stays datetime64
+    ds.to_netcdf(path)
+#---------Read the datasets-----------------------------------------------------
+
+# Julia File Path 
+# temp_file_path = "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
+# salinity_file_path = "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Salinity_2019.nc"
+
+# Jason File Path 
+# temp_file_path = "C:\Msci Project\RG_ArgoClim_Temperature_2019.nc"
+# salinity_file_path = "C:\Msci Project\RG_ArgoClim_Salinity_2019.nc"
+# updated_h_file_path = "C:\Msci Project\Mixed_Layer_Depth_Pressure (2004-2018).nc"
+
+
+# ds_temp = xr.open_dataset(
+#     temp_file_path,
+#     engine="netcdf4",
+#     decode_times=False,   # disable decoding to avoid error
+#     mask_and_scale=True,
+# )
+
+# ds_sal = xr.open_dataset(
+#     salinity_file_path,
+#     engine="netcdf4",
+#     decode_times=False,
+#     mask_and_scale=True,
+# )
+
+# height_grid = xr.open_dataset(
+#     updated_h_file_path,
+#     engine="netcdf4",
+#     decode_times=False,
+#     mask_and_scale=True
+# )
+
+# ds_temp = fix_rg_time(ds_temp)
+# ds_sal = fix_rg_time(ds_sal)
+
+# print(height_grid["MLD_PRESSURE"])
+# print(ds_temp["ARGO_TEMPERATURE_ANOMALY"])
+#----------------------For Checking---------------------------------#
+#print(ds_sal)
+#print(ds_temp)
+
+#print(ds_temp.PRESSURE)
+
+#print('salinity \n',ds_sal.ARGO_SALINITY_MEAN)
+#print('temperature \n', ds_temp.ARGO_TEMPERATURE_MEAN)
+
+#print(ds_temp.TIME.dtype)
+#print(ds_temp.TIME[:200])
+
+
+
