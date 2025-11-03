@@ -24,19 +24,20 @@ from h_analysis import get_anomaly
 matplotlib.use('TkAgg')
 
 
-TEMP_DATA_PATH = "../datasets/Temperature-(2004-2018).nc"
-MLD_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
+TEMP_DATA_PATH = "../datasets/Mixed_Layer_Temperature-(2004-2018).nc"
+MLD_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
 
 HEAT_FLUX_DATA_PATH = "../datasets/ERA5-ARGO_Mean_Surface_Heat_Flux.nc"
 ENT_FLUX_DATA_PATH = ""
 GEO_DATA_PATH = ""
-EK_DATA_PATH = ""
+EK_DATA_PATH = "../datasets/Ekman_Current_Anomaly.nc"
 
 RHO_O = 1025  # kg / m^3
 C_O = 4100  # J / (kg K)
 SECONDS_MONTH = 30.4375 * 24 * 60 * 60  # average seconds in a month
 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
+temperature_ds = temperature_ds.rename({'__xarray_dataarray_variable__': 'TEMPERATURE'})
 # display(temperature_ds)
 temperature = temperature_ds['TEMPERATURE']
 temperature_monthly_mean = get_monthly_mean(temperature)
@@ -45,6 +46,7 @@ temperature_anomaly = get_anomaly(temperature, temperature_monthly_mean)
 # display(temperature_anomaly)
 
 mld_ds = load_and_prepare_dataset(MLD_DATA_PATH)
+mld_ds = mld_ds.rename({'MONTH': 'TIME'})
 # display(mld_ds)
 
 heat_flux_ds = load_and_prepare_dataset(HEAT_FLUX_DATA_PATH)
@@ -65,30 +67,32 @@ heat_flux_anomaly = get_anomaly(heat_flux, heat_flux_monthly_mean)
 heat_flux_anomaly = heat_flux_anomaly.drop_vars(['MONTH'])
 # display(heat_flux_anomaly)
 
+ekman = load_and_prepare_dataset(EK_DATA_PATH)
+# display(ekman)
+ekman_anomaly = ekman['Q_Ek_anom']
 
-model_anomalies = []
-ADDED_BASELINE = False
+
+MONTH = 0.5
 for month in temperature.TIME.values:
-    if not ADDED_BASELINE:
-        base = temperature_anomaly.sel(PRESSURE=2.5, TIME=month)
-        base = base.expand_dims(TIME=[month])  # <-- keep its time
-        model_anomalies.append(base)
-        ADDED_BASELINE = True
+    if month == MONTH:
+        model_anomaly_ds = (
+            temperature_anomaly.sel(TIME=MONTH)
+            - temperature_anomaly.sel(TIME=MONTH)
+        )
+        model_anomaly_ds = model_anomaly_ds.expand_dims(TIME=[MONTH])
     else:
-        prev = model_anomalies[-1].isel(TIME=-1)
+        prev = model_anomaly_ds.sel(TIME=month-1)
         cur = (
             prev
-            + (
-                SECONDS_MONTH * heat_flux_anomaly.sel(TIME=month)
+            + SECONDS_MONTH * (
+                heat_flux_anomaly.sel(TIME=month)
                 # + ENT
                 # + GEO
-                # + EK
-            ) / (RHO_O * C_O * mld_ds.sel(TIME=month)['MLD_PRESSURE'])
+                + ekman_anomaly.sel(TIME=month)
+            ) / (RHO_O * C_O * mld_ds.sel(TIME=(month % 12 + 0.5))['MONTHLY_MEAN_MLD_PRESSURE'])
         )
         cur = cur.expand_dims(TIME=[month])
-        model_anomalies.append(cur)
-model_anomaly_ds = xr.concat(model_anomalies, 'TIME')
-model_anomaly_ds = model_anomaly_ds.drop_vars(["PRESSURE"])
+        model_anomaly_ds = xr.concat([model_anomaly_ds, cur], dim='TIME')
 display(model_anomaly_ds)
 
 # model_anomaly_ds.sel(TIME=100.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r')
@@ -106,7 +110,7 @@ pcolormesh = ax.pcolormesh(
     model_anomaly_ds.LATITUDE.values,
     model_anomaly_ds.isel(TIME=0),
     cmap='RdBu_r',
-    vmin=-100, vmax=100
+    vmin=-20, vmax=20
 )
 # contourf = ax.contourf(
 #     model_anomaly_ds.LONGITUDE.values,
@@ -114,7 +118,7 @@ pcolormesh = ax.pcolormesh(
 #     model_anomaly_ds.isel(TIME=0),
 #     cmap='RdBu_r',
 #     levels=200,
-#     vmin=-100, vmax=100
+#     vmin=-20, vmax=20
 # )
 ax.coastlines()
 ax.set_xlim(-180, 180)
@@ -151,6 +155,14 @@ def update(frame):
     return [pcolormesh, title]
     # contourf.set_array(model_anomaly_ds.isel(TIME=frame).values.ravel())
     # cbar.update_normal(contourf)
+    # contourf = ax.contourf(
+    #     model_anomaly_ds.LONGITUDE.values,
+    #     model_anomaly_ds.LATITUDE.values,
+    #     model_anomaly_ds.isel(TIME=frame),
+    #     cmap='RdBu_r',
+    #     levels=200,
+    #     vmin=-20, vmax=20
+    # )
     # title.set_text(
     #     f'Months since January 2004: {times[frame]}; month in year: {(times[frame] + 0.5) % 12}'
     # )
