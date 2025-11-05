@@ -1,16 +1,5 @@
-"""
-Read RG-ARGO datasets.
-
-Chengyun Zhu
-2025-10-10
-"""
-
-from IPython.display import display
-
 import xarray as xr
 import pandas as pd
-# import numpy as np
-# import matplotlib.pyplot as plt
 
 
 def _time_standard(ds: xr.Dataset, mid_month: bool = False) -> xr.Dataset:
@@ -41,7 +30,6 @@ def _time_standard(ds: xr.Dataset, mid_month: bool = False) -> xr.Dataset:
     ValueError
         If mid_month is not True or False.
     """
-
     _, reference_date = ds['TIME'].attrs['units'].split('since')
     if mid_month is False:
         ds['time'] = pd.date_range(start=reference_date, periods=ds.sizes['TIME'], freq='MS')
@@ -69,7 +57,6 @@ def _longitude_180(ds: xr.Dataset) -> xr.Dataset:
     xarray.Dataset
         Dataset with 'LONGITUDE' in [-180, 180] and sorted.
     """
-
     lon_atrib = ds.coords['LONGITUDE'].attrs
     ds['LONGITUDE'] = ((ds['LONGITUDE'] + 180) % 360) - 180
     ds = ds.sortby(ds['LONGITUDE'])
@@ -106,7 +93,6 @@ def load_and_prepare_dataset(
     xarray.Dataset or None
         The processed dataset, or None if loading fails.
     """
-
     try:
         with xr.open_dataset(filepath, decode_times=False) as ds:
             if time_standard:
@@ -121,93 +107,63 @@ def load_and_prepare_dataset(
         return None
 
 
-def main():
-    """main function for rgargo_read.py"""
-
-    from rgargo_plot import visualise_dataset
-
-    ds_temp = load_and_prepare_dataset(
-        "../datasets/RG_ArgoClim_Temperature_2019.nc",
-        time_standard=True,
-        longitude_180=True
-    )
-    display(ds_temp)
-
-    # ds_salt = load_and_prepare_dataset(
-    #     "../datasets/RG_ArgoClim_Salinity_2019.nc",
-    #     time_standard=True,
-    #     longitude_180=True
-    # )
-    # display(ds_salt)
-
-    # ds_202509 = load_and_prepare_dataset(
-    #     "../datasets/RG_ArgoClim_202509_2019.nc",
-    #     time_standard=True,
-    #     longitude_180=True
-    # )
-    # display(ds_202509)
-
-    # display(dir(ds_temp))
-
-    # meant_0: Mean Temperature for 15 years at surface
-    meant_0 = ds_temp['ARGO_TEMPERATURE_MEAN'].sel(PRESSURE=0, method='nearest')
-    # print(meant_0.min().item(), meant_0.max().item())
-    visualise_dataset(meant_0, vmin=-2, vmax=31)
-
-    # ta_0_2004jan: Temperature Anomaly at surface in 2004-01
-    ta_0_2004jan = ds_temp['ARGO_TEMPERATURE_ANOMALY'].sel(TIME=0.5).sel(
-        PRESSURE=0, method='nearest'
-    )
-    # print(ta_0_2004jan.min().item(), ta_0_2004jan.max().item())
-    visualise_dataset(ta_0_2004jan, vmin=-8, vmax=8)
-
-    # ta_all_2024jan_e0n0: Temperature Anomaly at all depths in 2024-01 at (0°E, 0°N)
-    ta_all_2004jan_e0n0 = ds_temp['ARGO_TEMPERATURE_ANOMALY'].sel(TIME=0.5).sel(
-        LONGITUDE=0, LATITUDE=0, method='nearest'
-    )
-    # print(ta_all_2004jan_e0n0.min().item(), ta_all_2004jan_e0n0.max().item())
-    visualise_dataset(ta_all_2004jan_e0n0)
-
-    # bathymetry
-    bathymetery = ds_temp['BATHYMETRY_MASK'].sel(
-        PRESSURE=0, method='nearest'
-    )
-    visualise_dataset(bathymetery)
-
-    # mapping
-    mapping = ds_temp['MAPPING_MASK'].sel(
-        PRESSURE=0, method='nearest'
-    )
-    visualise_dataset(mapping)
-
-    t_monthly_mean = load_and_prepare_dataset(
-        "../datasets/Temperature_Monthly_Mean.nc"
-    )
-    # visualise_dataset(
-    #     t_monthly_mean['MONTHLY_MEAN_TEMPERATURE'].sel(PRESSURE=0, MONTH=1, method='nearest')
-    # )
-
-    hbar = load_and_prepare_dataset(
-        "../datasets/Mixed_Layer_Depth_Pressure_Monthly_Mean.nc"
-    )
-    display(hbar)
-    visualise_dataset(
-        hbar['MONTHLY_MEAN_MLD_PRESSURE'].sel(MONTH=1, method='nearest'),
-        cmap='Blues',
-        vmin=0, vmax=500
-    )
-
-    check = {
-        'MONTH': 1,
-        'LONGITUDE': -47,
-        'LATITUDE': 56,
-        'method': 'nearest'
-    }
-    visualise_dataset(
-        t_monthly_mean['MONTHLY_MEAN_TEMPERATURE'].sel(**check)
-    )
-    print(hbar['MONTHLY_MEAN_MLD_PRESSURE'].sel(**check).item())
+MONTHS = {
+    'Jan': 1, 'Feb': 2, 'Mar': 3,
+    'Apr': 4, 'May': 5, 'Jun': 6,
+    'Jul': 7, 'Aug': 8, 'Sep': 9,
+    'Oct': 10, 'Nov': 11, 'Dec': 12
+}
 
 
-if __name__ == "__main__":
-    main()
+def get_monthly_mean(
+    da: xr.DataArray,
+) -> xr.DataArray:
+    """
+    Get the monthly mean of the DataArray.
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+        The DataArray to process.
+
+    Returns
+    -------
+    xarray.DataArray
+        The monthly mean DataArray.
+
+    Raises
+    ------
+    ValueError
+        If the DataArray does not have a TIME dimension.
+    """
+    if 'TIME' not in da.dims:
+        raise ValueError("The DataArray must have a TIME dimension.")
+    monthly_means = []
+    for _, month_num in MONTHS.items():
+        monthly_means.append(
+            da.sel(TIME=da['TIME'][month_num-1::12]).mean(dim='TIME')
+        )
+    monthly_mean_da = xr.concat(monthly_means, dim='MONTH')
+    monthly_mean_da = monthly_mean_da.assign_coords(MONTH=list(MONTHS.values()))
+    monthly_mean_da['MONTH'].attrs['units'] = 'month'
+    monthly_mean_da['MONTH'].attrs['axis'] = 'M'
+    monthly_mean_da.attrs['units'] = da.attrs.get('units')
+    monthly_mean_da.attrs['long_name'] = f"Seasonal Cycle Mean of {da.attrs.get('long_name')}"
+    monthly_mean_da.name = f"MONTHLY_MEAN_{da.name}"
+    return monthly_mean_da
+
+
+def get_anomaly(raw_ds, variable_name, monthly_mean):
+    anomalies = []
+    for month in raw_ds.coords['TIME']:
+        month = month.values
+        compare_to_month_mean = int((month + 0.5) % 12)
+        if compare_to_month_mean == 0:
+            compare_to_month_mean = 12
+        month_mean = monthly_mean.sel(MONTH=compare_to_month_mean)
+        anomaly = raw_ds.sel(TIME=month)[variable_name] - month_mean
+        anomalies.append(anomaly)
+    anomaly_ds = xr.concat(anomalies, "TIME")
+    anomaly_ds = anomaly_ds.drop_vars("MONTH")
+    raw_ds[variable_name+'_ANOMALY'] = anomaly_ds
+    return raw_ds

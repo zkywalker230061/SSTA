@@ -11,7 +11,6 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import cartopy.crs as ccrs
-
 from cartopy.mpl.ticker import (LongitudeFormatter, LatitudeFormatter,
                                 LatitudeLocator)
 
@@ -44,6 +43,7 @@ def map_visualise_dataset(
     **kwargs
         Additional arguments for the plot method.
     """
+
     display(ds)
     if ds['LONGITUDE'].attrs.get('modulo') == 180:
         kwargs.setdefault('xlim', (-180, 180))
@@ -114,6 +114,7 @@ def point_visualise_dataset(
     TypeError
         If the dataset is not at a single point.
     """
+
     display(ds)
     if ds['LONGITUDE'].size != 1 or ds['LATITUDE'].size != 1:
         raise TypeError(
@@ -144,6 +145,7 @@ def visualise_dataset(
     TypeError
         If the dataset is not for map visualisation or point visualisation.
     """
+
     if 'PRESSURE' not in ds.coords:
         map_visualise_dataset(ds, **kwargs)
 

@@ -17,4 +17,12 @@ This work is licensed under a
 [cc-by-nc-sa-shield]: https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg
 
 
+The Slab Mixed Layer Model:
 ![image](.readme_archive/sml.png)
+
+Results for Monthly Mean Mixed Layer Depth ($\bar{h}$) from RG-ARGO climatology:
+
+
+[![Watch the video](.readme_archive/hbar_jan.png)](.readme_archive/hbar.mp4)
+
+<video src=".readme_archive/hbar.mp4" loop="loop" controls preload></video>
