@@ -3,19 +3,17 @@ import netCDF4 as nc
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
-#import esmpy as ESMF
-from read_nc import get_monthly_mean, get_anomaly, load_and_prepare_dataset
+import esmpy as ESMF
+from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
 import matplotlib
 matplotlib.use('TkAgg')
 
 HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "../datasets/heat_flux_interpolated_all_contributions.nc"
 HEAT_FLUX_DATA_PATH = "../datasets/heat_flux_interpolated.nc"
-TEMP_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
+TEMP_DATA_PATH = "../datasets/RG_ArgoClim_Temperature_2019.nc"
 MLD_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
 USE_ALL_CONTRIBUTIONS = True
-
-
 
 if USE_ALL_CONTRIBUTIONS:
     heat_flux_ds = xr.open_dataset(HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH, decode_times=False)

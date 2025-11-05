@@ -87,20 +87,46 @@ def get_monthly_mean(da: xr.DataArray,) -> xr.DataArray:
     # monthly_mean_da.name = f"MONTHLY_MEAN_{da.name}"
     return monthly_mean_da
 
-def get_anomaly(raw_ds, variable_name, monthly_mean):
+def get_anomaly(
+    da: xr.DataArray,
+    monthly_mean_da: xr.DataArray
+) -> xr.DataArray:
+    """
+    Get the anomaly of the DataArray based on the provided monthly mean.
+    Parameters
+    ----------
+    da: xarray.DataArray
+        Input DataArray with 'TIME' coordinate.
+    monthly_mean_da: xarray.DataArray
+        Monthly mean DataArray with 'MONTH' coordinate.
+
+    Returns
+    -------
+    xarray.DataArray
+        Anomaly DataArray.
+
+    Raises
+    ------
+    ValueError
+        If the DataArray does not have a TIME dimension.
+    """
+
+    if 'TIME' not in da.dims:
+        raise ValueError("The DataArray must have a TIME dimension.")
     anomalies = []
-    for month in raw_ds.coords['TIME']:
-        month = month.values
-        compare_to_month_mean = int((month + 0.5) % 12)
-        if compare_to_month_mean == 0:
-            compare_to_month_mean = 12
-        month_mean = monthly_mean.sel(MONTH=compare_to_month_mean)
-        anomaly = raw_ds.sel(TIME=month)[variable_name] - month_mean
-        anomalies.append(anomaly)
-    anomaly_ds = xr.concat(anomalies, "TIME")
-    anomaly_ds = anomaly_ds.drop_vars("MONTH")
-    raw_ds['ANOMALY'] = anomaly_ds
-    return raw_ds
+    for month_num in da.coords['TIME']:
+        month_num = month_num.values
+        month_mean_num = int((month_num + 0.5) % 12)
+        if month_mean_num == 0:
+            month_mean_num = 12
+        anomalies.append(
+            da.sel(TIME=month_num) - monthly_mean_da.sel(MONTH=month_mean_num)
+        )
+    anomaly_da = xr.concat(anomalies, "TIME")
+    anomaly_da.attrs['units'] = da.attrs.get('units')
+    anomaly_da.attrs['long_name'] = f"Anomaly of {da.attrs.get('long_name')}"
+    anomaly_da.name = f"ANOMALY_{da.name}"
+    return anomaly_da
 
 def load_pressure_data(path: str, varname: str, *, time_mode: str = "datetime",) -> xr.DataArray:
     """Load MLD in PRESSURE units, fix time, convert to meters (positive down)."""
@@ -200,7 +226,7 @@ def mld_dbar_to_meter(p_mld: xr.DataArray, lat_3D: xr.DataArray) -> xr.DataArray
 
 
 if __name__ == "__main__":
-    file_path = '/Users/xxz/Desktop/SSTA/datasets/windstress.nc'
+    file_path = '/Users/julia/Desktop/SSTA/datasets/windstress.nc'
     ds = xr.open_dataset(
         file_path, 
         engine="netcdf4",
