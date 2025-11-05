@@ -37,9 +37,8 @@ C_O = 4100  # J / (kg K)
 SECONDS_MONTH = 30.4375 * 24 * 60 * 60  # average seconds in a month
 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
-temperature_ds = temperature_ds.rename({'__xarray_dataarray_variable__': 'TEMPERATURE'})
 # display(temperature_ds)
-temperature = temperature_ds['TEMPERATURE']
+temperature = temperature_ds['MLD_TEMPERATURE']
 temperature_monthly_mean = get_monthly_mean(temperature)
 # display(temperature_monthly_mean)
 temperature_anomaly = get_anomaly(temperature, temperature_monthly_mean)
