@@ -17,10 +17,10 @@ import matplotlib.pyplot as plt
 # temp_file_path = "C:\Msci Project\RG_ArgoClim_Temperature_2019.nc"
 # salinity_file_path = "C:\Msci Project\RG_ArgoClim_Salinity_2019.nc"
 # updated_h_file_path = "C:\Msci Project\Mixed_Layer_Depth_Pressure (2004-2018).nc"
-temp_file_path = "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
-salinity_file_path = "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Salinity_2019.nc"
-updated_h_file_path = "/Users/xxz/Desktop/SSTA/datasets/Mixed_Layer_Depth_Pressure (2004-2018).nc"
-updated_h_bar_file_path = "/Users/xxz/Desktop/SSTA/datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
+temp_file_path = "/Users/julia/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
+salinity_file_path = "/Users/juia/Desktop/SSTA/datasets/RG_ArgoClim_Salinity_2019.nc"
+# updated_h_file_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Depth_Pressure (2004-2018).nc"
+h_bar_file_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
 
 
 ds_temp = xr.open_dataset(
@@ -37,21 +37,21 @@ ds_temp = xr.open_dataset(
 #     mask_and_scale=True,
 # )
 
-height_grid = xr.open_dataset(
-    updated_h_file_path,
-    engine="netcdf4",
-    decode_times=False,
-    mask_and_scale=True
-)
+# height_grid = xr.open_dataset(
+#     updated_h_file_path,
+#     engine="netcdf4",
+#     decode_times=False,
+#     mask_and_scale=True
+# )
 
 h_bar = xr.open_dataset(
-    updated_h_bar_file_path,
+    h_bar_file_path,
     engine="netcdf4",
     decode_times=False,
     mask_and_scale=True
 )
 
-height_grid = height_grid["MLD_PRESSURE"]
+# height_grid = height_grid["MLD_PRESSURE"]
 
 print("H Bar:\n", h_bar)
 
@@ -99,7 +99,7 @@ print("data:\n",data["MLD_PRESSURE"])
 #%%
 #---2. Fixing Time Coordinate-----------
 ds_temp = fix_rg_time(ds_temp)
-h_normal = fix_rg_time(height_grid)
+# h_normal = fix_rg_time(height_grid)
 
 # ds_sal = fix_rg_time(ds_sal)
 

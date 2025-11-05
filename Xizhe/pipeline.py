@@ -35,7 +35,7 @@ class DataChoice:
     plot_title: str
 
 TEMPERATURE = DataChoice(
-    data_path="/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc",
+    data_path="/Users/julia/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc",
     mean_data="ARGO_TEMPERATURE_MEAN",
     anom_data="ARGO_TEMPERATURE_ANOMALY",
     label="Mean Temperature (°C)",
@@ -47,7 +47,7 @@ TEMPERATURE = DataChoice(
 )
 
 SALINITY = DataChoice(
-    data_path="/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Salinity_2019.nc",
+    data_path="/Users/julia/Desktop/SSTA/datasets/RG_ArgoClim_Salinity_2019.nc",
     mean_data="ARGO_SALINITY_MEAN",
     anom_data="ARGO_SALINITY_ANOMALY",
     label="Mean Salinity",
@@ -58,7 +58,7 @@ SALINITY = DataChoice(
     plot_title="Mean Salinity Using h Field"
 )
 
-PRESSURE_PATH = "/Users/xxz/Desktop/SSTA/datasets/Mixed_Layer_Depth_Pressure (2004-2018).nc"
+PRESSURE_PATH = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Depth_Pressure (2004-2018).nc"
 PRESSURE_VARNAME = "MLD_PRESSURE"
 
 #%%

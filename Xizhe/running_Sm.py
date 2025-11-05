@@ -13,7 +13,6 @@ import gsw
 import re
 from tqdm import tqdm
 from typing import Optional
-from dask.diagnostics import ProgressBar
 import matplotlib.pyplot as plt
 
 #%%
