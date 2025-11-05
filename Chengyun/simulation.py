@@ -28,7 +28,7 @@ TEMP_DATA_PATH = "../datasets/Mixed_Layer_Temperature-(2004-2018).nc"
 MLD_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
 
 HEAT_FLUX_DATA_PATH = "../datasets/ERA5-ARGO_Mean_Surface_Heat_Flux.nc"
-ENT_FLUX_DATA_PATH = ""
+ENT_FLUX_DATA_PATH = "../datasets/Entrainment_Heat_Flux_Anomaly-(2004-2018).nc"
 GEO_DATA_PATH = ""
 EK_DATA_PATH = "../datasets/Ekman_Current_Anomaly.nc"
 
@@ -66,6 +66,10 @@ heat_flux_anomaly = get_anomaly(heat_flux, heat_flux_monthly_mean)
 heat_flux_anomaly = heat_flux_anomaly.drop_vars(['MONTH'])
 # display(heat_flux_anomaly)
 
+ent = load_and_prepare_dataset(ENT_FLUX_DATA_PATH)
+# display(ent)
+ent_anomaly = ent['ENTRAINMENT_ANOMALY']
+
 ekman = load_and_prepare_dataset(EK_DATA_PATH)
 # display(ekman)
 ekman_anomaly = ekman['Q_Ek_anom']
@@ -85,7 +89,7 @@ for month in temperature.TIME.values:
             prev
             + SECONDS_MONTH * (
                 heat_flux_anomaly.sel(TIME=month)
-                # + ENT
+                + ent_anomaly.sel(TIME=month)
                 # + GEO
                 + ekman_anomaly.sel(TIME=month)
             ) / (RHO_O * C_O * mld_ds.sel(TIME=(month % 12 + 0.5))['MONTHLY_MEAN_MLD_PRESSURE'])
