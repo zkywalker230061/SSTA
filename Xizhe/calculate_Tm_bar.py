@@ -9,9 +9,9 @@ import matplotlib.pyplot as plt
 
 
 #---1. ---Read File--------------------------------------
-temp_file_path = "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
-salinity_file_path = "/Users/xxz/Desktop/SSTA/datasets/RG_ArgoClim_Salinity_2019.nc"
-updated_h_bar_file_path = "/Users/xxz/Desktop/SSTA/datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
+temp_file_path = "/Users/julia/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
+salinity_file_path = "/Users/julia/Desktop/SSTA/datasets/RG_ArgoClim_Salinity_2019.nc"
+updated_h_bar_file_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
 
 ds_temp = xr.open_dataset(
     temp_file_path,
@@ -67,7 +67,7 @@ def load_pressure_data(path: str, varname: str, *, compute_time_mode: str = "dat
     """Load MLD in PRESSURE units, fix time, convert to meters (positive down)."""
 
     ds = xr.open_dataset(path, engine="netcdf4", decode_times=False, mask_and_scale=True)
-    ds = fix_rg_time(ds, mode=compute_time_mode)
+    #ds = fix_rg_time(ds, mode=compute_time_mode)
 
     pressure = ds[varname] # Coordinates = (TIME: 180, LATITUDE: 145, LONGITUDE: 360)
     lat_1D = ds["LATITUDE"]

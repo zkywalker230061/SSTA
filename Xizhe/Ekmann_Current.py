@@ -13,7 +13,7 @@ omega = 2*np.pi/(24*3600)         #Earth's angular velocity
 
 def ekman_current_anomaly(tau_x_anom, tau_y_anom, dTm_dx_monthly, dTm_dy_monthly, f_2d, fmin=1e-5):
     """
-    Compute Q'_Ek = c_o * (τx'/f * dTmbar/dy - τy'/f * dTmbar/dx)
+    Compute Q'_Ek = c_o * (τx'/xf * dTmbar/dy - τy'/f * dTmbar/dx)
     Output dims: (TIME, LATITUDE, LONGITUDE)
     """
     # Create month index per TIME
@@ -148,9 +148,9 @@ def repeat_monthly_field(ds, var_name, n_repeats=15):
 
 
 if __name__ == "__main__":
-    file_path = '/Users/xxz/Desktop/SSTA/datasets/windstress.nc'
-    grad_lat_file_path = '/Users/xxz/Desktop/SSTA/datasets/Mixed_Layer_Temperature_Gradient_Lat.nc'
-    grad_lon_file_path = '/Users/xxz/Desktop/SSTA/datasets/Mixed_Layer_Temperature_Gradient_Lon.nc'
+    file_path = '/Users/julia/Desktop/SSTA/datasets/windstress.nc'
+    grad_lat_file_path = '/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature_Gradient_Lat.nc'
+    grad_lon_file_path = '/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature_Gradient_Lon.nc'
 
     ds = xr.open_dataset(               # (TIME: 180, LATITUDE: 145, LONGITUDE: 360)
         file_path,                      # Data variables:
@@ -195,7 +195,7 @@ if __name__ == "__main__":
     print('tau_y_anom.dims', tau_y_anom.dims)
     print('ds_grad_lat["__xarray_dataarray_variable__"].dims: ',ds_grad_lat["__xarray_dataarray_variable__"].dims)
     print('ds_grad_lon["__xarray_dataarray_variable__"].dims: ', ds_grad_lon["__xarray_dataarray_variable__"].dims)
-    print('f.dims',f.dims)
+    print('f_2d.dims',f_2d.dims)
     print ('Corioslis Parameter: \n',f_2d)
     
     Q_ek_anom = ekman_current_anomaly(tau_x_anom, tau_y_anom, dTm_dx_monthly, dTm_dy_monthly, f_2d)
