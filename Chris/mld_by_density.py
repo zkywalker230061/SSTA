@@ -51,5 +51,5 @@ monthly_datasets = []
 for month in range(1, 13):
     monthly_datasets.append(get_monthly_hbar(ds, month, make_plots=True))
 hbar_all_months_dataset = xr.concat(monthly_datasets, "MONTH")
-hbar_all_months_dataset.to_netcdf("../datasets/mld_by_potential_density.nc")
+#hbar_all_months_dataset.to_netcdf("../datasets/mld_by_potential_density.nc")
 print(hbar_all_months_dataset)
