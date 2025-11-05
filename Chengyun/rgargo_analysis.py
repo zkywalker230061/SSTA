@@ -243,10 +243,10 @@ def save_salinity():
 
 def main():
     """Main function for rgargo_analysis.py."""
-    save_monthly_mean_anomalies()
+    #save_monthly_mean_anomalies()
 
-    save_monthly_mean_temperature()
-    save_monthly_mean_salinity()
+    #save_monthly_mean_temperature()
+    #save_monthly_mean_salinity()
 
     save_temperature()
     save_salinity()

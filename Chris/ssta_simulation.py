@@ -11,9 +11,15 @@ matplotlib.use('TkAgg')
 
 HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "../datasets/heat_flux_interpolated_all_contributions.nc"
 HEAT_FLUX_DATA_PATH = "../datasets/heat_flux_interpolated.nc"
+EKMAN_ANOMALY_DATA_PATH = "../datasets/Ekman_Current_Anomaly.nc"
 TEMP_DATA_PATH = "../datasets/RG_ArgoClim_Temperature_2019.nc"
 MLD_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
 USE_ALL_CONTRIBUTIONS = True
+USE_EKMAN_TERM = True
+
+ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
+
+print(ekman_anomaly_ds)
 
 if USE_ALL_CONTRIBUTIONS:
     heat_flux_ds = xr.open_dataset(HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH, decode_times=False)
@@ -21,10 +27,16 @@ if USE_ALL_CONTRIBUTIONS:
 else:
     heat_flux_ds = xr.open_dataset(HEAT_FLUX_DATA_PATH, decode_times=True)
     heat_flux_ds['NET_HEAT_FLUX'] = heat_flux_ds['slhf'] + heat_flux_ds['sshf']
+
+
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
 #print(temperature_ds)
 heat_flux_monthly_mean = get_monthly_mean(heat_flux_ds['NET_HEAT_FLUX'])
 heat_flux_anomaly_ds = get_anomaly(heat_flux_ds, 'NET_HEAT_FLUX', heat_flux_monthly_mean)
+
+if USE_EKMAN_TERM:
+    heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY'] = heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY'] + ekman_anomaly_ds['Q_Ek_anom']
+
 #print(heat_flux_anomaly_ds)
 mld_ds = xr.open_dataset(MLD_DATA_PATH, decode_times=False)
 #print(mld_ds)
@@ -35,8 +47,8 @@ model_anomalies = []
 added_baseline = False
 for month in heat_flux_anomaly_ds.TIME.values:
     if not added_baseline:
-        base = temperature_ds.sel(PRESSURE=2.5, TIME=month)['ARGO_TEMPERATURE_ANOMALY']
-        base = base.expand_dims(TIME=[month])  # <-- keep its time
+        base = temperature_ds.sel(PRESSURE=2.5, TIME=month)['ARGO_TEMPERATURE_ANOMALY'] - temperature_ds.sel(PRESSURE=2.5, TIME=month)['ARGO_TEMPERATURE_ANOMALY']
+        base = base.expand_dims(TIME=[month])
         model_anomalies.append(base)
         added_baseline = True
     else:

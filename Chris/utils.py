@@ -165,5 +165,5 @@ def get_anomaly(raw_ds, variable_name, monthly_mean):
         anomalies.append(anomaly)
     anomaly_ds = xr.concat(anomalies, "TIME")
     anomaly_ds = anomaly_ds.drop_vars("MONTH")
-    raw_ds['ANOMALY'] = anomaly_ds
+    raw_ds[variable_name+'_ANOMALY'] = anomaly_ds
     return raw_ds
