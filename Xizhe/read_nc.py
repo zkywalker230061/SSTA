@@ -87,6 +87,21 @@ def get_monthly_mean(da: xr.DataArray,) -> xr.DataArray:
     # monthly_mean_da.name = f"MONTHLY_MEAN_{da.name}"
     return monthly_mean_da
 
+def get_anomaly(raw_ds, variable_name, monthly_mean):
+    anomalies = []
+    for month in raw_ds.coords['TIME']:
+        month = month.values
+        compare_to_month_mean = int((month + 0.5) % 12)
+        if compare_to_month_mean == 0:
+            compare_to_month_mean = 12
+        month_mean = monthly_mean.sel(MONTH=compare_to_month_mean)
+        anomaly = raw_ds.sel(TIME=month)[variable_name] - month_mean
+        anomalies.append(anomaly)
+    anomaly_ds = xr.concat(anomalies, "TIME")
+    anomaly_ds = anomaly_ds.drop_vars("MONTH")
+    raw_ds['ANOMALY'] = anomaly_ds
+    return raw_ds
+
 def load_pressure_data(path: str, varname: str, *, time_mode: str = "datetime",) -> xr.DataArray:
     """Load MLD in PRESSURE units, fix time, convert to meters (positive down)."""
 
@@ -104,6 +119,41 @@ def load_pressure_data(path: str, varname: str, *, time_mode: str = "datetime",)
     # print('depth_m:\n',depth_m)
     # print('depth_m after fix_longitude:\n', depth_m)
     return depth_m
+
+def load_and_prepare_dataset(
+        filepath: str,
+        time_mode: bool = False,
+        longitude_180: bool = True
+) -> xr.Dataset | None:
+    """
+    Load, standardize time, and convert longitude for RG-ARGO dataset.
+
+    Parameters
+    ----------
+    filepath: str
+        Path to the RG-ARGO netCDF file.
+    time_standard: bool
+        Default is False.
+        If True, standardize the time coordinate.
+    longitude_180: bool
+        Default is True.
+        If True, convert longitude to [-180, 180].
+
+    Returns
+    -------
+    xarray.Dataset or None
+        The processed dataset, or None if loading fails.
+    """
+    try:
+        with xr.open_dataset(filepath, decode_times=False) as ds:
+            if time_mode:
+                ds = fix_rg_time(ds)
+            if longitude_180:
+                ds = fix_longitude_coord(ds)
+            return ds
+    except (OSError, ValueError, KeyError) as e:
+        print(f"Error loading {filepath}: {e}")
+        return None
 
 def depth_dbar_to_meter(p: xr.DataArray, lat: xr.DataArray) -> xr.DataArray:
     """
