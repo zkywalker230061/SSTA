@@ -115,6 +115,6 @@ ani = animation.FuncAnimation(fig, update, frames=len(times), interval=300, blit
 #     fps=15, bitrate=1800
 # )
 # ani.save("movie.mp4", writer=writer)
-ani.save("SSTA.gif", writer='pillow', fps=5)
+# ani.save("SSTA.gif", writer='pillow', fps=5)
 
 plt.show()
