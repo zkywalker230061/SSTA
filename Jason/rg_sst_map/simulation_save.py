@@ -1,0 +1,407 @@
+"""
+Simulation adapted from code made by Chris and Chengyun
+Adapted an Implicit scheme and various other schemes
+"""
+
+#%%
+import gsw
+import netCDF4 as nc
+import xarray as xr
+import numpy as np
+import matplotlib.ticker as mticker
+import matplotlib.pyplot as plt
+#import esmpy as ESMF
+from read_nc import get_monthly_mean, get_anomaly, load_and_prepare_dataset, load_pressure_data
+from matplotlib.animation import FuncAnimation
+import matplotlib
+import cartopy.crs as ccrs
+from cartopy.mpl.ticker import (LongitudeFormatter, LatitudeFormatter,
+                                LatitudeLocator)
+matplotlib.use('TkAgg')
+
+#HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "../datasets/heat_flux_interpolated_all_contributions.nc"
+#HEAT_FLUX_DATA_PATH = "../datasets/heat_flux_interpolated.nc"
+MLD_TEMP_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature-(2004-2018).nc"
+MLD_DEPTH_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
+#TEMP_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
+HEAT_FLUX_DATA_PATH = r"C:\Users\jason\MSciProject\ERA5-ARGO_Mean_Surface_Heat_Flux.nc"
+EK_DATA_PATH = r"C:\Users\jason\MSciProject\Ekman_Current_Anomaly.nc"
+
+# --- Load and Prepare Data (assuming helper functions are correct) --------
+mld_temperature_ds = xr.open_dataset(MLD_TEMP_PATH, decode_times=False)
+mld_depth_ds = load_pressure_data(MLD_DEPTH_PATH, 'MONTHLY_MEAN_MLD_PRESSURE')
+heat_flux_ds = load_and_prepare_dataset(HEAT_FLUX_DATA_PATH)
+ekman_ds = load_and_prepare_dataset(EK_DATA_PATH)
+
+temperature = mld_temperature_ds['__xarray_dataarray_variable__']
+temperature_monthly_mean = get_monthly_mean(temperature)
+temperature_anomaly = get_anomaly(temperature, temperature_monthly_mean)
+
+mld_depth_ds = mld_depth_ds.rename({'MONTH': 'TIME'})  # TIME: 1, 2, ..., 12
+
+heat_flux = (heat_flux_ds['avg_slhtf'] + heat_flux_ds['avg_ishf'] +
+             heat_flux_ds['avg_snswrf'] + heat_flux_ds['avg_snlwrf'])
+heat_flux.attrs.update(units='W m**-2', long_name='Net Surface Heat Flux')
+heat_flux.name = 'NET_HEAT_FLUX'
+heat_flux_monthly_mean = get_monthly_mean(heat_flux)
+heat_flux_anomaly = get_anomaly(heat_flux, heat_flux_monthly_mean)
+heat_flux_anomaly = heat_flux_anomaly.drop_vars(['MONTH'])
+
+ekman_anomaly = ekman_ds['Q_Ek_anom']
+
+# --- Model Constants ------------------------------------------------------
+RHO_O = 1025.0  # kg/m^3
+C_O = 4100.0  # J/(kg K)
+SECONDS_MONTH = 30.4375 * 24 * 60 * 60  # s
+GAMMA = 10.0  # bulk damping factor
+
+# Get time coordinates
+times = temperature_anomaly.TIME.values
+t0 = times[0]
+
+# --- Helper to create efficient output arrays -----------------------------
+def create_output_array(name, long_name):
+    """Pre-allocates an xr.DataArray with the correct coords."""
+    return xr.DataArray(
+        np.nan,
+        coords=temperature_anomaly.coords,
+        dims=temperature_anomaly.dims,
+        name=name,
+        attrs={**temperature_anomaly.attrs,
+               'units': 'K',
+               'long_name': long_name}
+    )
+
+# --- Model Computation Functions ------------------------------------------
+
+def compute_implicit(start_time=1) -> xr.DataArray:
+    print("Running Implicit Scheme...")
+    model_anomaly_ds = create_output_array(
+        "T_model_anom_implicit",
+        "Mixed-layer temperature anomaly (implicit)"
+    )
+
+    # Initial condition (zero anomaly)
+    T_prev = xr.zeros_like(temperature_anomaly.isel(TIME=0))
+    model_anomaly_ds.loc[dict(TIME=t0)] = T_prev
+
+    # Loop from the second time step
+    for i, month in enumerate(times[start_time:], start=1):
+        # 'month' is t^{n+1} (e.g., 1.5, 2.5, ...)
+
+        # Get coefficients for time n+1
+        # Your logic: for t=1.5, moy=1.5. sel(1.5, nearest) -> 2.0 (Feb MLD)
+        moy_n_plus_1 = ((month - 0.5) % 12) + 0.5
+
+        denominator = (
+            RHO_O * C_O *
+            mld_depth_ds
+            .sel(TIME=moy_n_plus_1, method='nearest', tolerance=0.51)
+        )
+        # a^{n+1}
+        damp_factor = GAMMA / denominator
+
+        # b^{n+1}
+        forcing_term = (
+            heat_flux_anomaly.sel(TIME=moy_n_plus_1, method='nearest', tolerance=0.51) +
+            ekman_anomaly.sel(TIME=moy_n_plus_1, method='nearest', tolerance=0.51)
+        ) / denominator
+
+        # T^{n+1} = (T^n + dt*b^{n+1}) / (1 + dt*a^{n+1})
+        T_next = (T_prev + SECONDS_MONTH * forcing_term) / (1 + SECONDS_MONTH * damp_factor)
+
+        # Store result and update T_prev
+        model_anomaly_ds.loc[dict(TIME=month)] = T_next
+        T_prev = T_next
+
+    return model_anomaly_ds
+
+
+def compute_explicit(start_time=1) -> xr.DataArray:
+    print("Running Explicit Scheme...")
+    model_anomaly_ds = create_output_array(
+        "T_model_anom_explicit",
+        "Mixed-layer temperature anomaly (explicit)"
+    )
+
+    # Initial condition (zero anomaly)
+    T_prev = xr.zeros_like(temperature_anomaly.isel(TIME=0))
+    model_anomaly_ds.loc[dict(TIME=t0)] = T_prev
+
+    # Loop from the second time step
+    for i, month in enumerate(times[start_time:], start=1):
+        # 'month' is t^{n+1} (e.g., 1.5, 2.5, ...)
+        prev_time = times[i - 1]  # 'prev_time' is t^n (e.g., 0.5, 1.5, ...)
+
+        # Get coefficients for time n
+        # Your logic: for t=0.5, moy=0.5. sel(0.5, nearest) -> 1.0 (Jan MLD)
+        moy_n = ((prev_time - 0.5) % 12) + 0.5
+
+        denominator = (
+            RHO_O * C_O *
+            mld_depth_ds
+            .sel(TIME=moy_n, method='nearest', tolerance=0.51))
+        # a^n
+        damp_factor = GAMMA / denominator
+
+        # b^n
+        # *** LOGIC FIX ***: Use prev_time, not moy_n, to select forcing data.
+        forcing_term = (
+            heat_flux_anomaly.sel(TIME=prev_time, method='nearest', tolerance=0.51) +
+            ekman_anomaly.sel(TIME=prev_time, method='nearest', tolerance=0.51)
+        ) / denominator
+
+        # T^{n+1} = (1 - dt*a^n)T^n + dt*b^n
+        T_next = (1 - SECONDS_MONTH * damp_factor) * T_prev + SECONDS_MONTH * forcing_term
+
+        # Store result and update T_prev
+        model_anomaly_ds.loc[dict(TIME=month)] = T_next
+        T_prev = T_next
+
+    return model_anomaly_ds
+
+def compute_semi_implicit(start_time=1) -> xr.DataArray:
+    print("Running Semi-Implicit Scheme...")
+    model_anomaly_ds = create_output_array(
+        "T_model_anom_semi_implicit",
+        "Mixed-layer temperature anomaly (semi-implicit)"
+    )
+
+    # Initial condition (zero anomaly)
+    T_prev = xr.zeros_like(temperature_anomaly.isel(TIME=0))
+    model_anomaly_ds.loc[dict(TIME=t0)] = T_prev
+
+    # Loop from the second time step
+    for i, month in enumerate(times[start_time:], start=1):
+        # 'month' is t^{n+1} (e.g., 1.5, 2.5, ...)
+        prev_time = times[i - 1]  # 'prev_time' is t^n (e.g., 0.5, 1.5, ...)
+        moy_n = ((prev_time - 0.5) % 12) + 0.5
+        moy_n_plus_1 = ((month - 0.5) % 12) + 0.5
+
+        denominator_n_plus_1 = (
+            RHO_O * C_O *
+            mld_depth_ds
+            .sel(TIME=moy_n_plus_1, method='nearest', tolerance=0.51)
+        )
+
+        denominator_n = (
+            RHO_O * C_O *
+            mld_depth_ds
+            .sel(TIME=moy_n, method='nearest', tolerance=0.51)
+        )
+        # a^{n+1}
+        damp_factor = GAMMA / denominator_n_plus_1
+
+        # b^{n+1}
+        forcing_term = (
+            heat_flux_anomaly.sel(TIME=moy_n, method='nearest', tolerance=0.51) +
+            ekman_anomaly.sel(TIME=moy_n, method='nearest', tolerance=0.51)
+        ) / denominator_n
+
+        # T^{n+1} = (T^n + dt*b^{n+1}) / (1 + dt*a^{n+1})
+        T_next = (T_prev + SECONDS_MONTH * forcing_term) / (1 + SECONDS_MONTH * damp_factor)
+
+        # Store result and update T_prev
+        model_anomaly_ds.loc[dict(TIME=month)] = T_next
+        T_prev = T_next
+
+    return model_anomaly_ds
+
+
+def compute_crank(start_time=1) -> xr.DataArray:
+    print("Running Crank Nicolson Scheme...")
+    model_anomaly_ds = create_output_array(
+        "T_model_anom_crank_nicolson",
+        "Mixed-layer temperature anomaly (Crank Nicolson)"
+    )
+
+    # Initial condition (zero anomaly)
+    T_prev = xr.zeros_like(temperature_anomaly.isel(TIME=0))
+    model_anomaly_ds.loc[dict(TIME=t0)] = T_prev
+
+    # Loop from the second time step
+    for i, month in enumerate(times[start_time:], start=1):
+        # 'month' is t^{n+1} (e.g., 1.5, 2.5, ...)
+
+        prev_time = times[i - 1]  # 'prev_time' is t^n (e.g., 0.5, 1.5, ...)
+        moy_n = ((prev_time - 0.5) % 12) + 0.5
+        moy_n_plus_1 = ((month - 0.5) % 12) + 0.5
+
+        denominator_n_plus_1 = (
+            RHO_O * C_O *
+            mld_depth_ds
+            .sel(TIME=moy_n_plus_1, method='nearest', tolerance=0.51)
+        )
+
+        denominator_n = (
+            RHO_O * C_O *
+            mld_depth_ds
+            .sel(TIME=moy_n, method='nearest', tolerance=0.51)
+        )
+
+        # a^{n+1}
+        damp_factor_nplus1 = GAMMA / denominator_n_plus_1
+        damp_factor_n = GAMMA / denominator_n
+
+        # b^{n+1}
+        forcing_term_n = (
+            heat_flux_anomaly.sel(TIME=moy_n, method='nearest', tolerance=0.51) +
+            ekman_anomaly.sel(TIME=moy_n, method='nearest', tolerance=0.51)
+        )/ denominator_n
+
+        forcing_term_nplus1 = (
+        (heat_flux_anomaly.sel(TIME=moy_n_plus_1, method='nearest', tolerance=0.51) +
+            ekman_anomaly.sel(TIME=moy_n_plus_1, method='nearest', tolerance=0.51))
+        ) / denominator_n_plus_1
+
+        # T^{n+1} = (T^n + dt*b^{n+1}) / (1 + dt*a^{n+1})
+        T_next = ((1-0.5*damp_factor_n*SECONDS_MONTH)*T_prev
+                  + SECONDS_MONTH * (0.5*forcing_term_n + 0.5*forcing_term_nplus1)
+                )/ (1 + 0.5* SECONDS_MONTH * damp_factor_nplus1)
+
+        # Store result and update T_prev
+        model_anomaly_ds.loc[dict(TIME=month)] = T_next
+        T_prev = T_next
+
+    return model_anomaly_ds
+
+
+# --- Run both simulations -------------------------------------------------
+sim_implicit = compute_implicit(start_time=10)
+sim_explicit = compute_explicit(start_time=25)
+sim_semi_implicit = compute_semi_implicit(start_time=50)
+sim_crank = compute_crank(start_time=100)
+
+# --- Side-by-side animation -------------------------------------------------
+print("Starting animation...")
+# Use the time grid from one of the simulations
+anim_times = sim_implicit.TIME.values
+
+# Common lon/lat
+lons = sim_implicit.LONGITUDE.values
+lats = sim_implicit.LATITUDE.values
+
+VMIN, VMAX = -10,10
+
+fig = plt.figure(figsize=(16, 6))
+
+# Explicit panel
+ax1 = plt.subplot(2, 2, 1, projection=ccrs.PlateCarree())
+mesh_exp = ax1.pcolormesh(lons, lats, sim_explicit.isel(TIME=0),
+                          cmap='RdBu_r', vmin=VMIN, vmax=VMAX)
+ax1.coastlines()
+ax1.set_xlim(-180, 180)
+ax1.set_ylim(-90, 90)
+gl1 = ax1.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                    linewidth=2, color='gray', alpha=0.5, linestyle='--')
+gl1.top_labels = False
+gl1.right_labels = False
+gl1.xlines = False
+gl1.ylines = False
+gl1.xlocator = mticker.FixedLocator([-180, -90, 0, 90, 180])
+gl1.ylocator = LatitudeLocator()
+gl1.xformatter = LongitudeFormatter()
+gl1.yformatter = LatitudeFormatter()
+gl1.ylabel_style = {'size': 12, 'color': 'gray'}
+gl1.xlabel_style = {'size': 12, 'color': 'gray'}
+ax1.set_title(f'Explicit — t={anim_times[0]}')
+
+# Implicit panel
+ax2 = plt.subplot(2, 2, 2, projection=ccrs.PlateCarree())
+mesh_imp = ax2.pcolormesh(lons, lats, sim_implicit.isel(TIME=0),
+                          cmap='RdBu_r', vmin=VMIN, vmax=VMAX)
+ax2.coastlines()
+ax2.set_xlim(-180, 180)
+ax2.set_ylim(-90, 90)
+gl2 = ax2.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                    linewidth=2, color='gray', alpha=0.5, linestyle='--')
+gl2.top_labels = False
+gl2.right_labels = False
+gl2.left_labels = True
+gl2.xlines = False
+gl2.ylines = False
+gl2.xlocator = mticker.FixedLocator([-180, -90, 0, 90, 180])
+gl2.ylocator = LatitudeLocator()
+gl2.xformatter = LongitudeFormatter()
+gl2.yformatter = LatitudeFormatter()
+gl2.ylabel_style = {'size': 12, 'color': 'gray'}
+gl2.xlabel_style = {'size': 12, 'color': 'gray'}
+ax2.set_title(f'Implicit — t={anim_times[0]}')
+
+# Semi-Implicit panel
+ax3 = plt.subplot(2, 2, 3, projection=ccrs.PlateCarree())
+mesh_semi_imp = ax3.pcolormesh(lons, lats, sim_semi_implicit.isel(TIME=0),
+                          cmap='RdBu_r', vmin=VMIN, vmax=VMAX)
+ax3.coastlines()
+ax3.set_xlim(-180, 180)
+ax3.set_ylim(-90, 90)
+gl3 = ax3.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                    linewidth=2, color='gray', alpha=0.5, linestyle='--')
+gl3.top_labels = False
+gl3.right_labels = False
+gl3.left_labels = True
+gl3.xlines = False
+gl3.ylines = False
+gl3.xlocator = mticker.FixedLocator([-180, -90, 0, 90, 180])
+gl3.ylocator = LatitudeLocator()
+gl3.xformatter = LongitudeFormatter()
+gl3.yformatter = LatitudeFormatter()
+gl3.ylabel_style = {'size': 12, 'color': 'gray'}
+gl3.xlabel_style = {'size': 12, 'color': 'gray'}
+ax3.set_title(f'Semi-Implicit — t={anim_times[0]}')
+
+# Crank Nicolson panel
+ax4 = plt.subplot(2, 2, 4, projection=ccrs.PlateCarree())
+mesh_crank = ax4.pcolormesh(lons, lats, sim_crank.isel(TIME=0),
+                          cmap='RdBu_r', vmin=VMIN, vmax=VMAX)
+ax4.coastlines()
+ax4.set_xlim(-180, 180)
+ax4.set_ylim(-90, 90)
+gl4 = ax4.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                    linewidth=2, color='gray', alpha=0.5, linestyle='--')
+gl4.top_labels = False
+gl4.right_labels = False
+gl4.xlines = False
+gl4.ylines = False
+gl4.xlocator = mticker.FixedLocator([-180, -90, 0, 90, 180])
+gl4.ylocator = LatitudeLocator()
+gl4.xformatter = LongitudeFormatter()
+gl4.yformatter = LatitudeFormatter()
+gl4.ylabel_style = {'size': 12, 'color': 'gray'}
+gl4.xlabel_style = {'size': 12, 'color': 'gray'}
+ax4.set_title(f'Crank Nicolson — t={anim_times[0]}')
+
+# Shared colorbar
+cbar = fig.colorbar(mesh_imp, ax=[ax1, ax2,ax3,ax4], shrink=0.8,
+                    label=sim_implicit.attrs.get('units', 'K'))
+
+def update(frame):
+    # Update explicit
+    Z_exp = sim_explicit.isel(TIME=frame).values
+    mesh_exp.set_array(Z_exp.ravel())
+
+    # Update implicit
+    Z_imp = sim_implicit.isel(TIME=frame).values
+    mesh_imp.set_array(Z_imp.ravel())
+
+    # Update semi-implicit
+    Z_semi_imp = sim_semi_implicit.isel(TIME=frame).values
+    mesh_semi_imp.set_array(Z_semi_imp.ravel())
+
+    Z_crank = sim_crank.isel(TIME=frame).values
+    mesh_crank.set_array(Z_crank.ravel())
+
+    # Update titles
+    current_time = anim_times[frame]
+    month_in_year = (current_time % 12) + 0.5  # 0.5 (Jan) to 11.5 (Dec)
+    ax1.set_title(f'Explicit — Time: {current_time} (Month: {month_in_year:.1f})')
+    ax2.set_title(f'Implicit — Time: {current_time} (Month: {month_in_year:.1f})')
+    ax3.set_title(f'Semi-Implicit — Time: {current_time} (Month: {month_in_year:.1f})')
+    ax4.set_title(f'Crank Nicolson — Time: {current_time} (Month: {month_in_year:.1f})')
+    return [mesh_exp, mesh_imp, mesh_semi_imp, mesh_crank]
+
+# Create and show animation
+animation = FuncAnimation(fig, update, frames=len(anim_times), interval=300, blit=False)
+# plt.tight_layout()
+plt.show()
+# %%
