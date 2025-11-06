@@ -49,6 +49,7 @@ temperature_anomaly = get_anomaly(temperature, temperature_monthly_mean)
 mld_ds = load_and_prepare_dataset(MLD_DATA_PATH)
 # mld_ds = mld_ds.rename({'MONTH': 'TIME'})
 # display(mld_ds)
+mld = mld_ds['MONTHLY_MEAN_MLD_PRESSURE']
 
 t_sub_ds = load_and_prepare_dataset(T_SUB_DATA_PATH)
 # display(t_sub_ds)
@@ -109,13 +110,13 @@ for month in temperature.TIME.values:
     #             + ent_anomaly.sel(TIME=month)
     #             # + GEO
     #             + ekman_anomaly.sel(TIME=month)
-    #         ) / (RHO_O * C_O * mld_ds.sel(MONTH=(month % 12 + 0.5))['MONTHLY_MEAN_MLD_PRESSURE'])
+    #         ) / (RHO_O * C_O * mld.sel(MONTH=(month % 12 + 0.5)))
     #     )
     #     cur = cur.expand_dims(TIME=[month])
     #     model_anomaly_ds = xr.concat([model_anomaly_ds, cur], dim='TIME')
     temp = (
         (t_sub_anomaly.sel(TIME=month) + (heat_flux_anomaly.sel(TIME=month) + ekman_anomaly.sel(TIME=month))/(RHO_O * C_O * w_e_monthly_mean.sel(MONTH=(month % 12 + 0.5))))
-        * (1 - np.exp(- (w_e_monthly_mean.sel(MONTH=(month % 12 + 0.5))*SECONDS_MONTH*month)/mld_ds.sel(MONTH=(month % 12 + 0.5))['MONTHLY_MEAN_MLD_PRESSURE']))
+        * (1 - np.exp(- (w_e_monthly_mean.sel(MONTH=(month % 12 + 0.5))*SECONDS_MONTH*month)/mld.sel(MONTH=(month % 12 + 0.5))))
     )
     model_list.append(temp.expand_dims(TIME=[month]))
 model_anomaly_ds = xr.concat(model_list, dim='TIME')
