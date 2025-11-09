@@ -148,12 +148,13 @@ def get_monthly_mean(
     monthly_mean_da['MONTH'].attrs['units'] = 'month'
     monthly_mean_da['MONTH'].attrs['axis'] = 'M'
     monthly_mean_da.attrs['units'] = da.attrs.get('units')
-    monthly_mean_da.attrs['long_name'] = f"Seasonal Cycle Mean of {da.attrs.get('long_name')}"
-    monthly_mean_da.name = f"MONTHLY_MEAN_{da.name}"
+    #monthly_mean_da.attrs['long_name'] = f"Seasonal Cycle Mean of {da.attrs.get('long_name')}"
+    #monthly_mean_da.name = f"MONTHLY_MEAN_{da.name}"
     return monthly_mean_da
 
 
 def get_anomaly(raw_ds, variable_name, monthly_mean):
+    #raw_ds = raw_ds[variable_name]
     anomalies = []
     for month in raw_ds.coords['TIME']:
         month = month.values

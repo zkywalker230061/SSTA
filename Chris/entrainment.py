@@ -42,7 +42,6 @@ def get_T_sub(temp_ds, mld_ds, month, make_plots=True):
 # combine dataset from each of the months
 datasets_over_time = []
 for month in temp_ds.TIME.values:
-    print(month)
     datasets_over_time.append(get_T_sub(temp_ds, mld_ds, month, make_plots=False))
 t_sub_ds = xr.concat(datasets_over_time, "TIME")
 t_sub_ds = t_sub_ds.drop_vars("MLD_PRESSURE")
@@ -54,5 +53,17 @@ t_sub_ds = get_anomaly(t_sub_ds, 'T_sub', t_sub_monthly_mean)
 t_sub_ds.to_netcdf("../datasets/t_sub.nc")
 print(t_sub_ds)
 
-t_sub_ds['T_sub_ANOMALY'].sel(TIME=121.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r')
+vmin = -10
+vmax = 10
+
+t_sub_ds['T_sub'].sel(TIME=132.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=vmin, vmax=vmax)
+plt.show()
+
+t_sub_ds['T_sub'].sel(TIME=138.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=vmin, vmax=vmax)
+plt.show()
+
+t_sub_ds['T_sub_ANOMALY'].sel(TIME=132.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=vmin, vmax=vmax)
+plt.show()
+
+t_sub_ds['T_sub_ANOMALY'].sel(TIME=138.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=vmin, vmax=vmax)
 plt.show()
