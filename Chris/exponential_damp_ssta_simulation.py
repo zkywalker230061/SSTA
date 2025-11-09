@@ -9,6 +9,7 @@ import cartopy.crs as ccrs
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
 import matplotlib
+
 matplotlib.use('TkAgg')
 
 HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "../datasets/heat_flux_interpolated_all_contributions.nc"
@@ -21,22 +22,28 @@ H_BAR_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc
 T_SUB_DATA_PATH = "../datasets/t_sub.nc"
 USE_ALL_CONTRIBUTIONS = True
 USE_EKMAN_TERM = True
+USE_ENTRAINMENT = False     # something broken with entrainment; if False, use gamma_0 for damping
+INTEGRATE_EXPLICIT = False
+rho_0 = 1025
+c_0 = 4100
+gamma_0 = 10
 
 if USE_ALL_CONTRIBUTIONS:
     heat_flux_ds = xr.open_dataset(HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH, decode_times=False)
-    heat_flux_ds['NET_HEAT_FLUX'] = heat_flux_ds['avg_slhtf'] + heat_flux_ds['avg_snlwrf'] + heat_flux_ds['avg_snswrf'] + heat_flux_ds['avg_ishf']
+    heat_flux_ds['NET_HEAT_FLUX'] = heat_flux_ds['avg_slhtf'] + heat_flux_ds['avg_snlwrf'] + heat_flux_ds[
+        'avg_snswrf'] + heat_flux_ds['avg_ishf']
 else:
     heat_flux_ds = xr.open_dataset(HEAT_FLUX_DATA_PATH, decode_times=True)
     heat_flux_ds['NET_HEAT_FLUX'] = heat_flux_ds['slhf'] + heat_flux_ds['sshf']
-
 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
 heat_flux_monthly_mean = get_monthly_mean(heat_flux_ds['NET_HEAT_FLUX'])
 heat_flux_anomaly_ds = get_anomaly(heat_flux_ds, 'NET_HEAT_FLUX', heat_flux_monthly_mean)
 
-if USE_EKMAN_TERM:
+if USE_EKMAN_TERM:      # it's bad naming but nevertheless the case that heat_flux_anom contains surface flux and Ekman
     ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
-    heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY'] = heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY'] + ekman_anomaly_ds['Q_Ek_anom']
+    heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY'] = heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY'] + ekman_anomaly_ds[
+        'Q_Ek_anom']
 
 mld_ds = xr.open_dataset(MLD_DATA_PATH, decode_times=False)
 
@@ -45,31 +52,77 @@ hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
 entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
 entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
 
+
+def month_to_second(month):
+    return month * 30.4375 * 24 * 60 * 60
+
+
 model_anomalies = []
-time = 30.4375 * 24 * 60 * 60 * 0.5
-for month in heat_flux_anomaly_ds.TIME.values:
-    month_in_year = int((month + 0.5) % 12)
-    if month_in_year == 0:
-        month_in_year = 12
-    hbar = hbar_ds.sel(MONTH=month_in_year)['MONTHLY_MEAN_MLD_PRESSURE']
-    entrainment_vel = entrainment_vel_ds.sel(MONTH=month_in_year)['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
-    Tm_anomaly = (t_sub_ds.sel(TIME=month)['T_sub_ANOMALY'] + heat_flux_anomaly_ds.sel(TIME=month)['NET_HEAT_FLUX_ANOMALY'] / (entrainment_vel * 1025 * 4100)) * (1-np.exp(-1 * entrainment_vel * time / hbar))
-    Tm_anomaly = Tm_anomaly.expand_dims(TIME=[month])
-    model_anomalies.append(Tm_anomaly)
-    time += 30.4375 * 24 * 60 * 60
-model_anomaly_ds = xr.concat(model_anomalies, 'TIME')
-#print(model_anomaly_ds)
-model_anomaly_ds.to_netcdf("../datasets/model_anomaly_exponential_damping.nc")
-print(abs(model_anomaly_ds).mean().item())
-#print(model_anomaly_ds.min().item())
+if INTEGRATE_EXPLICIT:
+    time = 30.4375 * 24 * 60 * 60 * 0.5
+    for month in heat_flux_anomaly_ds.TIME.values:
+        month_in_year = int((month + 0.5) % 12)
+        if month_in_year == 0:
+            month_in_year = 12
+        hbar = hbar_ds.sel(MONTH=month_in_year)['MONTHLY_MEAN_MLD_PRESSURE']
+        entrainment_vel = entrainment_vel_ds.sel(MONTH=month_in_year)['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
+        Tm_anomaly = (t_sub_ds.sel(TIME=month)['T_sub_ANOMALY'] + heat_flux_anomaly_ds.sel(TIME=month)[
+            'NET_HEAT_FLUX_ANOMALY'] / (entrainment_vel * rho_0 * c_0)) * (
+                                 1 - np.exp(-1 * entrainment_vel * time / hbar))
+        Tm_anomaly = Tm_anomaly.expand_dims(TIME=[month])
+        model_anomalies.append(Tm_anomaly)
+        time += 30.4375 * 24 * 60 * 60
+    model_anomaly_ds = xr.concat(model_anomalies, 'TIME')
+    model_anomaly_ds.to_netcdf("../datasets/model_anomaly_exponential_damping_explicit.nc")
+else:
+    added_baseline = False
+    for month in heat_flux_anomaly_ds.TIME.values:
+        # find the previous and current month from 1 to 12 to access the monthly-averaged data (hbar, entrainment vel.)
+        prev_month = month - 1
+        month_in_year = int((month + 0.5) % 12)
+        if month_in_year == 0:
+            month_in_year = 12
+        prev_month_in_year = month_in_year - 1
+        if prev_month_in_year == 0:
+            prev_month_in_year = 12
+
+        if not added_baseline:  # just adds the baseline of a whole bunch of zero
+            base = temperature_ds.sel(PRESSURE=2.5, TIME=month)['ARGO_TEMPERATURE_ANOMALY'] - \
+                   temperature_ds.sel(PRESSURE=2.5, TIME=month)['ARGO_TEMPERATURE_ANOMALY']
+            base = base.expand_dims(TIME=[month])
+            model_anomalies.append(base)
+            added_baseline = True
+        else:
+            prev_tm_anom = model_anomalies[-1].isel(TIME=-1)
+            prev_tsub_anom = t_sub_ds.sel(TIME=prev_month)['T_sub_ANOMALY']
+            prev_heat_flux_anom = heat_flux_anomaly_ds.sel(TIME=prev_month)['NET_HEAT_FLUX_ANOMALY']
+            prev_entrainment_vel = entrainment_vel_ds.sel(MONTH=prev_month_in_year)['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
+            prev_hbar = hbar_ds.sel(MONTH=prev_month_in_year)['MONTHLY_MEAN_MLD_PRESSURE']
+
+            cur_tsub_anom = t_sub_ds.sel(TIME=month)['T_sub_ANOMALY']
+            cur_heat_flux_anom = heat_flux_anomaly_ds.sel(TIME=month)['NET_HEAT_FLUX_ANOMALY']
+            cur_entrainment_vel = entrainment_vel_ds.sel(MONTH=month_in_year)['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
+            cur_hbar = hbar_ds.sel(MONTH=month_in_year)['MONTHLY_MEAN_MLD_PRESSURE']
+
+            if USE_ENTRAINMENT:
+                cur_tm_anom = cur_tsub_anom + cur_heat_flux_anom / (cur_entrainment_vel * rho_0 * c_0) + (prev_tm_anom - prev_tsub_anom - prev_heat_flux_anom / (prev_entrainment_vel * rho_0 * c_0)) * np.exp(prev_entrainment_vel / prev_hbar * month_to_second(prev_month) - cur_entrainment_vel / cur_hbar * month_to_second(month))
+
+            else:
+                cur_tm_anom = cur_heat_flux_anom / gamma_0 + (prev_tm_anom - prev_heat_flux_anom / gamma_0) * np.exp(gamma_0 / (rho_0 * c_0 * prev_hbar) * month_to_second(prev_month) - gamma_0 / (rho_0 * c_0 * cur_hbar) * month_to_second(month))
+
+            cur_tm_anom = cur_tm_anom.expand_dims(TIME=[month])
+            model_anomalies.append(cur_tm_anom)
+    model_anomaly_ds = xr.concat(model_anomalies, 'TIME')
+    model_anomaly_ds.to_netcdf("../datasets/model_anomaly_exponential_damping_implicit.nc")
 
 # make a movie
 times = model_anomaly_ds.TIME.values
 
 fig, ax = plt.subplots()
-#ax = plt.axes(projection=ccrs.PlateCarree())
-#ax.coastlines()
-pcolormesh = ax.pcolormesh(model_anomaly_ds.LONGITUDE.values, model_anomaly_ds.LATITUDE.values, model_anomaly_ds.isel(TIME=0), cmap='RdBu_r')
+# ax = plt.axes(projection=ccrs.PlateCarree())
+# ax.coastlines()
+pcolormesh = ax.pcolormesh(model_anomaly_ds.LONGITUDE.values, model_anomaly_ds.LATITUDE.values,
+                           model_anomaly_ds.isel(TIME=0), cmap='RdBu_r')
 title = ax.set_title(f'Time = {times[0]}')
 
 cbar = plt.colorbar(pcolormesh, ax=ax, label='Modelled anomaly from surface heat flux')
@@ -88,6 +141,7 @@ def update(frame):
     cbar.update_normal(pcolormesh)
     title.set_text(f'Year: {year}; Month: {month}')
     return [pcolormesh, title]
+
 
 animation = FuncAnimation(fig, update, frames=len(times), interval=300, blit=False)
 plt.show()

@@ -5,7 +5,49 @@ from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 
 T_SUB_DATA_PATH = "../datasets/t_sub.nc"
 
-t_sub_ds = load_and_prepare_dataset(T_SUB_DATA_PATH)
+t_sub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
 
-t_sub_ds['T_sub_ANOMALY'].sel(TIME=121.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r')
+vmin_anom = -1
+vmax_anom = 1
+
+# t_sub_ds['T_sub'].sel(TIME=132.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r')
+# plt.show()
+#
+# t_sub_ds['T_sub'].sel(TIME=138.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r')
+# plt.show()
+
+t_sub_ds['T_sub_ANOMALY'].sel(TIME=0.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=vmin_anom, vmax=vmax_anom)
+plt.show()
+
+t_sub_ds['T_sub_ANOMALY'].sel(TIME=6.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=vmin_anom, vmax=vmax_anom)
+plt.show()
+
+t_sub_ds['T_sub_ANOMALY'].sel(TIME=60.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=vmin_anom, vmax=vmax_anom)
+plt.show()
+
+t_sub_ds['T_sub_ANOMALY'].sel(TIME=66.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=vmin_anom, vmax=vmax_anom)
+plt.show()
+
+t_sub_ds['T_sub_ANOMALY'].sel(TIME=132.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=vmin_anom, vmax=vmax_anom)
+plt.show()
+
+t_sub_ds['T_sub_ANOMALY'].sel(TIME=135.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=vmin_anom, vmax=vmax_anom)
+plt.show()
+
+t_sub_ds['T_sub_ANOMALY'].sel(TIME=138.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=vmin_anom, vmax=vmax_anom)
+plt.show()
+
+t_sub_ds['T_sub_ANOMALY'].sel(TIME=141.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=vmin_anom, vmax=vmax_anom)
+plt.show()
+
+t_sub_ds['T_sub_ANOMALY'].sel(TIME=168.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=vmin_anom, vmax=vmax_anom)
+plt.show()
+
+t_sub_ds['T_sub_ANOMALY'].sel(TIME=171.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=vmin_anom, vmax=vmax_anom)
+plt.show()
+
+t_sub_ds['T_sub_ANOMALY'].sel(TIME=174.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=vmin_anom, vmax=vmax_anom)
+plt.show()
+
+t_sub_ds['T_sub_ANOMALY'].sel(TIME=177.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=vmin_anom, vmax=vmax_anom)
 plt.show()
