@@ -15,22 +15,24 @@ from cartopy.mpl.ticker import (LongitudeFormatter, LatitudeFormatter,
 matplotlib.use('TkAgg')
 
 # --- File Paths (assuming these are correct) -------------------------------
-MLD_TEMP_PATH = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature-(2004-2018).nc"
+MLD_TEMP_PATH = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature(T_m).nc"
 MLD_DEPTH_PATH = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
 HEAT_FLUX_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/ERA5-ARGO_Mean_Surface_Heat_Flux.nc"
 EK_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Ekman_Current_Anomaly.nc"
+CHRIS_SCHEME_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/model_anomaly_exponential_damping_implicit.nc"
 
 # --- Load and Prepare Data (assuming helper functions are correct) --------
 mld_temperature_ds = xr.open_dataset(MLD_TEMP_PATH, decode_times=False)
 mld_depth_ds = load_pressure_data(MLD_DEPTH_PATH, 'MONTHLY_MEAN_MLD_PRESSURE')
 heat_flux_ds = load_and_prepare_dataset(HEAT_FLUX_DATA_PATH)
 ekman_ds = load_and_prepare_dataset(EK_DATA_PATH)
+chris_ds = load_and_prepare_dataset(CHRIS_SCHEME_DATA_PATH)
 
 temperature = mld_temperature_ds['__xarray_dataarray_variable__']
 temperature_monthly_mean = get_monthly_mean(temperature)
 temperature_anomaly = get_anomaly(temperature, temperature_monthly_mean)
 
-mld_depth_ds = mld_depth_ds.rename({'MONTH': 'TIME'})  # TIME: 1, 2, ..., 12
+mld_depth_ds = mld_depth_ds.rename({'MONTH': 'TIME'})
 
 heat_flux = (heat_flux_ds['avg_slhtf'] + heat_flux_ds['avg_ishf'] +
              heat_flux_ds['avg_snswrf'] + heat_flux_ds['avg_snlwrf'])
@@ -42,6 +44,7 @@ heat_flux_anomaly = heat_flux_anomaly.drop_vars(['MONTH'])
 
 ekman_anomaly = ekman_ds['Q_Ek_anom']
 
+chris_ds = chris_ds['ARGO_TEMPERATURE_ANOMALY']
 # --- Model Constants ------------------------------------------------------
 RHO_O = 1025.0  # kg/m^3
 C_O = 4100.0  # J/(kg K)
@@ -364,9 +367,70 @@ gl4.ylabel_style = {'size': 12, 'color': 'gray'}
 gl4.xlabel_style = {'size': 12, 'color': 'gray'}
 ax4.set_title(f'Crank Nicolson — t={anim_times[0]}')
 
+
+#--------- Chris Plot Settings--------------------------------
+anim_times_chris = chris_ds.TIME.values
+
+# Common lon/lat
+lons = chris_ds.LONGITUDE.values
+lats = chris_ds.LATITUDE.values
+
+fig_chris = plt.figure(figsize=(16, 6))
+
+# Chris panel
+ax5 = plt.subplot(1, 2, 1, projection=ccrs.PlateCarree())
+mesh_chris = ax5.pcolormesh(lons, lats, chris_ds.isel(TIME=0),
+                          cmap='RdBu_r', vmin=VMIN, vmax=VMAX)
+ax5.coastlines()
+ax5.set_xlim(-180, 180)
+ax5.set_ylim(-90, 90)
+gl5 = ax5.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                    linewidth=2, color='gray', alpha=0.5, linestyle='--')
+gl5.top_labels = False
+gl5.right_labels = False
+gl5.xlines = False
+gl5.ylines = False
+gl5.xlocator = mticker.FixedLocator([-180, -90, 0, 90, 180])
+gl5.ylocator = LatitudeLocator()
+gl5.xformatter = LongitudeFormatter()
+gl5.yformatter = LatitudeFormatter()
+gl5.ylabel_style = {'size': 12, 'color': 'gray'}
+gl5.xlabel_style = {'size': 12, 'color': 'gray'}
+ax5.set_title(f'Explicit — t={anim_times_chris[0]}')
+
+
+ax6 = plt.subplot(1,2,2, projection = ccrs.PlateCarree())
+mesh_observed = ax6.pcolormesh(lons, lats, temperature_anomaly.isel(TIME=0),
+                          cmap='RdBu_r', vmin=VMIN, vmax=VMAX)
+ax6.coastlines()
+ax6.set_xlim(-180, 180)
+ax6.set_ylim(-90, 90)
+gl6 = ax6.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                    linewidth=2, color='gray', alpha=0.5, linestyle='--')
+gl6.top_labels = False
+gl6.right_labels = False
+gl6.xlines = False
+gl6.ylines = False
+gl6.xlocator = mticker.FixedLocator([-180, -90, 0, 90, 180])
+gl6.ylocator = LatitudeLocator()
+gl6.xformatter = LongitudeFormatter()
+gl6.yformatter = LatitudeFormatter()
+gl6.ylabel_style = {'size': 12, 'color': 'gray'}
+gl6.xlabel_style = {'size': 12, 'color': 'gray'}
+ax6.set_title(f'Observation — t={anim_times_chris[0]}')
+
+# ----Observed Tm'-----------------------------------------------------
+
 # Shared colorbar
 cbar = fig.colorbar(mesh_imp, ax=[ax1, ax2,ax3,ax4], shrink=0.8,
                     label=sim_implicit.attrs.get('units', 'K'))
+
+cbar_chris = fig_chris.colorbar(mesh_chris, ax=ax5, shrink=0.8,
+                    label=chris_ds.attrs.get('units', 'K'))
+
+
+cbar_obs = fig_chris.colorbar(mesh_observed, ax=ax6, shrink=0.8,
+                    label=temperature_anomaly.attrs.get('units', 'K'))
 
 def update(frame):
     # Update explicit
@@ -383,7 +447,7 @@ def update(frame):
 
     Z_crank = sim_crank.isel(TIME=frame).values
     mesh_crank.set_array(Z_crank.ravel())
-
+   
     # Update titles
     current_time = anim_times[frame]
     month_in_year = (current_time % 12) + 0.5  # 0.5 (Jan) to 11.5 (Dec)
@@ -393,7 +457,28 @@ def update(frame):
     ax4.set_title(f'Crank Nicolson — Time: {current_time} (Month: {month_in_year:.1f})')
     return [mesh_exp, mesh_imp, mesh_semi_imp, mesh_crank]
 
+
+def update_chris(frame):
+    Z_chris = chris_ds.isel(TIME=frame).values
+    mesh_chris.set_array(Z_chris.ravel())
+    # Update titles
+    current_time = anim_times_chris[frame]
+    month_in_year = (current_time % 12) + 0.5  # 0.5 (Jan) to 11.5 (Dec)
+    ax5.set_title(f'Chris Scheme — Time: {current_time} (Month: {month_in_year:.1f})')
+
+    Z_obs = temperature_anomaly.isel(TIME=frame).values
+    mesh_observed.set_array(Z_obs.ravel())
+    # Update titles
+    current_time = anim_times_chris[frame]
+    month_in_year = (current_time % 12) + 0.5  # 0.5 (Jan) to 11.5 (Dec)
+    ax6.set_title(f'Observation — Time: {current_time} (Month: {month_in_year:.1f})')
+    return [mesh_chris, mesh_observed]
+
+
 # Create and show animation
 animation = FuncAnimation(fig, update, frames=len(anim_times), interval=600, blit=False)
+animation_chris = FuncAnimation(fig_chris, update_chris, frames=len(anim_times_chris), interval=600, blit=False)
+
 # plt.tight_layout()
 plt.show()
+
