@@ -29,14 +29,18 @@ def ekman_current_anomaly(tau_x_anom, tau_y_anom, dTm_dx_monthly, dTm_dy_monthly
 
     # Compute Q'_Ek
     Q_ek = c_o * ((tau_x_anom * dTm_dy_t / f) - (tau_y_anom * dTm_dx_t / f))
+    Q_ek_x = c_o * (tau_x_anom * dTm_dy_t / f)
+    Q_ek_y = c_o * (tau_y_anom * dTm_dx_t / f)
     Q_ek = Q_ek.where(mask)
+    Q_ek_x = Q_ek_x.where(mask)
+    Q_ek_y = Q_ek_y.where(mask)
 
     Q_ek.name = "Q_Ek_anom"
     Q_ek.attrs.update({
         "description": "Ekman term anomaly using τ' and monthly mean Tm gradients",
         "formula": "c_o * (τx'/f * dTmbar/dy - τy'/f * dTmbar/dx)",
     })
-    return Q_ek
+    return Q_ek, Q_ek_x, Q_ek_y
 
 def month_idx (time_da: xr.DataArray) -> xr.DataArray:
     n = time_da.sizes['TIME']
@@ -191,20 +195,25 @@ if __name__ == "__main__":
     lat = ds["LATITUDE"]
     f_2d = coriolis_parameter(lat).broadcast_like(ds_tau_x)
 
-    print('tau_x_anom.dims',tau_x_anom.dims)
-    print('tau_y_anom.dims', tau_y_anom.dims)
-    print('ds_grad_lat["__xarray_dataarray_variable__"].dims: ',ds_grad_lat["__xarray_dataarray_variable__"].dims)
-    print('ds_grad_lon["__xarray_dataarray_variable__"].dims: ', ds_grad_lon["__xarray_dataarray_variable__"].dims)
-    print('f_2d.dims',f_2d.dims)
-    print ('Corioslis Parameter: \n',f_2d)
+    # print('tau_x_anom.dims',tau_x_anom.dims)
+    # print('tau_y_anom.dims', tau_y_anom.dims)
+    # print('ds_grad_lat["__xarray_dataarray_variable__"].dims: ',ds_grad_lat["__xarray_dataarray_variable__"].dims)
+    # print('ds_grad_lon["__xarray_dataarray_variable__"].dims: ', ds_grad_lon["__xarray_dataarray_variable__"].dims)
+    # print('f_2d.dims',f_2d.dims)
+    # print ('Corioslis Parameter: \n',f_2d)
     
-    Q_ek_anom = ekman_current_anomaly(tau_x_anom, tau_y_anom, dTm_dx_monthly, dTm_dy_monthly, f_2d)
+    Q_ek_anom, Q_ek_anom_x, Q_ek_anom_y = ekman_current_anomaly(tau_x_anom, tau_y_anom, dTm_dx_monthly, dTm_dy_monthly, f_2d)
     Q_ek_anom.TIME.attrs["units"] = "months since 2004-01-01" 
+    Q_ek_anom_x.TIME.attrs["units"] = "months since 2004-01-01" 
+    Q_ek_anom_y.TIME.attrs["units"] = "months since 2004-01-01" 
     Q_ek_anom = fix_rg_time(Q_ek_anom, mode="datetime")
+    Q_ek_anom_x = fix_rg_time(Q_ek_anom_x, mode="datetime")
+    Q_ek_anom_y = fix_rg_time(Q_ek_anom_y, mode="datetime")
     print(
-        'ekmann current anomaly:', Q_ek_anom
+        'ekmann current anomaly:', Q_ek_anom,
+        'Q_ek_anom_x', Q_ek_anom_x,
+        'Q_ek_anom_y', Q_ek_anom_y
         # ds_grad_lat,
-
         #  'original dataset:\n', ds,
         #'\n ds_tau_x: \n', ds_tau_x,
         #'\n ds_tau_y: \n', ds_tau_y,
@@ -229,6 +238,84 @@ if __name__ == "__main__":
         cbar_kwargs={"label": "Q'_Ek (arbitrary units)"}
     )
     plt.title(f"Ekman Current Anomaly ({date})")
+    plt.xlabel("Longitude")
+    plt.ylabel("Latitude")
+    plt.tight_layout()
+    plt.show()
+
+    anom_x = Q_ek_anom_x.sel(TIME=date)
+    anom_y = Q_ek_anom_y.sel(TIME=date) 
+    fig = plt.figure(figsize=(16, 6))
+    
+    ax1 = plt.subplot(1,2,1)
+    im1 = anom_x.plot(
+        ax=ax1,
+        cmap="RdBu_r",
+        vmin=-np.nanpercentile(anom_x, 99),
+        vmax=np.nanpercentile(anom_x, 99),
+        add_colorbar=False,   # we'll add colorbars explicitly to control layout
+    )
+    ax1.set_title(f"Ekman anomaly — x-term — {date}")
+    ax1.set_xlabel("Longitude")
+    ax1.set_ylabel("Latitude")
+
+    ax2 = plt.subplot(1,2,2)
+    im2 = anom_x.plot(
+        ax=ax2,
+        cmap="RdBu_r",
+        vmin=-np.nanpercentile(anom_y, 99),
+        vmax=np.nanpercentile(anom_y, 99),
+        add_colorbar=False,   # we'll add colorbars explicitly to control layout
+    )
+    ax2.set_title(f"Ekman anomaly — y-term  — {date}")
+    ax2.set_xlabel("Longitude")
+
+    cbar = fig.colorbar(im1, ax=[ax1, ax2], orientation="vertical", pad=0.02)
+    cbar.set_label("Q'_Ek (W/m^2)")
+
+    plt.suptitle(f"Ekman anomaly decomposition — {date}", fontsize=14)
+    plt.show()
+
+    #------------------------------------------------------------
+    Q_ek_anom_x_monthly = get_monthly_mean(Q_ek_anom_x)
+    Q_ek_anom_y_monthly = get_monthly_mean(Q_ek_anom_y)
+    weight_x = abs(Q_ek_anom_x_monthly)/ (abs(Q_ek_anom_y_monthly) + abs(Q_ek_anom_x_monthly))
+    weight_y = abs(Q_ek_anom_y_monthly)/ (abs(Q_ek_anom_y_monthly) + abs(Q_ek_anom_x_monthly))
+    dominance = Q_ek_anom_x - Q_ek_anom_y
+    #dominance = get_monthly_mean(dominance)
+    
+    # MONTH_idx = 2
+    dominance = dominance.sel(TIME = date)
+    plt.figure(figsize=(10, 5))
+    dominance.plot(
+        cmap="RdBu_r",
+        cbar_kwargs={"label": "Difference"}
+    )
+    plt.title(f"Difference of Ekman Current (x-y) on {date} ")
+    plt.xlabel("Longitude")
+    plt.ylabel("Latitude")
+    plt.tight_layout()
+    plt.show()
+
+    weight_plot = weight_x.sel(MONTH = 7)
+    plt.figure(figsize=(10, 5))
+    weight_plot.plot(
+        cmap="RdBu_r",
+        cbar_kwargs={"label": "Weighted ratio of Ekman Current on x "}
+    )
+    plt.title(f"Weighted ratio of Ekman Current x/(x+y)in Month {date} ")
+    plt.xlabel("Longitude")
+    plt.ylabel("Latitude")
+    plt.tight_layout()
+    plt.show()
+
+    weight_plot = weight_y.sel(MONTH = 7)
+    plt.figure(figsize=(10, 5))
+    weight_plot.plot(
+        cmap="RdBu_r",
+        cbar_kwargs={"label": "Weighted ratio of Ekman Current on x "}
+    )
+    plt.title(f"Weighted ratio of Ekman Current y/(x+y)in Month {date} ")
     plt.xlabel("Longitude")
     plt.ylabel("Latitude")
     plt.tight_layout()
