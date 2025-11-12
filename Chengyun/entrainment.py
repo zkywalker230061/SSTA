@@ -44,14 +44,15 @@ def find_half_temperature(depth, temperature, mld):
         The temperature at the mixed layer depth (hbar).
     """
 
-    below_mld = np.where(depth <= mld)[0]
+    above_mld = np.where(depth <= mld)[0]
+    below_mld = np.where(depth > mld)[0]
 
     # catch case where no MLD (should be only over land)
-    if len(below_mld) == 0:
+    if len(above_mld) == 0 or len(below_mld) == 0:
         return np.nan
 
+    above_mld_index = above_mld[-1]
     below_mld_index = below_mld[0]
-    above_mld_index = below_mld_index - 1
     mld_temp = np.interp(
         mld,
         [depth[above_mld_index], depth[below_mld_index]],
@@ -208,29 +209,31 @@ def main():
 
     # save_sub_temperature_dataset()
 
-    # MONTH = 7
+    MONTH = 7
 
-    # t_sub = load_and_prepare_dataset(
-    #     "../datasets/Sub_Layer_Temperature-(2004-2018).nc"
-    # )['SUB_TEMPERATURE']
-    # # display(t_sub)
-    # visualise_dataset(
-    #     t_sub.sel(TIME=MONTH, method='nearest'),
-    #     cmaps='RdBu_r',
-    # )
+    t_sub = load_and_prepare_dataset(
+        "../datasets/Sub_Layer_Temperature-(2004-2018).nc"
+    )['SUB_TEMPERATURE']
+    # display(t_sub)
+    visualise_dataset(
+        t_sub.sel(TIME=MONTH, method='nearest'),
+        cmaps='RdBu_r',
+    )
 
-    # t_sub_monthly_mean = get_monthly_mean(t_sub)
-    # t_sub_anomaly = get_anomaly(t_sub, t_sub_monthly_mean)
-    # # display(t_sub_anomaly)
-    # visualise_dataset(
-    #     t_sub_anomaly.sel(TIME=MONTH, method='nearest'),
-    #     cmaps='RdBu_r',
-    #     vmin=-30, vmax=30
-    # )
+    t_sub_monthly_mean = get_monthly_mean(t_sub)
+    t_sub_anomaly = get_anomaly(t_sub, t_sub_monthly_mean)
+    print(t_sub_anomaly.max().item(), t_sub_anomaly.min().item())
+    print(abs(t_sub_anomaly).mean().item())
+    # display(t_sub_anomaly)
+    visualise_dataset(
+        t_sub_anomaly.sel(TIME=MONTH, method='nearest'),
+        cmaps='RdBu_r',
+        vmin=-2, vmax=2
+    )
 
     # save_entrainment_velocity()
 
-    save_q_entrainment_anomaly()
+    # save_q_entrainment_anomaly()
 
 
 if __name__ == "__main__":

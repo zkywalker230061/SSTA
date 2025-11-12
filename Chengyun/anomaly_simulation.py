@@ -46,7 +46,7 @@ pcolormesh = ax.pcolormesh(
     t_anomaly.LATITUDE.values,
     t_anomaly.isel(TIME=0),
     cmap='RdBu_r',
-    vmin=-5, vmax=5
+    vmin=-2, vmax=2
 )
 # contourf = ax.contourf(
 #     t_anomaly.LONGITUDE.values,
@@ -109,7 +109,7 @@ def update(frame):
     # return [contourf, title]
 
 
-ani = animation.FuncAnimation(fig, update, frames=len(times), interval=300, blit=False)
+ani = animation.FuncAnimation(fig, update, frames=len(times), interval=1000, blit=False)
 
 # writer = animation.FFMpegWriter(
 #     fps=15, bitrate=1800

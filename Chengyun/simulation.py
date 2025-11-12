@@ -122,7 +122,8 @@ for month in temperature.TIME.values:
 model_anomaly_ds = xr.concat(model_list, dim='TIME')
 display(model_anomaly_ds)
 
-model_anomaly_ds.to_netcdf("../datasets/Simulated_SSTA-(2004-2018).nc")
+# model_anomaly_ds.to_netcdf("../datasets/Simulated_SSTA-(2004-2018).nc")
+print(model_anomaly_ds.max().item(), model_anomaly_ds.min().item())
 
 # difference_from_obs = model_anomaly_ds - temperature_anomaly
 # display(difference_from_obs)
