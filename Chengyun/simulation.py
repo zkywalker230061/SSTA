@@ -37,6 +37,7 @@ EK_DATA_PATH = "../datasets/Ekman_Current_Anomaly.nc"
 RHO_O = 1025  # kg / m^3
 C_O = 4100  # J / (kg K)
 SECONDS_MONTH = 30.4375 * 24 * 60 * 60  # average seconds in a month
+GAMMA = 10
 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
 # display(temperature_ds)
@@ -90,36 +91,40 @@ ent_anomaly = ent['ENTRAINMENT_ANOMALY']
 ekman = load_and_prepare_dataset(EK_DATA_PATH)
 # display(ekman)
 ekman_anomaly = ekman['Q_Ek_anom']
+ekman_anomaly = ekman_anomaly.where(~np.isnan(ekman_anomaly), 0)
 
 
 MONTH = 0.5
-model_list = []
+# model_list = []
 for month in temperature.TIME.values:
-    # if month == MONTH:
-    #     model_anomaly_ds = (
-    #         temperature_anomaly.sel(TIME=MONTH)
-    #         - temperature_anomaly.sel(TIME=MONTH)
-    #     )
-    #     model_anomaly_ds = model_anomaly_ds.expand_dims(TIME=[MONTH])
-    # else:
-    #     prev = model_anomaly_ds.sel(TIME=month-1)
-    #     cur = (
-    #         prev
-    #         + SECONDS_MONTH * (
-    #             heat_flux_anomaly.sel(TIME=month)
-    #             + ent_anomaly.sel(TIME=month)
-    #             # + GEO
-    #             + ekman_anomaly.sel(TIME=month)
-    #         ) / (RHO_O * C_O * mld.sel(MONTH=(month % 12 + 0.5)))
-    #     )
-    #     cur = cur.expand_dims(TIME=[month])
-    #     model_anomaly_ds = xr.concat([model_anomaly_ds, cur], dim='TIME')
-    temp = (
-        (t_sub_anomaly.sel(TIME=month) + (heat_flux_anomaly.sel(TIME=month) + ekman_anomaly.sel(TIME=month))/(RHO_O * C_O * w_e_monthly_mean.sel(MONTH=(month % 12 + 0.5))))
-        * (1 - np.exp(- (w_e_monthly_mean.sel(MONTH=(month % 12 + 0.5))*SECONDS_MONTH*month)/mld.sel(MONTH=(month % 12 + 0.5))))
-    )
-    model_list.append(temp.expand_dims(TIME=[month]))
-model_anomaly_ds = xr.concat(model_list, dim='TIME')
+    if month == MONTH:
+        model_anomaly_ds = (
+            temperature_anomaly.sel(TIME=MONTH)
+            - temperature_anomaly.sel(TIME=MONTH)
+        )
+        model_anomaly_ds = model_anomaly_ds.expand_dims(TIME=[MONTH])
+    else:
+        prev = model_anomaly_ds.sel(TIME=month-1)
+        cur = (
+            prev
+            + SECONDS_MONTH * (
+                heat_flux_anomaly.sel(TIME=month)
+                + ent_anomaly.sel(TIME=month)
+                # + GEO
+                + ekman_anomaly.sel(TIME=month)
+                - GAMMA * prev
+            ) / (RHO_O * C_O * mld.sel(MONTH=(month % 12 + 0.5)))
+        )
+        cur = cur.expand_dims(TIME=[month])
+        model_anomaly_ds = xr.concat([model_anomaly_ds, cur], dim='TIME')
+
+#     temp = (
+#         (t_sub_anomaly.sel(TIME=month) + (heat_flux_anomaly.sel(TIME=month) + ekman_anomaly.sel(TIME=month))/(RHO_O * C_O * w_e_monthly_mean.sel(MONTH=(month % 12 + 0.5))))
+#         * (1 - np.exp(- (w_e_monthly_mean.sel(MONTH=(month % 12 + 0.5))*SECONDS_MONTH*month)/mld.sel(MONTH=(month % 12 + 0.5))))
+#     )
+#     model_list.append(temp.expand_dims(TIME=[month]))
+# model_anomaly_ds = xr.concat(model_list, dim='TIME')
+
 display(model_anomaly_ds)
 
 # model_anomaly_ds.to_netcdf("../datasets/Simulated_SSTA-(2004-2018).nc")
@@ -203,5 +208,5 @@ def update(frame):
     # return [contourf, title]
 
 
-animation = FuncAnimation(fig, update, frames=len(times), interval=300, blit=False)
+animation = FuncAnimation(fig, update, frames=len(times), interval=1000, blit=False)
 plt.show()
