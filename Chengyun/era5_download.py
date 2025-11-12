@@ -27,10 +27,7 @@ def era5_argolise(ds: xr.Dataset) -> xr.Dataset:
     Prerequisites:
     - Download ERA5 data from Copernicus Climate Data Store (CDS) manually or using cdsapi.
         cdsapi example in main.
-    - Ensure downloaded data is following some format consistent with RG-ARGO datasets:
-        - longitude: -179.5 to 179.5
-        - latitude: 79.5 to -64.5
-        - grid: 1.0 x 1.0 degree
+    - Ensure downloaded data is following some formats:
         - data_format: netcdf
         - product_type:
             monthly_averaged_reanalysis (moda) - len(ds['number']) == None
