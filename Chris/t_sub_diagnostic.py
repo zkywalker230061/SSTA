@@ -11,6 +11,12 @@ t_sub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
 # t_sub_ds = get_anomaly(t_sub_ds, 'T_sub', t_sub_monthly_mean)
 # t_sub_ds.to_netcdf("../datasets/t_sub_2.nc")
 
+print(t_sub_ds["T_sub_ANOMALY"].max().item())
+print(t_sub_ds["T_sub_ANOMALY"].min().item())
+print(abs(t_sub_ds["T_sub_ANOMALY"]).mean().item())
+
+
+
 vmin_anom = -1
 vmax_anom = 1
 
