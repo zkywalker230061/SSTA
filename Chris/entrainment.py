@@ -20,24 +20,28 @@ def get_T_sub(temp_ds, mld_ds, month, make_plots=True):
     temp_ds = temp_ds.sel(TIME=month)
     mld_ds = mld_ds.sel(TIME=month)
 
-
     def interpolation(depth, temperature, mld):
-        below_mld = np.where(depth <= mld)[0]
+        above_mld = np.where(depth <= mld)[0]
+        below_mld = np.where(depth > mld)[0]
 
         # catch case where no MLD (should be only over land)
-        if len(below_mld) == 0:
+        if len(above_mld) == 0 or len(below_mld) == 0:
             return np.nan
 
+        above_mld_index = above_mld[-1]
         below_mld_index = below_mld[0]
-        above_mld_index = below_mld_index - 1
-        return np.interp(mld, [depth[above_mld_index], depth[below_mld_index]], [temperature[above_mld_index], temperature[below_mld_index]])
 
-    T_sub = xr.apply_ufunc(interpolation, temp_ds['PRESSURE'], temp_ds['TEMPERATURE'], mld_ds['MLD_PRESSURE'], input_core_dims=[['PRESSURE'], ['PRESSURE'], []], vectorize=True)
+        return np.interp(mld, [depth[below_mld_index], depth[above_mld_index]],
+                         [temperature[below_mld_index], temperature[above_mld_index]])
+
+    T_sub = xr.apply_ufunc(interpolation, temp_ds['PRESSURE'], temp_ds['TEMPERATURE'], mld_ds['MLD_PRESSURE'],
+                           input_core_dims=[['PRESSURE'], ['PRESSURE'], []], vectorize=True)
     mld_ds['T_sub'] = T_sub
     if make_plots:
         mld_ds['T_sub'].plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r')
         plt.show()
     return mld_ds
+
 
 # combine dataset from each of the months
 datasets_over_time = []
