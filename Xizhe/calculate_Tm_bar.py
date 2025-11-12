@@ -1,6 +1,6 @@
 #%%
-from read_nc import fix_rg_time, fix_longitude_coord
-from calculate_Tm_Sm import depth_dbar_to_meter, _full_field, mld_dbar_to_meter, vertical_integral, z_to_xarray
+from Xizhe.utils_read_nc import fix_rg_time, fix_longitude_coord
+from Xizhe.utils_Tm_Sm import depth_dbar_to_meter, _full_field, mld_dbar_to_meter, vertical_integral, z_to_xarray
 from grad_field import compute_gradient_lat, compute_gradient_lon
 import numpy as np
 import pandas as pd

@@ -2,7 +2,7 @@ import xarray as xr
 import numpy as np
 import matplotlib.ticker as mticker
 import matplotlib.pyplot as plt
-from read_nc import get_monthly_mean, get_anomaly, load_and_prepare_dataset
+from Xizhe.utils_read_nc import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
 import cartopy.crs as ccrs
 from cartopy.mpl.ticker import (LongitudeFormatter, LatitudeFormatter,

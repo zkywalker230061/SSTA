@@ -1,8 +1,8 @@
 import numpy as np
 import xarray as xr
-from calculate_Tm_Sm import vertical_integral
+from Xizhe.utils_Tm_Sm import vertical_integral
 from grad_field import compute_gradient_lat, compute_gradient_lon
-from read_nc import fix_rg_time
+from Xizhe.utils_read_nc import fix_rg_time
 import matplotlib.pyplot as plt
 
 

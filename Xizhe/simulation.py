@@ -4,7 +4,7 @@ import xarray as xr
 import numpy as np
 import matplotlib.ticker as mticker
 import matplotlib.pyplot as plt
-from read_nc import get_monthly_mean, get_anomaly, load_and_prepare_dataset, load_pressure_data
+from Xizhe.utils_read_nc import get_monthly_mean, get_anomaly, load_and_prepare_dataset, load_pressure_data
 from matplotlib.animation import FuncAnimation
 import matplotlib
 import cartopy.crs as ccrs
