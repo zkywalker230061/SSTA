@@ -56,6 +56,9 @@ t_sub_ds = get_anomaly(t_sub_ds, 'T_sub', t_sub_monthly_mean)
 
 t_sub_ds.to_netcdf("../datasets/t_sub.nc")
 print(t_sub_ds)
+print(t_sub_ds["T_sub_ANOMALY"].max().item())
+print(t_sub_ds["T_sub_ANOMALY"].min().item())
+print(abs(t_sub_ds["T_sub_ANOMALY"]).mean().item())
 
 vmin = -10
 vmax = 10

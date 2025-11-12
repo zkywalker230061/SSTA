@@ -19,14 +19,14 @@ TEMP_DATA_PATH = "../datasets/RG_ArgoClim_Temperature_2019.nc"
 MLD_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
 ENTRAINMENT_VEL_DATA_PATH = "../datasets/Entrainment_Velocity-(2004-2018).nc"
 H_BAR_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
-T_SUB_DATA_PATH = "../datasets/t_sub_2.nc"
+T_SUB_DATA_PATH = "../datasets/t_sub.nc"
 USE_ALL_CONTRIBUTIONS = True
 USE_EKMAN_TERM = True
 USE_ENTRAINMENT = True     # something broken with entrainment; if False, use gamma_0 for damping
 INTEGRATE_EXPLICIT = False
-rho_0 = 1025
-c_0 = 4100
-gamma_0 = 10
+rho_0 = 1025.0
+c_0 = 4100.0
+gamma_0 = 10.0
 
 if USE_ALL_CONTRIBUTIONS:
     heat_flux_ds = xr.open_dataset(HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH, decode_times=False)
@@ -52,6 +52,7 @@ hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
 entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
 entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
 
+entrainment_lower_threshold = 0.5 * np.nanmean(np.abs(entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']))
 
 def month_to_second(month):
     return month * 30.4375 * 24 * 60 * 60
@@ -95,6 +96,7 @@ else:
         else:
             prev_tm_anom = model_anomalies[-1].isel(TIME=-1)
             prev_tsub_anom = t_sub_ds.sel(TIME=prev_month)['T_sub_ANOMALY']
+            prev_tm_anom = xr.where(np.isfinite(prev_tm_anom), prev_tm_anom, 0)     # reset NaN to 0; I'd rather this reset to the 'last useful value', but can't figure out how to do that now
             prev_heat_flux_anom = heat_flux_anomaly_ds.sel(TIME=prev_month)['NET_HEAT_FLUX_ANOMALY']
             prev_entrainment_vel = entrainment_vel_ds.sel(MONTH=prev_month_in_year)['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
             prev_hbar = hbar_ds.sel(MONTH=prev_month_in_year)['MONTHLY_MEAN_MLD_PRESSURE']
@@ -103,13 +105,41 @@ else:
             cur_heat_flux_anom = heat_flux_anomaly_ds.sel(TIME=month)['NET_HEAT_FLUX_ANOMALY']
             cur_entrainment_vel = entrainment_vel_ds.sel(MONTH=month_in_year)['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
             cur_hbar = hbar_ds.sel(MONTH=month_in_year)['MONTHLY_MEAN_MLD_PRESSURE']
-
-            if USE_ENTRAINMENT:
-                cur_tm_anom = cur_tsub_anom + cur_heat_flux_anom / (cur_entrainment_vel * rho_0 * c_0) + (prev_tm_anom - prev_tsub_anom - prev_heat_flux_anom / (prev_entrainment_vel * rho_0 * c_0)) * np.exp(prev_entrainment_vel / prev_hbar * month_to_second(prev_month) - cur_entrainment_vel / cur_hbar * month_to_second(month))
-
-            else:
+            if not USE_ENTRAINMENT:         # ignore entrainment altogether
                 cur_tm_anom = cur_heat_flux_anom / gamma_0 + (prev_tm_anom - prev_heat_flux_anom / gamma_0) * np.exp(gamma_0 / (rho_0 * c_0 * prev_hbar) * month_to_second(prev_month) - gamma_0 / (rho_0 * c_0 * cur_hbar) * month_to_second(month))
 
+            else:       # if treating entrainment, we have to be careful not to divide by zero
+                no_entrainment_mask = np.abs(cur_entrainment_vel) <= entrainment_lower_threshold     # mask for when entrainment does not apply
+                entrainment_mask = np.abs(cur_entrainment_vel) > entrainment_lower_threshold     # opposite to no_entrainment_mask
+
+                no_entrainment_mask = xr.DataArray(no_entrainment_mask, coords=cur_entrainment_vel.coords, dims=cur_entrainment_vel.dims)
+                entrainment_mask = xr.DataArray(entrainment_mask, coords=cur_entrainment_vel.coords, dims=cur_entrainment_vel.dims)
+
+                cur_tm_anom = np.full_like(cur_tsub_anom, np.nan, dtype=float)  # initialise cur_tm
+                if np.any(entrainment_mask):
+                    cur_entrainment_vel_entrainment_mask = np.where(entrainment_mask, cur_entrainment_vel, np.nan)
+                    prev_entrainment_vel_entrainment_mask = np.where(entrainment_mask, prev_entrainment_vel, np.nan)
+                    cur_hbar_entrainment_mask = np.where(entrainment_mask, cur_hbar, np.nan)
+                    prev_hbar_entrainment_mask = np.where(entrainment_mask, prev_hbar, np.nan)
+
+                    exponent = (prev_entrainment_vel_entrainment_mask / prev_hbar_entrainment_mask * month_to_second(prev_month) - cur_entrainment_vel_entrainment_mask / cur_hbar_entrainment_mask * month_to_second(month))
+                    exponent = np.clip(exponent, -600, 600)     # prevent absurd values
+                    exponent = np.exp(exponent)
+
+                    cur_tm_anom_entrain = cur_tsub_anom + cur_heat_flux_anom / (cur_entrainment_vel_entrainment_mask * rho_0 * c_0) + (prev_tm_anom - prev_tsub_anom - prev_heat_flux_anom / (prev_entrainment_vel_entrainment_mask * rho_0 * c_0)) * exponent
+                else:
+                    cur_tm_anom_entrain = np.full_like(cur_tsub_anom, np.nan, dtype=float)
+                if np.any(no_entrainment_mask):     # ignore entrainment in the same way as previously
+                    cur_hbar_no_entrainment_mask = np.where(no_entrainment_mask, cur_hbar, np.nan)
+                    prev_hbar_no_entrainment_mask = np.where(no_entrainment_mask, prev_hbar, np.nan)
+
+                    exponent_no_entrainment = gamma_0 / (rho_0 * c_0 * prev_hbar_no_entrainment_mask) * month_to_second(prev_month) - gamma_0 / (rho_0 * c_0 * cur_hbar_no_entrainment_mask) * month_to_second(month)
+                    exponent_no_entrainment = np.exp(exponent_no_entrainment)
+                    cur_tm_anom_no_entrain = cur_heat_flux_anom / gamma_0 + (prev_tm_anom - prev_heat_flux_anom / gamma_0) * exponent_no_entrainment
+                else:
+                    cur_tm_anom_no_entrain = np.full_like(cur_tsub_anom, np.nan, dtype=float)
+                cur_tm_anom = xr.where(no_entrainment_mask, cur_tm_anom_no_entrain, cur_tm_anom_entrain)
+            cur_tm_anom = cur_tm_anom.drop_vars('MONTH', errors='ignore')
             cur_tm_anom = cur_tm_anom.expand_dims(TIME=[month])
             model_anomalies.append(cur_tm_anom)
     model_anomaly_ds = xr.concat(model_anomalies, 'TIME')
