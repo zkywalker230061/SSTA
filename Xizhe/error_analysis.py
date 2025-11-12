@@ -2,7 +2,7 @@ import xarray as xr
 import numpy as np
 import matplotlib.ticker as mticker
 import matplotlib.pyplot as plt
-from Xizhe.utils_read_nc import get_monthly_mean, get_anomaly, load_and_prepare_dataset
+from utils_read_nc import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
 import cartopy.crs as ccrs
 from cartopy.mpl.ticker import (LongitudeFormatter, LatitudeFormatter,
@@ -98,14 +98,13 @@ print('monthly_heat_flux_anom_std',monthly_heat_flux_anom_std)
 
 VMIN, VMAX = 0,45
 #---------------------------------------------------------------------------------------------------------
-fig = plt.figure(figsize=[12,5])
+fig = plt.figure(figsize=[16,6])
 
 ax = fig.add_subplot(1, 2, 1, projection=ccrs.PlateCarree())
 pc = plt.pcolormesh(
         ekman_anom_std["LONGITUDE"], ekman_anom_std["LATITUDE"], ekman_anom_std,
         cmap='RdBu_r', shading="auto", vmin=VMIN, vmax=VMAX
     )
-cbar = fig.colorbar(pc, ax=ax, orientation="vertical", label="Standard Deviation")
 # gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, linewidth=2, color='gray', alpha=0.5, linestyle='--')
 # gl = ax.gridlines(draw_labels=True, linewidth=1, color='gray', alpha=0.5, linestyle='--')
 ax.set_title("Ekman Current Anomaly Standard Deviation")
@@ -119,15 +118,14 @@ pc2 = plt.pcolormesh(
         heat_flux_anom_std["LONGITUDE"], heat_flux_anom_std["LATITUDE"], heat_flux_anom_std,
         cmap='RdBu_r', shading="auto", vmin=VMIN, vmax=VMAX
     )
-cbar2 = fig.colorbar(pc2, ax=ax2, orientation="vertical", label="Standard Deviation")
+cbar2 = fig.colorbar(pc2, ax=[ax,ax2], orientation="vertical", label="Standard Deviation", shrink = 0.7)
 # gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, linewidth=2, color='gray', alpha=0.5, linestyle='--')
 # gl = ax.gridlines(draw_labels=True, linewidth=1, color='gray', alpha=0.5, linestyle='--')
 ax2.set_title("Air Sea Heat Flux Anomaly Standard Deviation")
 ax2.set_xlabel("Longitude")
 ax2.set_ylabel("Latitude")
 ax2.coastlines()
-
-plt.tight_layout()
+plt.savefig('Anomaly Standard Deviation')
 plt.show()
 
 
@@ -195,12 +193,13 @@ def update(frame):
     # Update titles
     current_time = anim_times[frame]
     # month_in_year = (current_time % 12) + 0.5  # 0.5 (Jan) to 11.5 (Dec)
-    ax3.set_title(f'monthly_Ekman_anom_std — MONTH: {current_time})')
-    ax4.set_title(f'monthly_heat_flux_std — MONTH: {current_time} )')
+    ax3.set_title(f'Monthly Averaged Ekman Current Anomaly std — MONTH: {current_time}')
+    ax4.set_title(f'Monthly Averaged Heat Flux std — MONTH: {current_time}')
     return [mesh_ekman, mesh_flux]
 
 animation = FuncAnimation(fig2, update, frames=len(anim_times), interval=600, blit=False)
-
+# animation.save('Climatology Averaged Standard Deviation.mp4', writer='ffmpeg', fps=2)
 plt.show()
 
 mesh_ekman.get_array().size
+

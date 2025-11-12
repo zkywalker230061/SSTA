@@ -5,8 +5,8 @@ Writing a function to calculate the gradients of our fields
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
-from Xizhe.utils_read_nc import fix_rg_time, fix_longitude_coord
-from Xizhe.utils_Tm_Sm import depth_dbar_to_meter, _full_field, mld_dbar_to_meter, vertical_integral, z_to_xarray
+from utils_read_nc import fix_rg_time, fix_longitude_coord
+from utils_Tm_Sm import depth_dbar_to_meter, _full_field, mld_dbar_to_meter, vertical_integral, z_to_xarray
 
 
 def compute_gradient_lat(
