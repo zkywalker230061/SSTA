@@ -170,6 +170,35 @@ def save_entrainment_velocity():
     w_e_da.to_netcdf("../datasets/Entrainment_Velocity-(2004-2018).nc")
 
 
+def save_q_entrainment():
+    """Save the Q_Entrainment dataset."""
+
+    t_sub_ds = load_and_prepare_dataset(
+        "../datasets/Sub_Layer_Temperature-(2004-2018).nc"
+    )
+    t_m_ds = load_and_prepare_dataset(
+        "../datasets/Mixed_Layer_Temperature-(2004-2018).nc"
+    )
+    w_e_ds = load_and_prepare_dataset(
+        "../datasets/Entrainment_Velocity-(2004-2018).nc"
+    )
+
+    t_sub = t_sub_ds['SUB_TEMPERATURE']
+    t_m = t_m_ds['MLD_TEMPERATURE']
+    w_e = w_e_ds['ENTRAINMENT_VELOCITY']
+
+    q_entrainment = RHO_O * C_O * w_e * (t_sub - t_m)
+    q_entrainment.attrs['units'] = 'W/m^2'
+    q_entrainment.attrs['long_name'] = (
+        'Monthly Q_Entrainment Jan 2004 - Dec 2018 (15.0 year)'
+    )
+    q_entrainment.name = 'ENTRAINMENT_HEAT_FLUX'
+    display(q_entrainment)
+    q_entrainment.to_netcdf(
+        "../datasets/Entrainment_Heat_Flux-(2004-2018).nc"
+    )
+
+
 def save_q_entrainment_anomaly():
     """Save the Q_Entrainment anomaly dataset."""
 
@@ -232,6 +261,8 @@ def main():
     )
 
     # save_entrainment_velocity()
+
+    # save_q_entrainment()
 
     # save_q_entrainment_anomaly()
 
