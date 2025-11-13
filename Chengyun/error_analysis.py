@@ -122,97 +122,224 @@ def error_analysis(da: xr.DataArray):
     plt.show()
 
 
+def simulation_error_analysis(
+    simulation_da: xr.DataArray
+):
+    """
+    Perform error analysis on the simulation DataArray.
+
+    Parameters
+    ----------
+    simulation_da: xarray.DataArray
+        The simulation DataArray to analyze.
+
+    Returns
+    -------
+    xarray.DataArray
+        Error DataArray.
+
+    Raises
+    ------
+    ValueError
+        If the DataArray does not have a TIME dimension.
+    """
+
+    t = load_and_prepare_dataset(
+        "../datasets/Mixed_Layer_Temperature-(2004-2018).nc",
+    )
+    # display(t)
+    t_monthly_mean = get_monthly_mean(t['MLD_TEMPERATURE'])
+    # display(t_monthly_mean)
+    t_anomaly = get_anomaly(t['MLD_TEMPERATURE'], t_monthly_mean)
+    # display(t_anomaly)
+
+    if 'TIME' not in simulation_da.dims:
+        raise ValueError("The Anomaly DataArray must have a TIME dimension.")
+    error_list = []
+    for month_num in simulation_da.coords['TIME']:
+        month_num = month_num.values
+        month_error = simulation_da.sel(TIME=month_num) - t_anomaly.sel(TIME=month_num)
+        # get error of this month
+        error = np.sqrt(np.mean(month_error**2))
+        error_list.append(error)
+    error_da = xr.concat(error_list, "TIME")
+    error_da.attrs['units'] = t_anomaly.attrs.get('units')
+    error_da.attrs['long_name'] = f"Error of {t_anomaly.attrs.get('long_name')}"
+    error_da.name = f"ERROR_{t_anomaly.name}"
+    return error_da
+
+
 def main():
     """Main function for error analysis."""
-    mld_ds = load_and_prepare_dataset(
-        "../datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
+
+    # mld_ds = load_and_prepare_dataset(
+    #     "../datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
+    # )
+    # # display(mld_ds)
+    # mld = mld_ds['MLD_PRESSURE']
+
+    # error_analysis(mld)
+
+    # heat_flux_ds = load_and_prepare_dataset(
+    #     "../datasets/ERA5-ARGO_Mean_Surface_Heat_Flux.nc"
+    # )
+    # # display(heat_flux_ds)
+    # heat_flux = (
+    #     heat_flux_ds['avg_slhtf']
+    #     + heat_flux_ds['avg_ishf']
+    #     + heat_flux_ds['avg_snswrf']
+    #     + heat_flux_ds['avg_snlwrf']
+    # )
+    # heat_flux.attrs.update(
+    #     units='W m**-2', long_name='Net Surface Heat Flux'
+    # )
+    # heat_flux.name = 'NET_HEAT_FLUX'
+
+    # # error_analysis(heat_flux)
+
+    # ekman_ds = load_and_prepare_dataset(
+    #     "../datasets/Ekman_Current_Anomaly.nc"
+    # )
+    # # display(ekman_ds)
+    # ekman = ekman_ds['Q_Ek_anom']
+
+    # # error_analysis(ekman)
+
+    # entrainment_ds = load_and_prepare_dataset(
+    #     "../datasets/Entrainment_Heat_Flux-(2004-2018).nc"
+    # )
+    # # display(entrainment_ds)
+    # entrainment = entrainment_ds['ENTRAINMENT_HEAT_FLUX']
+
+    # # error_analysis(entrainment)
+
+    # heat_flux_error = get_mean_of_error(
+    #     get_error(
+    #         get_monthly_mean(heat_flux),
+    #         get_anomaly(heat_flux, get_monthly_mean(heat_flux))
+    #     )
+    # )
+
+    # entrainment_error = get_mean_of_error(
+    #     get_error(
+    #         get_monthly_mean(entrainment),
+    #         get_anomaly(entrainment, get_monthly_mean(entrainment))
+    #     )
+    # )
+
+    # ekman_error = get_mean_of_error(
+    #     get_error(
+    #         get_monthly_mean(ekman),
+    #         get_anomaly(ekman, get_monthly_mean(ekman))
+    #     )
+    # )
+
+    # plt.figure(figsize=(12, 6))
+    # x = np.array(list(MONTHS.values()))
+    # plt.plot(
+    #     x, heat_flux_error,
+    #     marker='o',
+    #     linestyle='-',
+    #     label='Heat Flux Standard Deviation',
+    #     color='#FF9999'
+    # )
+    # plt.plot(
+    #     x, entrainment_error,
+    #     marker='o',
+    #     linestyle='-',
+    #     label='Entrainment Standard Deviation',
+    #     color='#66CCFF'
+    # )
+    # plt.plot(
+    #     x, ekman_error,
+    #     marker='o',
+    #     linestyle='-',
+    #     label='Ekman Current Standard Deviation',
+    #     color='#99FF99'
+    # )
+    # plt.xticks(x)
+    # plt.xlabel('Month')
+    # plt.ylabel('Standard Deviation')
+    # plt.title('Mean Standard Deviation Over Months')
+    # plt.legend()
+    # plt.show()
+
+    semi_implicit_ds = load_and_prepare_dataset(
+        "../datasets/_Semi_Implicit_Scheme_Test_ConstDamp(10)"
     )
-    # display(mld_ds)
-    mld = mld_ds['MLD_PRESSURE']
-
-    error_analysis(mld)
-
-    heat_flux_ds = load_and_prepare_dataset(
-        "../datasets/ERA5-ARGO_Mean_Surface_Heat_Flux.nc"
+    # display(semi_implicit_ds)
+    semi_implicit = semi_implicit_ds["T_model_anom_semi_implicit"]
+    semi_implicit_error = simulation_error_analysis(
+        semi_implicit
     )
-    # display(heat_flux_ds)
-    heat_flux = (
-        heat_flux_ds['avg_slhtf']
-        + heat_flux_ds['avg_ishf']
-        + heat_flux_ds['avg_snswrf']
-        + heat_flux_ds['avg_snlwrf']
+    # display(semi_implicit_error)
+
+    explicit_ds = load_and_prepare_dataset(
+        "../datasets/Simulated_SSTA-Explicit.nc"
     )
-    heat_flux.attrs.update(
-        units='W m**-2', long_name='Net Surface Heat Flux'
+    # display(explicit_ds)
+    explicit = explicit_ds["ANOMALY_MLD_TEMPERATURE"]
+    explicit = explicit.drop_vars(['MONTH'])
+    explicit_error = simulation_error_analysis(
+        explicit
     )
-    heat_flux.name = 'NET_HEAT_FLUX'
+    # display(explicit_error)
 
-    # error_analysis(heat_flux)
-
-    ekman_ds = load_and_prepare_dataset(
-        "../datasets/Ekman_Current_Anomaly.nc"
+    crack_ds = load_and_prepare_dataset(
+        "../datasets/_Crack_Scheme_Test_ConstDamp(10)"
     )
-    # display(ekman_ds)
-    ekman = ekman_ds['Q_Ek_anom']
-
-    # error_analysis(ekman)
-
-    entrainment_ds = load_and_prepare_dataset(
-        "../datasets/Entrainment_Heat_Flux-(2004-2018).nc"
+    # display(crack_ds)
+    crack = crack_ds["T_model_anom_crank_nicolson"]
+    crack_error = simulation_error_analysis(
+        crack
     )
-    # display(entrainment_ds)
-    entrainment = entrainment_ds['ENTRAINMENT_HEAT_FLUX']
+    # display(crack_error)
 
-    # error_analysis(entrainment)
-
-    heat_flux_error = get_mean_of_error(
-        get_error(
-            get_monthly_mean(heat_flux),
-            get_anomaly(heat_flux, get_monthly_mean(heat_flux))
-        )
+    implicit_ds = load_and_prepare_dataset(
+        "../datasets/Simulated_SSTA-Implicit.nc"
     )
-
-    entrainment_error = get_mean_of_error(
-        get_error(
-            get_monthly_mean(entrainment),
-            get_anomaly(entrainment, get_monthly_mean(entrainment))
-        )
+    # display(implicit_ds)
+    implicit = implicit_ds["ANOMALY_MLD_TEMPERATURE"]
+    implicit = implicit.drop_vars(['MONTH'])
+    implicit_error = simulation_error_analysis(
+        implicit
     )
-
-    ekman_error = get_mean_of_error(
-        get_error(
-            get_monthly_mean(ekman),
-            get_anomaly(ekman, get_monthly_mean(ekman))
-        )
-    )
+    # display(implicit_error)
 
     plt.figure(figsize=(12, 6))
-    x = np.array(list(MONTHS.values()))
     plt.plot(
-        x, heat_flux_error,
+        explicit_error['TIME'], explicit_error,
         marker='o',
         linestyle='-',
-        label='Heat Flux Standard Deviation',
+        label='Explicit Scheme Error',
         color='#FF9999'
     )
     plt.plot(
-        x, entrainment_error,
+        semi_implicit_error['TIME'], semi_implicit_error,
         marker='o',
         linestyle='-',
-        label='Entrainment Standard Deviation',
+        label='Semi-Implicit Scheme Error',
         color='#66CCFF'
     )
     plt.plot(
-        x, ekman_error,
+        crack_error['TIME'], crack_error,
         marker='o',
         linestyle='-',
-        label='Ekman Current Standard Deviation',
+        label='Crank-Nicolson Scheme Error',
         color='#99FF99'
     )
-    plt.xticks(x)
-    plt.xlabel('Month')
-    plt.ylabel('Standard Deviation')
-    plt.title('Mean Standard Deviation Over Months')
+    plt.plot(
+        implicit_error['TIME'], implicit_error,
+        marker='o',
+        linestyle='-',
+        label='Implicit Scheme Error',
+        color='#FFCC66'
+    )
+    plt.ylim(0, 2)
+    # plt.xticks(explicit_error['TIME'])
+    plt.xlabel('Months')
+    plt.ylabel('RMSE')
+    plt.title('Simulation Scheme Error Analysis')
     plt.legend()
     plt.show()
 
