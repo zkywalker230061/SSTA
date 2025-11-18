@@ -24,6 +24,7 @@ USE_ALL_CONTRIBUTIONS = True
 USE_EKMAN_TERM = True
 USE_ENTRAINMENT = True     # something broken with entrainment; if False, use gamma_0 for damping
 INTEGRATE_EXPLICIT = False
+SEPARATE_REGIMES = False        # if True, then consider entrainment only when it is above entrainment_lower_threshold
 rho_0 = 1025.0
 c_0 = 4100.0
 gamma_0 = 10.0
@@ -107,6 +108,11 @@ else:
             cur_hbar = hbar_ds.sel(MONTH=month_in_year)['MONTHLY_MEAN_MLD_PRESSURE']
             if not USE_ENTRAINMENT:         # ignore entrainment altogether
                 cur_tm_anom = cur_heat_flux_anom / gamma_0 + (prev_tm_anom - prev_heat_flux_anom / gamma_0) * np.exp(gamma_0 / (rho_0 * c_0 * prev_hbar) * month_to_second(prev_month) - gamma_0 / (rho_0 * c_0 * cur_hbar) * month_to_second(month))
+
+            if not SEPARATE_REGIMES:
+                cur_k = (gamma_0 / (rho_0 * c_0) + cur_entrainment_vel) / cur_hbar
+                prev_k = (gamma_0 / (rho_0 * c_0) + prev_entrainment_vel) / prev_hbar
+                cur_tm_anom = (cur_entrainment_vel / (cur_k * cur_hbar)) * cur_tsub_anom + cur_heat_flux_anom / (cur_k * rho_0 * c_0 * cur_hbar) + (prev_tm_anom - (prev_entrainment_vel / (prev_k * prev_hbar)) * prev_tsub_anom - prev_heat_flux_anom / (prev_k * rho_0 * c_0 * prev_hbar)) * np.exp(prev_k * month_to_second(prev_month) - cur_k * month_to_second(month))
 
             else:       # if treating entrainment, we have to be careful not to divide by zero
                 no_entrainment_mask = np.abs(cur_entrainment_vel) <= entrainment_lower_threshold     # mask for when entrainment does not apply
