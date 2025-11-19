@@ -1,11 +1,6 @@
-import gsw
-import netCDF4 as nc
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
-import esmpy as ESMF
-import cartopy.crs as ccrs
-
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
 import matplotlib
@@ -24,9 +19,12 @@ USE_ALL_CONTRIBUTIONS = True
 USE_EKMAN_TERM = True
 USE_ENTRAINMENT = True     # something broken with entrainment; if False, use gamma_0 for damping
 INTEGRATE_EXPLICIT = False
+SEPARATE_REGIMES = False        # if True, then consider entrainment only when it is above entrainment_lower_threshold
 rho_0 = 1025.0
 c_0 = 4100.0
 gamma_0 = 10.0
+
+# lists for statistics
 
 if USE_ALL_CONTRIBUTIONS:
     heat_flux_ds = xr.open_dataset(HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH, decode_times=False)
@@ -39,11 +37,13 @@ else:
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
 heat_flux_monthly_mean = get_monthly_mean(heat_flux_ds['NET_HEAT_FLUX'])
 heat_flux_anomaly_ds = get_anomaly(heat_flux_ds, 'NET_HEAT_FLUX', heat_flux_monthly_mean)
+surface_flux_ds = heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY']
 
 if USE_EKMAN_TERM:      # it's bad naming but nevertheless the case that heat_flux_anom contains surface flux and Ekman
     ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
     heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY'] = heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY'] + ekman_anomaly_ds[
         'Q_Ek_anom']
+    ekman_flux_ds = ekman_anomaly_ds['Q_Ek_anom']
 
 mld_ds = xr.open_dataset(MLD_DATA_PATH, decode_times=False)
 
@@ -59,6 +59,7 @@ def month_to_second(month):
 
 
 model_anomalies = []
+entrainment_fluxes = []
 if INTEGRATE_EXPLICIT:
     time = 30.4375 * 24 * 60 * 60 * 0.5
     for month in heat_flux_anomaly_ds.TIME.values:
@@ -108,6 +109,11 @@ else:
             if not USE_ENTRAINMENT:         # ignore entrainment altogether
                 cur_tm_anom = cur_heat_flux_anom / gamma_0 + (prev_tm_anom - prev_heat_flux_anom / gamma_0) * np.exp(gamma_0 / (rho_0 * c_0 * prev_hbar) * month_to_second(prev_month) - gamma_0 / (rho_0 * c_0 * cur_hbar) * month_to_second(month))
 
+            if not SEPARATE_REGIMES:
+                cur_k = (gamma_0 / (rho_0 * c_0) + cur_entrainment_vel) / cur_hbar
+                prev_k = (gamma_0 / (rho_0 * c_0) + prev_entrainment_vel) / prev_hbar
+                cur_tm_anom = (cur_entrainment_vel / (cur_k * cur_hbar)) * cur_tsub_anom + cur_heat_flux_anom / (cur_k * rho_0 * c_0 * cur_hbar) + (prev_tm_anom - (prev_entrainment_vel / (prev_k * prev_hbar)) * prev_tsub_anom - prev_heat_flux_anom / (prev_k * rho_0 * c_0 * prev_hbar)) * np.exp(prev_k * month_to_second(prev_month) - cur_k * month_to_second(month))
+
             else:       # if treating entrainment, we have to be careful not to divide by zero
                 no_entrainment_mask = np.abs(cur_entrainment_vel) <= entrainment_lower_threshold     # mask for when entrainment does not apply
                 entrainment_mask = np.abs(cur_entrainment_vel) > entrainment_lower_threshold     # opposite to no_entrainment_mask
@@ -142,8 +148,19 @@ else:
             cur_tm_anom = cur_tm_anom.drop_vars('MONTH', errors='ignore')
             cur_tm_anom = cur_tm_anom.expand_dims(TIME=[month])
             model_anomalies.append(cur_tm_anom)
+            entrainment_flux = rho_0 * c_0 * cur_entrainment_vel * (cur_tsub_anom - cur_tm_anom)
+            entrainment_fluxes.append(entrainment_flux)
     model_anomaly_ds = xr.concat(model_anomalies, 'TIME')
     model_anomaly_ds.to_netcdf("../datasets/model_anomaly_exponential_damping_implicit.nc")
+    entrainment_flux_ds = xr.concat(entrainment_fluxes, 'TIME')
+    entrainment_flux_ds = entrainment_flux_ds.drop_vars(["MONTH", "PRESSURE"])
+    entrainment_flux_ds = entrainment_flux_ds.transpose("TIME", "LATITUDE", "LONGITUDE")
+    surface_flux_ds = surface_flux_ds.rename("SURFACE_FLUX_ANOMALY")
+    ekman_flux_ds = ekman_flux_ds.rename("EKMAN_FLUX_ANOMALY")
+    entrainment_flux_ds = entrainment_flux_ds.rename("ENTRAINMENT_FLUX_ANOMALY")
+    flux_components_ds = xr.merge([surface_flux_ds, ekman_flux_ds, entrainment_flux_ds])
+    flux_components_ds.to_netcdf("../datasets/flux_components.nc")
+
 
 # make a movie
 times = model_anomaly_ds.TIME.values
