@@ -17,8 +17,8 @@ print(abs(t_sub_ds["T_sub_ANOMALY"]).mean().item())
 
 
 
-vmin_anom = -1
-vmax_anom = 1
+vmin_anom = -2
+vmax_anom = 2
 
 t_sub_ds['T_sub'].sel(TIME=132.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=0, vmax=30)
 plt.show()
