@@ -18,7 +18,7 @@ matplotlib.use('TkAgg')
 MLD_TEMP_PATH = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature(T_m).nc"
 MLD_DEPTH_PATH = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
 HEAT_FLUX_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/ERA5-ARGO_Mean_Surface_Heat_Flux.nc"
-EK_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Ekman_Current_Anomaly.nc"
+EK_DATA_PATH = "/Users/julia/Desktop/SSTA/Xizhe/daily data test/Ekman Current Anomaly - Daily 2004 - Test"
 CHRIS_SCHEME_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/model_anomaly_exponential_damping_implicit.nc"
 
 # --- Load and Prepare Data (assuming helper functions are correct) --------
@@ -48,7 +48,7 @@ chris_ds = chris_ds['ARGO_TEMPERATURE_ANOMALY']
 # --- Model Constants ------------------------------------------------------
 RHO_O = 1025.0  # kg/m^3
 C_O = 4100.0  # J/(kg K)
-SECONDS_MONTH = 30.4375 * 24 * 60 * 60  # s
+SECONDS_MONTH = 24 * 60 * 60  # s
 GAMMA = 10.0  # bulk damping factor
 
 # Get time coordinates
