@@ -20,11 +20,11 @@ def ekman_current_anomaly(tau_x_anom, tau_y_anom, dTm_dx_monthly, dTm_dy_monthly
     Output dims: (TIME, LATITUDE, LONGITUDE)
     """
     # Create month index per TIME
-    m = month_idx(tau_x_anom["TIME"])
+    m = month_idx(tau_x_anom)
 
     # Select gradient of the corresponding month for each TIME (aligns MONTH -> TIME)
-    dTm_dx_t = dTm_dx_monthly.sel(MONTH=m)
-    dTm_dy_t = dTm_dy_monthly.sel(MONTH=m)
+    dTm_dx_t = dTm_dx_monthly.sel(MONTH=m['MONTH'])
+    dTm_dy_t = dTm_dy_monthly.sel(MONTH=m['MONTH'])
 
     # Broadcast Coriolis parameter
     f = f_2d.broadcast_like(tau_x_anom)
@@ -45,15 +45,17 @@ def ekman_current_anomaly(tau_x_anom, tau_y_anom, dTm_dx_monthly, dTm_dy_monthly
     })
     return Q_ek, Q_ek_x, Q_ek_y
 
-def month_idx (time_da: xr.DataArray) -> xr.DataArray:
+def month_idx (da: xr.DataArray) -> xr.DataArray:
+    """
+    Creates a new non-dimensional coordinate 'MONTH' (1-12) for a 366-day time axis.
+    """
     month_lengths = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    if time_da.sizes["TIME"] != sum(month_lengths):
+    if da.sizes["TIME"] != sum(month_lengths):
         raise ValueError("TIME length is not 366; check your data or month_lengths.")
     
     month_index = np.repeat(np.arange(1, 13), month_lengths)
-    time_da.assign_coords(MONTH=("TIME", month_index))
-    
-    return time_da
+    da = da.assign_coords(MONTH=("TIME", month_index))
+    return da
 
 def get_monthly_mean(da: xr.DataArray,) -> xr.DataArray:
     if 'TIME' not in da.dims:
@@ -84,8 +86,8 @@ def get_anomaly(full_field, monthly_mean):
         raise ValueError("The full_field DataArray must have a TIME dimension.")
     
     # Get the month index (1-12) for each item in the full_field
-    m = month_idx(full_field['TIME'])
-    anom = full_field.groupby(m) - monthly_mean
+    m = month_idx(full_field)
+    anom = full_field.groupby(m['MONTH']) - monthly_mean
     return anom
 
 def coriolis_parameter(lat):
@@ -187,7 +189,7 @@ if __name__ == "__main__":
         windstress_file_path,                      # Data variables:
         engine="netcdf4",                       # avg_iews   (TIME, LATITUDE, LONGITUDE) float32 38MB ...
         decode_times=False,                     # avg_inss   (TIME, LATITUDE, LONGITUDE) float32 38MB ...       
-        mask_and_scale=True)            # * TIME       (TIME) float32 720B 0.5 1.5 2.5 3.5 ... 176.5 177.5 178.5 179.5
+        mask_and_scale=True)                    # * TIME       (TIME) float32 720B 0,1,2,3,4,...365
     
     ds_grad_lat = xr.open_dataset(
         grad_lat_file_path,             # (MONTH: 12, LATITUDE: 145, LONGITUDE: 360)
@@ -203,35 +205,27 @@ if __name__ == "__main__":
 
 
 
-    ds_tau_x = ds_windstress['avg_iews']           # (TIME: 180, LATITUDE: 145, LONGITUDE: 360)
-    ds_tau_y = ds_windstress['avg_inss']           # TIME  0.5 1.5 2.5 3.5 ... 176.5 177.5 178.5 179.5
+    ds_tau_x = ds_windstress['avg_iews']           # (TIME: 366, LATITUDE: 145, LONGITUDE: 360)
+    ds_tau_y = ds_windstress['avg_inss']           # TIME  0,1,2,3,4,5,6,7,..,365
     dTm_dy_monthly = ds_grad_lat["__xarray_dataarray_variable__"]  # (MONTH, LAT, LON)
     dTm_dx_monthly = ds_grad_lon["__xarray_dataarray_variable__"]  # (MONTH, LAT, LON)
-    #%%
-    
+    #%% 
     monthly_mean_tau_x = daily_to_monthly_mean_leapyear(ds_tau_x)
     monthly_mean_tau_y = daily_to_monthly_mean_leapyear(ds_tau_y)
     
-    print(monthly_mean_tau_x)
-    print(month_idx(ds_tau_x))
     #%%
-    tau_x_anom = get_anomaly(ds_tau_x, monthly_mean_tau_x)  #(TIME: 180, LATITUDE: 145, LONGITUDE: 360)
-    print(tau_x_anom)
-    #%%
+    tau_x_anom = get_anomaly(ds_tau_x, monthly_mean_tau_x)  #(TIME: 366, LATITUDE: 145, LONGITUDE: 360, MONTH)
     tau_y_anom = get_anomaly(ds_tau_y, monthly_mean_tau_y)
 
     lat = ds_windstress["LATITUDE"]
     f_2d = coriolis_parameter(lat).broadcast_like(ds_tau_x)
     
     Q_ek_anom, Q_ek_anom_x, Q_ek_anom_y = ekman_current_anomaly(tau_x_anom, tau_y_anom, dTm_dx_monthly, dTm_dy_monthly, f_2d)
-    # Q_ek_anom.TIME.attrs["units"] = "months since 2004-01-01" 
-    # Q_ek_anom_x.TIME.attrs["units"] = "months since 2004-01-01" 
-    # Q_ek_anom_y.TIME.attrs["units"] = "months since 2004-01-01" 
-    # Q_ek_anom = fix_rg_time(Q_ek_anom, mode="datetime")
-    # Q_ek_anom_x = fix_rg_time(Q_ek_anom_x, mode="datetime")
-    # Q_ek_anom_y = fix_rg_time(Q_ek_anom_y, mode="datetime")
+    
+    Q_ek_anom.to_netcdf('Ekman Current Anomaly - Daily 2024 - Test')
+
     print(
-        ds_windstress
+        # ds_windstress
         # 'ekmann current anomaly:', Q_ek_anom,
         # 'Q_ek_anom_x', Q_ek_anom_x,
         # 'Q_ek_anom_y', Q_ek_anom_y
@@ -249,7 +243,7 @@ if __name__ == "__main__":
     )
 
 
-    date = 150.5
+    date = 1
     month_in_year = (date % 12) + 0.5
     year = 2004 + date//12
 
@@ -297,19 +291,20 @@ if __name__ == "__main__":
 
         current_time = anim_times[frame]
         month_in_year = (current_time % 12) + 0.5
-        year = 2004 + (current_time // 12)
+        year = 2004 
 
-        ax1.set_title(f'Ekman Current Anomaly in Month {month_in_year} in year {year}')
+        ax1.set_title(f'Ekman Current Anomaly on Day {current_time} in year {year}')
         return [mesh_1]
     
     animation = FuncAnimation(fig, update, frames=len(anim_times), interval=300, blit=False)
+    cbar = fig.colorbar(mesh_1, ax=ax1, orientation="vertical", pad=0.02)
     # animation.save('Animation_Ekman_Current_Anomaly_Map.mp4', writer='ffmpeg', fps=10)   
     plt.show()
 
     #-----Anomaly decomposition plot-------------------------------------------------------
     anom_x = Q_ek_anom_x.sel(TIME=date)
     anom_y = Q_ek_anom_y.sel(TIME=date)
-    fig = plt.figure(figsize=(24,5))
+    fig = plt.figure(figsize=(24,4))
     
     ax1 = plt.subplot(1,2,1)
     im1 = anom_x.plot(
@@ -319,7 +314,7 @@ if __name__ == "__main__":
         vmax=30,
         add_colorbar=False,   # we'll add colorbars explicitly to control layout
     )
-    ax1.set_title(f"Ekman anomaly — taux-term — in Month {month_in_year} in year {year}")
+    ax1.set_title(f"Ekman anomaly — taux-term — on {date}")
     ax1.set_xlabel("Longitude")
     ax1.set_ylabel("Latitude")
 
@@ -331,15 +326,15 @@ if __name__ == "__main__":
         vmax=30,
         add_colorbar=False,
     )
-    ax2.set_title(f"Ekman anomaly — tauy -term  — in Month {month_in_year} in year {year}")
+    ax2.set_title(f"Ekman anomaly — tauy -term  — on {date}")
     ax2.set_xlabel("Longitude")
 
     cbar = fig.colorbar(im1, ax=[ax1, ax2], orientation="vertical", pad=0.02)
     cbar.set_label("Q'_Ek (W/m^2)")
     
-    plt.suptitle(f"Ekman Current Anomaly by Componenets — in Month {month_in_year} in year {year}", fontsize=14)
-    # plt.savefig(f"Ekman_Anomaly_Componenets_subplot_{month_in_year}_{year}.png", dpi=600)
+    plt.suptitle(f"Ekman Current Anomaly by Componenets — on {date}", fontsize=14)
     plt.show()
+    # plt.savefig(f"Ekman_Anomaly_Componenets_subplot_{month_in_year}_{year}.png", dpi=600)
 
     #-----difference plot x-y -------------------------------------------------------
     # dominance = Q_ek_anom_x - Q_ek_anom_y
@@ -396,7 +391,7 @@ if __name__ == "__main__":
     cbar = fig.colorbar(im1, ax=[ax1, ax2], orientation="vertical")
     cbar.set_label("Weighted Ratio (0 to 1)")
 
-    plt.suptitle(f"Relative Importance of Ekman Anomaly Terms (Month: {month_in_year})", fontsize=16)
+    plt.suptitle(f"Relative Importance of Ekman Anomaly Terms {date})", fontsize=16)
     # plt.savefig(f"Ekman_Anom_weighted_ratio_{month_in_year}.png", dpi=600)
     plt.show()
 
@@ -496,3 +491,4 @@ if __name__ == "__main__":
     print("Animation saved as 'weighted_ratio_animation.mp4'")
 
     plt.show() # This will show the *live* animation *after* saving
+# %%
