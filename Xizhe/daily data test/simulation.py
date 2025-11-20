@@ -283,4 +283,7 @@ sim_explicit = compute_explicit(start_time=0)
 sim_semi_implicit = compute_semi_implicit(start_time=0)
 sim_crank = compute_crank(start_time=0)
 
-print(sim_explicit)
+sim_implicit.to_netcdf('datasets/sim_Implicit_Scheme_Test_ConstDamp(10)_daily_2004')
+sim_explicit.to_netcdf('datasets/sim_explicit_Scheme_Test_ConstDamp(10)_daily_2004')
+sim_semi_implicit.to_netcdf('datasets/sim_semi_implicit_Scheme_Test_ConstDamp(10)_daily_2004')
+sim_crank.to_netcdf('datasets/sim_crank_Scheme_Test_ConstDamp(10)_daily_2004')
