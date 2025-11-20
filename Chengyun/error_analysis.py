@@ -160,7 +160,8 @@ def simulation_error_analysis(
         month_num = month_num.values
         month_error = simulation_da.sel(TIME=month_num) - t_anomaly.sel(TIME=month_num)
         # get error of this month
-        error = np.sqrt(np.mean(month_error**2))
+        # error = np.sqrt(np.mean(month_error**2))
+        error = np.mean(abs(month_error))
         error_list.append(error)
     error_da = xr.concat(error_list, "TIME")
     error_da.attrs['units'] = t_anomaly.attrs.get('units')
@@ -306,14 +307,33 @@ def main():
     )
     # display(implicit_error)
 
-    plt.figure(figsize=(12, 6))
-    plt.plot(
-        explicit_error['TIME'], explicit_error,
-        marker='o',
-        linestyle='-',
-        label='Explicit Scheme Error',
-        color='#FF9999'
+    chris_ds = load_and_prepare_dataset(
+        "../datasets/model_anomaly_exponential_damping_implicit.nc",
     )
+    # display(chris_ds)
+    chris = chris_ds["ARGO_TEMPERATURE_ANOMALY"]
+    chris_error = simulation_error_analysis(
+        chris
+    )
+    # display(chris_error)
+
+    chris_no_entrain_ds = load_and_prepare_dataset(
+        "../datasets/model_anomaly_exponential_damping_implicit_no_entrain.nc",
+    )
+    # display(chris_no_entrain_ds)
+    chris_no_entrain = chris_no_entrain_ds["ARGO_TEMPERATURE_ANOMALY"]
+    chris_no_entrain_error = simulation_error_analysis(
+        chris_no_entrain
+    )
+
+    plt.figure(figsize=(12, 6))
+    # plt.plot(
+    #     explicit_error['TIME'], explicit_error,
+    #     marker='o',
+    #     linestyle='-',
+    #     label='Explicit Scheme Error',
+    #     color='#FF9999'
+    # )
     plt.plot(
         semi_implicit_error['TIME'], semi_implicit_error,
         marker='o',
@@ -335,13 +355,34 @@ def main():
         label='Implicit Scheme Error',
         color='#FFCC66'
     )
-    plt.ylim(0, 2)
+    plt.plot(
+        chris_error['TIME'], chris_error,
+        marker='o',
+        linestyle='-',
+        label="Chris' Scheme Error",
+        color='#CC99FF'
+    )
+    # plt.plot(
+    #     chris_no_entrain_error['TIME'], chris_no_entrain_error,
+    #     marker='o',
+    #     linestyle='-',
+    #     label="Chris' Scheme without Entrainment Error",
+    #     color='#FF66CC'
+    # )
+    plt.ylim(-0.5, 2)
     # plt.xticks(explicit_error['TIME'])
     plt.xlabel('Months')
     plt.ylabel('RMSE')
     plt.title('Simulation Scheme Error Analysis')
     plt.legend()
     plt.show()
+
+    print("explicit", explicit_error.mean().item())
+    print("semi", semi_implicit_error.mean().item())
+    print("crank", crack_error.mean().item())
+    print("implicit", implicit_error.mean().item())
+    print("chris", chris_error.mean().item())
+    print("chris no entrain", chris_no_entrain_error.mean().item())
 
 
 if __name__ == "__main__":
