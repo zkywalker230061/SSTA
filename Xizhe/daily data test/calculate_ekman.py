@@ -1,9 +1,6 @@
 #%%
 import numpy as np
 import xarray as xr
-from utils_Tm_Sm import vertical_integral
-from grad_field import compute_gradient_lat, compute_gradient_lon
-from utils_read_nc import fix_rg_time
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 import cartopy.crs as ccrs
@@ -63,18 +60,6 @@ def get_monthly_mean(da: xr.DataArray,) -> xr.DataArray:
     
     m = month_idx(da['TIME'])
     monthly_mean_da = da.groupby(m).mean('TIME', keep_attrs=True)
-    # monthly_means = []
-    # for _, month_num in MONTHS.items():
-    #     monthly_means.append(
-    #         da.sel(TIME=da['TIME'][month_num-1::12]).mean(dim='TIME')
-    #     )
-    # monthly_mean_da = xr.concat(monthly_means, dim='MONTH')
-    # monthly_mean_da = monthly_mean_da.assign_coords(MONTH=list(MONTHS.values()))
-    # monthly_mean_da['MONTH'].attrs['units'] = 'month'
-    # monthly_mean_da['MONTH'].attrs['axis'] = 'M'
-    # monthly_mean_da.attrs['units'] = da.attrs.get('units')
-    # monthly_mean_da.attrs['long_name'] = f"Seasonal Cycle Mean of {da.attrs.get('long_name')}"
-    # monthly_mean_da.name = f"MONTHLY_MEAN_{da.name}"
     return monthly_mean_da
 
 def get_anomaly(full_field, monthly_mean):
@@ -181,7 +166,7 @@ def daily_to_monthly_mean_leapyear(da):
 
 
 if __name__ == "__main__":
-    windstress_file_path = '/Users/julia/Desktop/SSTA/datasets/ERA5-ARGO_Mean_Turbulent_Surface_Stress_Daily.nc'
+    windstress_file_path = '/Users/julia/Desktop/SSTA/datasets/ERA5-ARGO_Mean_Turbulent_Surface_Stress_Daily_2004.nc'
     grad_lat_file_path = '/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature_Gradient_Lat.nc'
     grad_lon_file_path = '/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature_Gradient_Lon.nc'
 
@@ -213,16 +198,16 @@ if __name__ == "__main__":
     monthly_mean_tau_x = daily_to_monthly_mean_leapyear(ds_tau_x)
     monthly_mean_tau_y = daily_to_monthly_mean_leapyear(ds_tau_y)
     
-    #%%
     tau_x_anom = get_anomaly(ds_tau_x, monthly_mean_tau_x)  #(TIME: 366, LATITUDE: 145, LONGITUDE: 360, MONTH)
     tau_y_anom = get_anomaly(ds_tau_y, monthly_mean_tau_y)
 
+    #%%
     lat = ds_windstress["LATITUDE"]
     f_2d = coriolis_parameter(lat).broadcast_like(ds_tau_x)
     
     Q_ek_anom, Q_ek_anom_x, Q_ek_anom_y = ekman_current_anomaly(tau_x_anom, tau_y_anom, dTm_dx_monthly, dTm_dy_monthly, f_2d)
     
-    Q_ek_anom.to_netcdf('Ekman Current Anomaly - Daily 2024 - Test')
+    # Q_ek_anom.to_netcdf('Ekman Current Anomaly - Daily 2024 - Test')
 
     print(
         # ds_windstress
@@ -245,7 +230,7 @@ if __name__ == "__main__":
 
     date = 1
     month_in_year = (date % 12) + 0.5
-    year = 2004 + date//12
+    year = 2004 
 
 
     #---Map Plot for Ekman Current Anomaly on a date ------------------------------------------
@@ -298,7 +283,7 @@ if __name__ == "__main__":
     
     animation = FuncAnimation(fig, update, frames=len(anim_times), interval=300, blit=False)
     cbar = fig.colorbar(mesh_1, ax=ax1, orientation="vertical", pad=0.02)
-    # animation.save('Animation_Ekman_Current_Anomaly_Map.mp4', writer='ffmpeg', fps=10)   
+    animation.save('Animation_Ekman_Current_Anomaly_Map_daily_2004.mp4', writer='ffmpeg', fps=10)   
     plt.show()
 
     #-----Anomaly decomposition plot-------------------------------------------------------
@@ -332,7 +317,7 @@ if __name__ == "__main__":
     cbar = fig.colorbar(im1, ax=[ax1, ax2], orientation="vertical", pad=0.02)
     cbar.set_label("Q'_Ek (W/m^2)")
     
-    plt.suptitle(f"Ekman Current Anomaly by Componenets — on {date}", fontsize=14)
+    plt.suptitle(f"Ekman Current Anomaly by Componenets — on Day {date} in {year}", fontsize=14)
     plt.show()
     # plt.savefig(f"Ekman_Anomaly_Componenets_subplot_{month_in_year}_{year}.png", dpi=600)
 

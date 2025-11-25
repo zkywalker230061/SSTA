@@ -67,6 +67,26 @@ def month_idx (time_da: xr.DataArray) -> xr.DataArray:
     month_idx.name = 'MONTH'
     return month_idx
 
+def month_idx_for_366 (da: xr.DataArray) -> xr.DataArray:
+    """
+    Creates a new non-dimensional coordinate 'MONTH' (1-12) for a 366-day time axis.
+    """
+    month_lengths = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    if da.sizes["TIME"] != sum(month_lengths):
+        raise ValueError("TIME length is not 366; check your data or month_lengths.")
+    
+    month_index = np.repeat(np.arange(1, 13), month_lengths)
+    da = da.assign_coords(MONTH=("TIME", month_index))
+    return da
+
+def get_monthly_mean_for_366(da: xr.DataArray,) -> xr.DataArray:
+    if 'TIME' not in da.dims:
+        raise ValueError("The DataArray must have a TIME dimension.")
+    
+    m = month_idx_for_366(da['TIME'])
+    monthly_mean_da = da.groupby(m['MONTH']).mean('TIME', keep_attrs=True)
+    return monthly_mean_da
+
 def get_monthly_mean(da: xr.DataArray,) -> xr.DataArray:
     if 'TIME' not in da.dims:
         raise ValueError("The DataArray must have a TIME dimension.")
