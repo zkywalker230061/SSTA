@@ -117,13 +117,9 @@ else:
                 if not SEPARATE_REGIMES:
                     cur_k = (gamma_0 / (rho_0 * c_0) + cur_entrainment_vel) / cur_hbar
                     prev_k = (gamma_0 / (rho_0 * c_0) + prev_entrainment_vel) / prev_hbar
-                    mean_k = 0.5 * (cur_k + prev_k)
                     exponent = prev_k * month_to_second(prev_month) - prev_k * month_to_second(month)
-                    #exponent = exponent.where(exponent <= 10, 10)
-                    # if exponent.max().item() > 1000:
-                    #     print("EXCESSIVE EXPONENT at time")
-                    #     print(month)
-                    #     print()
+                    # exponent = -0.5 * (prev_k + cur_k) * month_to_second(1)
+                    # exponent = exponent.where(exponent <= 0, 0)
                     cur_tm_anom = (cur_entrainment_vel / (cur_k * cur_hbar)) * cur_tsub_anom + cur_heat_flux_anom / (cur_k * rho_0 * c_0 * cur_hbar) + (prev_tm_anom - (prev_entrainment_vel / (prev_k * prev_hbar)) * prev_tsub_anom - prev_heat_flux_anom / (prev_k * rho_0 * c_0 * prev_hbar)) * np.exp(exponent)
 
                 else:       # if treating entrainment, we have to be careful not to divide by zero

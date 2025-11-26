@@ -1,7 +1,7 @@
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
-from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset, get_eof
+from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset, get_eof, make_movie
 
 TEMP_DATA_PATH = "../datasets/RG_ArgoClim_Temperature_2019.nc"
 MLD_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
@@ -59,8 +59,3 @@ print(t_sub_ds)
 print(t_sub_ds["T_sub_ANOMALY"].max().item())
 print(t_sub_ds["T_sub_ANOMALY"].min().item())
 print(abs(t_sub_ds["T_sub_ANOMALY"]).mean().item())
-
-# get eof
-t_sub_anomaly_eof = get_eof(t_sub_ds["T_sub_ANOMALY"], 10, "TIME")
-print(t_sub_anomaly_eof)
-print(t_sub_anomaly_eof.components())

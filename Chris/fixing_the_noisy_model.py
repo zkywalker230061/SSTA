@@ -21,7 +21,6 @@ map_mask = temperature_ds['BATHYMETRY_MASK'].sel(PRESSURE=2.5)
 # print("Variance explained:", variance[:3].sum().item())
 
 # simple eof
-
 simple_eof_ds, variance = get_simple_eof(noisy_ds["ARGO_TEMPERATURE_ANOMALY"], mask=map_mask, modes=5, clean_nan=True)
 print("Variance explained:", variance[:3].sum().item())
 make_movie(simple_eof_ds)
