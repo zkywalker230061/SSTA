@@ -378,8 +378,54 @@ def hourly_main():
     #     "../datasets/ERA5-ARGO_Mean_Turbulent_Surface_Stress_Hourly.nc"
     # )
 
+    # era5_wind_stress_hourly = load_and_prepare_dataset(
+    #     "../datasets/ERA5-ARGO_Mean_Turbulent_Surface_Stress_Hourly.nc"
+    # )
+    # display(era5_wind_stress_hourly)
+    # print(
+    #     abs(era5_wind_stress_hourly['avg_iews']).mean().item(),
+    #     abs(era5_wind_stress_hourly['avg_inss']).mean().item()
+    # )
+    # print(
+    #     era5_wind_stress_hourly['avg_iews'].max().item(),
+    #     era5_wind_stress_hourly['avg_inss'].max().item()
+    # )
+
+    # TIME = 1072915200
+    # fig = plt.figure(figsize=(10, 5))
+    # ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
+    # ax.set_extent([-180, 180, -90, 90], crs=ccrs.PlateCarree())
+    # ax.coastlines()
+    # x = era5_wind_stress_hourly['LONGITUDE'].values
+    # y = era5_wind_stress_hourly['LATITUDE'].values
+    # u = era5_wind_stress_hourly['avg_iews'].sel(
+    #     TIME=TIME
+    # ).values
+    # v = era5_wind_stress_hourly['avg_inss'].sel(
+    #     TIME=TIME
+    # ).values
+    # magnitude = np.hypot(u, v)
+    # ax.streamplot(
+    #     x, y, u, v,
+    #     transform=ccrs.PlateCarree(),
+    #     linewidth=1, density=1, color=magnitude
+    #     )
+    # plt.show()
+
+    # ------------------------------------------------------------------------
+    era5_wind_stress_hourly = xr.open_dataset(
+        "../datasets/ERA5_Mean_Turbulent_Surface_Stress_Hourly-2005.nc"
+    )
+    era5_wind_stress_hourly = era5_argolise(
+        era5_wind_stress_hourly, hourly=True
+    )
+    display(era5_wind_stress_hourly)
+    era5_wind_stress_hourly.to_netcdf(
+        "../datasets/ERA5-ARGO_Mean_Turbulent_Surface_Stress_Hourly-2005.nc"
+    )
+
     era5_wind_stress_hourly = load_and_prepare_dataset(
-        "../datasets/ERA5-ARGO_Mean_Turbulent_Surface_Stress_Hourly.nc"
+        "../datasets/ERA5-ARGO_Mean_Turbulent_Surface_Stress_Hourly-2005.nc"
     )
     display(era5_wind_stress_hourly)
     print(
@@ -391,7 +437,7 @@ def hourly_main():
         era5_wind_stress_hourly['avg_inss'].max().item()
     )
 
-    TIME = 1072915200
+    TIME = 1104537600
     fig = plt.figure(figsize=(10, 5))
     ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
     ax.set_extent([-180, 180, -90, 90], crs=ccrs.PlateCarree())
@@ -442,24 +488,72 @@ def hourly_main():
     #     "../datasets/ERA5-ARGO_Mean_Surface_Heat_Flux_Hourly.nc"
     # )
 
-    era5_heat_flux_hourly = load_and_prepare_dataset(
-        "../datasets/ERA5-ARGO_Mean_Surface_Heat_Flux_Hourly.nc"
-    )
-    display(era5_heat_flux_hourly)
-    visualise_dataset(
-        era5_heat_flux_hourly['avg_slhtf'].sel(TIME=1072915200),
-    )
-    visualise_dataset(
-        era5_heat_flux_hourly['avg_ishf'].sel(TIME=1072915200),
-    )
-    visualise_dataset(
-        era5_heat_flux_hourly['avg_snswrf'].sel(TIME=1072915200),
-        cmap='Reds'
-    )
-    visualise_dataset(
-        era5_heat_flux_hourly['avg_snlwrf'].sel(TIME=1072915200),
-        cmap='Blues_r'
-    )
+    # era5_heat_flux_hourly = load_and_prepare_dataset(
+    #     "../datasets/ERA5-ARGO_Mean_Surface_Heat_Flux_Hourly.nc"
+    # )
+    # display(era5_heat_flux_hourly)
+    # visualise_dataset(
+    #     era5_heat_flux_hourly['avg_slhtf'].sel(TIME=1072915200),
+    # )
+    # visualise_dataset(
+    #     era5_heat_flux_hourly['avg_ishf'].sel(TIME=1072915200),
+    # )
+    # visualise_dataset(
+    #     era5_heat_flux_hourly['avg_snswrf'].sel(TIME=1072915200),
+    #     cmap='Reds'
+    # )
+    # visualise_dataset(
+    #     era5_heat_flux_hourly['avg_snlwrf'].sel(TIME=1072915200),
+    #     cmap='Blues_r'
+    # )
+
+    # ------------------------------------------------------------------------
+    # era5_heat_flux_hourly = xr.open_dataset(
+    #     "../datasets/ERA5_Mean_Surface_Heat_Flux_Hourly-3.nc"
+    # )
+    # era5_heat_flux = era5_argolise(era5_heat_flux_hourly, hourly=True)
+    # display(era5_heat_flux_hourly)
+    # era5_heat_flux.to_netcdf("../datasets/ERA5-ARGO_Mean_Surface_Heat_Flux_Hourly-3.nc")
+    # era5_heat_flux_hourly = xr.open_dataset(
+    #     "../datasets/ERA5_Mean_Surface_Heat_Flux_Hourly-4.nc"
+    # )
+    # era5_heat_flux = era5_argolise(era5_heat_flux_hourly, hourly=True)
+    # display(era5_heat_flux_hourly)
+    # era5_heat_flux.to_netcdf("../datasets/ERA5-ARGO_Mean_Surface_Heat_Flux_Hourly-4.nc")
+
+    # era5_heat_flux_hourly_1 = load_and_prepare_dataset(
+    #     "../datasets/ERA5-ARGO_Mean_Surface_Heat_Flux_Hourly-3.nc"
+    # )
+    # era5_heat_flux_hourly_2 = load_and_prepare_dataset(
+    #     "../datasets/ERA5-ARGO_Mean_Surface_Heat_Flux_Hourly-4.nc"
+    # )
+    # era5_heat_flux_hourly = xr.concat(
+    #     [era5_heat_flux_hourly_1, era5_heat_flux_hourly_2],
+    #     dim='TIME'
+    # )
+    # display(era5_heat_flux_hourly)
+    # era5_heat_flux_hourly.to_netcdf(
+    #     "../datasets/ERA5-ARGO_Mean_Surface_Heat_Flux_Hourly-2005.nc"
+    # )
+
+    # era5_heat_flux_hourly = load_and_prepare_dataset(
+    #     "../datasets/ERA5-ARGO_Mean_Surface_Heat_Flux_Hourly-2005.nc"
+    # )
+    # display(era5_heat_flux_hourly)
+    # visualise_dataset(
+    #     era5_heat_flux_hourly['avg_slhtf'].sel(TIME=1104537600),
+    # )
+    # visualise_dataset(
+    #     era5_heat_flux_hourly['avg_ishf'].sel(TIME=1104537600),
+    # )
+    # visualise_dataset(
+    #     era5_heat_flux_hourly['avg_snswrf'].sel(TIME=1104537600),
+    #     cmap='Reds'
+    # )
+    # visualise_dataset(
+    #     era5_heat_flux_hourly['avg_snlwrf'].sel(TIME=1104537600),
+    #     cmap='Blues_r'
+    # )
 
 
 def get_daily_mean_from_hourly(ds_hourly: xr.Dataset) -> xr.Dataset:
@@ -539,6 +633,7 @@ if __name__ == "__main__":
     # hourly_main()
     # daily_main()  # not finished yet
 
+    # 2004 -------------------------------------------------------------------
     # era5_wind_stress_hourly = load_and_prepare_dataset(
     #     "../datasets/ERA5-ARGO_Mean_Turbulent_Surface_Stress_Hourly.nc"
     # )
@@ -559,4 +654,27 @@ if __name__ == "__main__":
     # display(era5_heat_flux_daily)
     # era5_heat_flux_daily.to_netcdf(
     #     "../datasets/ERA5-ARGO_Mean_Surface_Heat_Flux_Daily.nc"
+    # )
+
+    # 2005 -------------------------------------------------------------------
+    # era5_wind_stress_hourly = load_and_prepare_dataset(
+    #     "../datasets/ERA5-ARGO_Mean_Turbulent_Surface_Stress_Hourly-2005.nc"
+    # )
+    # era5_wind_stress_daily = get_daily_mean_from_hourly(
+    #     era5_wind_stress_hourly
+    # )
+    # display(era5_wind_stress_daily)
+    # era5_wind_stress_daily.to_netcdf(
+    #     "../datasets/ERA5-ARGO_Mean_Turbulent_Surface_Stress_Daily-2005.nc"
+    # )
+
+    # era5_heat_flux_hourly = load_and_prepare_dataset(
+    #     "../datasets/ERA5-ARGO_Mean_Surface_Heat_Flux_Hourly-2005.nc"
+    # )
+    # era5_heat_flux_daily = get_daily_mean_from_hourly(
+    #     era5_heat_flux_hourly
+    # )
+    # display(era5_heat_flux_daily)
+    # era5_heat_flux_daily.to_netcdf(
+    #     "../datasets/ERA5-ARGO_Mean_Surface_Heat_Flux_Daily-2005.nc"
     # )

@@ -307,23 +307,31 @@ def main():
     )
     # display(implicit_error)
 
-    chris_ds = load_and_prepare_dataset(
-        "../datasets/model_anomaly_exponential_damping_implicit.nc",
+    chris_meank_ds = load_and_prepare_dataset(
+        "../datasets/models_with_entrainment/mean_k.nc",
     )
-    # display(chris_ds)
-    chris = chris_ds["ARGO_TEMPERATURE_ANOMALY"]
-    chris_error = simulation_error_analysis(
-        chris
+    # display(chris_meank_ds)
+    chris_meank = chris_meank_ds["ARGO_TEMPERATURE_ANOMALY"]
+    chris_meank_error = simulation_error_analysis(
+        chris_meank
     )
-    # display(chris_error)
 
-    chris_no_entrain_ds = load_and_prepare_dataset(
-        "../datasets/model_anomaly_exponential_damping_implicit_no_entrain.nc",
+    chris_prevk_ds = load_and_prepare_dataset(
+        "../datasets/models_with_entrainment/prev_k.nc",
     )
-    # display(chris_no_entrain_ds)
-    chris_no_entrain = chris_no_entrain_ds["ARGO_TEMPERATURE_ANOMALY"]
-    chris_no_entrain_error = simulation_error_analysis(
-        chris_no_entrain
+    # display(chris_prevk_ds)
+    chris_prevk = chris_prevk_ds["ARGO_TEMPERATURE_ANOMALY"]
+    chris_prevk_error = simulation_error_analysis(
+        chris_prevk
+    )
+
+    chris_capped_ds = load_and_prepare_dataset(
+        "../datasets/models_with_entrainment/exponent_capped.nc",
+    )
+    # display(chris_capped_ds)
+    chris_capped = chris_capped_ds["ARGO_TEMPERATURE_ANOMALY"]
+    chris_capped_error = simulation_error_analysis(
+        chris_capped
     )
 
     plt.figure(figsize=(12, 6))
@@ -356,19 +364,27 @@ def main():
         color='#FFCC66'
     )
     plt.plot(
-        chris_error['TIME'], chris_error,
+        chris_meank_error['TIME'], chris_meank_error,
         marker='o',
         linestyle='-',
-        label="Chris' Scheme Error",
-        color='#CC99FF'
+        label="Chris' Scheme with Entrainment Error (Mean K)",
+        color='#FF6666'
     )
-    # plt.plot(
-    #     chris_no_entrain_error['TIME'], chris_no_entrain_error,
-    #     marker='o',
-    #     linestyle='-',
-    #     label="Chris' Scheme without Entrainment Error",
-    #     color='#FF66CC'
-    # )
+
+    plt.plot(
+        chris_prevk_error['TIME'], chris_prevk_error,
+        marker='o',
+        linestyle='-',
+        label="Chris' Scheme with Entrainment Error (Prev K)",
+        color='#FF66CC'
+    )
+    plt.plot(
+        chris_capped_error['TIME'], chris_capped_error,
+        marker='o',
+        linestyle='-',
+        label="Chris' Scheme with Entrainment Error (Capped Exponent)",
+        color='#66FF66'
+    )
     plt.ylim(-0.5, 2)
     # plt.xticks(explicit_error['TIME'])
     plt.xlabel('Months')
@@ -381,8 +397,9 @@ def main():
     print("semi", semi_implicit_error.mean().item())
     print("crank", crack_error.mean().item())
     print("implicit", implicit_error.mean().item())
-    print("chris", chris_error.mean().item())
-    print("chris no entrain", chris_no_entrain_error.mean().item())
+    print("chris with entrain mean k", chris_meank_error.mean().item())
+    print("chris with entrain prev k", chris_prevk_error.mean().item())
+    print("chris with entrain capped", chris_capped_error.mean().item())
 
 
 if __name__ == "__main__":
