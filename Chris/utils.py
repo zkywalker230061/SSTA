@@ -251,6 +251,23 @@ def get_eof(dataset, mask, modes=3, time_name="TIME", lat_name="LATITUDE", long_
     return smoothed_ds, explained_variance
 
 
+def get_simple_eof(dataset, mask=None, modes=3, clean_nan=False):
+    if mask is not None:
+        ocean = mask.to_numpy().astype(bool)
+        dataset = dataset.where(ocean)
+    if clean_nan:
+        dataset = dataset.dropna(dim="LATITUDE", how="all").dropna(dim="LONGITUDE", how="all")
+        dataset = dataset.fillna(dataset.mean(dim="TIME"))
+
+    model = xe.single.EOF(n_modes=modes)
+    model.fit(dataset, dim="TIME")
+    components = model.components()  # spatial EOFs
+    scores = model.scores()  # PC time series
+    explained_variance = model.explained_variance_ratio()
+    reconstructed = model.inverse_transform(scores)  # smoothed reconstruction using first 3 modes
+    return reconstructed, explained_variance
+
+
 def make_movie(dataset):
     times = dataset.TIME.values
 

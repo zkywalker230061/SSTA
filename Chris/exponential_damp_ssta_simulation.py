@@ -118,7 +118,7 @@ else:
                     cur_k = (gamma_0 / (rho_0 * c_0) + cur_entrainment_vel) / cur_hbar
                     prev_k = (gamma_0 / (rho_0 * c_0) + prev_entrainment_vel) / prev_hbar
                     mean_k = 0.5 * (cur_k + prev_k)
-                    exponent = prev_k * month_to_second(prev_month) - cur_k * month_to_second(month)
+                    exponent = prev_k * month_to_second(prev_month) - prev_k * month_to_second(month)
                     #exponent = exponent.where(exponent <= 10, 10)
                     # if exponent.max().item() > 1000:
                     #     print("EXCESSIVE EXPONENT at time")
