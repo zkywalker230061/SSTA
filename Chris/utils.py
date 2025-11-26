@@ -1,5 +1,13 @@
 import xarray as xr
 import pandas as pd
+#import eofs
+import xeofs as xe
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+import matplotlib
+import numpy as np
+
+matplotlib.use('TkAgg')
 
 
 def _time_standard(ds: xr.Dataset, mid_month: bool = False) -> xr.Dataset:
@@ -168,3 +176,106 @@ def get_anomaly(raw_ds, variable_name, monthly_mean):
     anomaly_ds = anomaly_ds.drop_vars("MONTH")
     raw_ds[variable_name+'_ANOMALY'] = anomaly_ds
     return raw_ds
+
+
+def get_eof(dataset, mask, modes=3, time_name="TIME", lat_name="LATITUDE", long_name="LONGITUDE", max_iterations=50,
+            tolerance=1e-4):
+    time_size = dataset.sizes[time_name]
+    lat_size = dataset.sizes[lat_name]
+    long_size = dataset.sizes[long_name]
+
+    # apply mask
+    ocean = mask.to_numpy().astype(bool)
+    points = ocean.sum()  # number of ocean grid cells
+
+    # weight by area
+    lat = dataset[lat_name].to_numpy()
+    lat_weighted = np.sqrt(np.cos(np.deg2rad(lat)))
+    lat_weighted = np.clip(lat_weighted, 1e-6, None)
+    weight_map = np.repeat(lat_weighted[:, None], long_size, axis=1)
+    weight_map = weight_map[ocean]  # apply mask
+    X0_full = dataset.to_numpy()
+    X0 = X0_full[:, ocean]
+
+    valid_cols = ~np.all(np.isnan(X0), axis=0)
+    X0 = X0[:, valid_cols]
+    weight_map = weight_map[valid_cols]
+
+    ocean_valid = np.zeros_like(ocean, dtype=bool)
+    ocean_valid[ocean] = valid_cols  # True for ocean points we kept
+
+    # guess the value of NaN positions using the mean of each column
+    mask_nan = np.isnan(X0)
+    column_mean = np.nanmean(X0, axis=0)
+    column_mean = np.where(np.isfinite(column_mean), column_mean, 0.0)
+
+    X_with_guesses = np.where(mask_nan, column_mean[None, :], X0)
+    prev = X_with_guesses.copy()
+    weight_map = np.clip(weight_map, 1e-3, None)
+
+    # iterative EOF
+    for iteration in range(max_iterations):
+        print(iteration)
+        X_mean = np.nanmean(X_with_guesses, axis=0)
+        X_centered = X_with_guesses - X_mean
+        X_weighted = X_centered * weight_map
+        X_weighted = np.nan_to_num(X_weighted, nan=0.0, posinf=0.0, neginf=0.0)
+        U, s, Vt = np.linalg.svd(X_weighted, full_matrices=False)
+        k = modes
+
+        U_k = U[:, :k]
+        s_k = s[:k]
+        Vt_k = Vt[:k, :]
+
+        X_weighted_reconstructed = (U_k * s_k) @ Vt_k
+        X_reconstructed = X_weighted_reconstructed / weight_map + X_mean
+
+        X_new = X_with_guesses.copy()  # update only NaN ocean points
+        X_new[mask_nan] = X_reconstructed[mask_nan]
+
+        error = np.nanmean((X_new[mask_nan] - prev[mask_nan]) ** 2)
+        print(error)
+        if error < tolerance:  # if converged, stop iterating
+            break
+
+        prev = X_with_guesses
+        X_with_guesses = X_new
+
+    reconstructed_ds = np.full((time_size, lat_size, long_size), np.nan)
+    reconstructed_ds[:, ocean_valid] = X_with_guesses
+
+    smoothed_ds = xr.DataArray(reconstructed_ds, dims=dataset.dims, coords=dataset.coords)
+
+    explained_variance = (s ** 2) / (s ** 2).sum()
+
+    return smoothed_ds, explained_variance
+
+
+def make_movie(dataset):
+    times = dataset.TIME.values
+
+    fig, ax = plt.subplots()
+    # ax = plt.axes(projection=ccrs.PlateCarree())
+    # ax.coastlines()
+    pcolormesh = ax.pcolormesh(dataset.LONGITUDE.values, dataset.LATITUDE.values,
+                               dataset.isel(TIME=0), cmap='RdBu_r')
+    title = ax.set_title(f'Time = {times[0]}')
+
+    cbar = plt.colorbar(pcolormesh, ax=ax, label='Modelled anomaly from surface heat flux')
+    ax.set_xlabel('Longitude')
+    ax.set_ylabel('Latitude')
+
+    def update(frame):
+        month = int((times[frame] + 0.5) % 12)
+        if month == 0:
+            month = 12
+        year = 2004 + int((times[frame]) / 12)
+        pcolormesh.set_array(dataset.isel(TIME=frame).values.ravel())
+        #pcolormesh.set_clim(vmin=float(model_anomaly_ds.isel(TIME=frame).min()), vmax=float(model_anomaly_ds.isel(TIME=frame).max()))
+        pcolormesh.set_clim(vmin=-10, vmax=10)
+        cbar.update_normal(pcolormesh)
+        title.set_text(f'Year: {year}; Month: {month}')
+        return [pcolormesh, title]
+
+    animation = FuncAnimation(fig, update, frames=len(times), interval=300, blit=False)
+    plt.show()

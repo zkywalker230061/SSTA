@@ -1,7 +1,7 @@
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
-from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
+from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset, get_eof
 
 TEMP_DATA_PATH = "../datasets/RG_ArgoClim_Temperature_2019.nc"
 MLD_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
@@ -60,17 +60,7 @@ print(t_sub_ds["T_sub_ANOMALY"].max().item())
 print(t_sub_ds["T_sub_ANOMALY"].min().item())
 print(abs(t_sub_ds["T_sub_ANOMALY"]).mean().item())
 
-vmin = -10
-vmax = 10
-
-t_sub_ds['T_sub'].sel(TIME=132.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=vmin, vmax=vmax)
-plt.show()
-
-t_sub_ds['T_sub'].sel(TIME=138.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=vmin, vmax=vmax)
-plt.show()
-
-t_sub_ds['T_sub_ANOMALY'].sel(TIME=132.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=vmin, vmax=vmax)
-plt.show()
-
-t_sub_ds['T_sub_ANOMALY'].sel(TIME=138.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=vmin, vmax=vmax)
-plt.show()
+# get eof
+t_sub_anomaly_eof = get_eof(t_sub_ds["T_sub_ANOMALY"], 10, "TIME")
+print(t_sub_anomaly_eof)
+print(t_sub_anomaly_eof.components())
