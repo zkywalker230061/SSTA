@@ -28,6 +28,13 @@ HEAT_FLUX_DATA_PATH = r"C:\Users\jason\MSciProject\ERA5-ARGO_Mean_Surface_Heat_F
 EK_DATA_PATH = r"C:\Users\jason\MSciProject\Ekman_Current_Anomaly.nc"
 CHRIS_SCHEME_DATA_PATH = r"C:\Users\jason\MSciProject\model_anomaly_exponential_damping_implicit.nc"
 
+
+explicit_daily_path = r"C:\Users\jason\MSciProject\sim_explicit_Scheme_Test_ConstDamp(10)_daily_2004.nc"
+implicit_daily_path = r"C:\Users\jason\MSciProject\sim_implicit_Scheme_Test_ConstDamp(10)_daily_2004.nc"
+semi_implicit_daily_path = r"C:\Users\jason\MSciProject\sim_semi_implicit_Scheme_Test_ConstDamp(10)_daily_2004.nc"
+crank_daily_path = r"C:\Users\jason\MSciProject\sim_crank_Scheme_Test_ConstDamp(10)_daily_2004.nc"
+
+
 # --- Load and Prepare Data (assuming helper functions are correct) --------
 mld_temperature_ds = xr.open_dataset(MLD_TEMP_PATH, decode_times=False)
 mld_depth_ds = load_pressure_data(MLD_DEPTH_PATH, 'MONTHLY_MEAN_MLD_PRESSURE')
@@ -52,6 +59,19 @@ heat_flux_anomaly = heat_flux_anomaly.drop_vars(['MONTH'])
 ekman_anomaly = ekman_ds['Q_Ek_anom']
 
 chris_ds = chris_ds['ARGO_TEMPERATURE_ANOMALY']
+
+
+
+explicit_daily = load_and_prepare_dataset(explicit_daily_path)
+implicit_daily = load_and_prepare_dataset(implicit_daily_path)
+semi_implicit_daily = load_and_prepare_dataset(semi_implicit_daily_path)
+crank_daily = load_and_prepare_dataset(crank_daily_path)
+
+
+explicit_daily = explicit_daily["T_model_anom_explicit"]
+implicit_daily = implicit_daily["T_model_anom_implicit"]
+semi_implicit_daily = semi_implicit_daily["T_model_anom_semi_implcit"]
+crank_daily = crank_daily["T_model_anom_crank_nicolson"]
 # --- Model Constants ------------------------------------------------------
 RHO_O = 1025.0  # kg/m^3
 C_O = 4100.0  # J/(kg K)
