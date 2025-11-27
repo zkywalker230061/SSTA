@@ -13,14 +13,17 @@ EKMAN_ANOMALY_DATA_PATH = "../datasets/Ekman_Current_Anomaly.nc"
 TEMP_DATA_PATH = "../datasets/RG_ArgoClim_Temperature_2019.nc"
 MLD_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
 ENTRAINMENT_VEL_DATA_PATH = "../datasets/Entrainment_Velocity-(2004-2018).nc"
+ENTRAINMENT_VEL_DENOISED_DATA_PATH = "../datasets/entrainment_vel_denoised.nc"
 H_BAR_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
 T_SUB_DATA_PATH = "../datasets/t_sub.nc"
+T_SUB_DENOISED_DATA_PATH = "../datasets/t_sub_denoised.nc"
 USE_ALL_CONTRIBUTIONS = True
 USE_SURFACE_FLUX = True
 USE_EKMAN_TERM = True
 USE_ENTRAINMENT = True     # something broken with entrainment; if False, use gamma_0 for damping
 INTEGRATE_EXPLICIT = False
 SEPARATE_REGIMES = False        # if True, then consider entrainment only when it is above entrainment_lower_threshold
+USE_DENOISED_VALUES = True
 rho_0 = 1025.0
 c_0 = 4100.0
 gamma_0 = 10.0
@@ -50,10 +53,16 @@ if USE_EKMAN_TERM:      # it's bad naming but nevertheless the case that heat_fl
 
 mld_ds = xr.open_dataset(MLD_DATA_PATH, decode_times=False)
 
-t_sub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
+if USE_DENOISED_VALUES:
+    t_sub_ds = xr.open_dataset(T_SUB_DENOISED_DATA_PATH, decode_times=False)
+    t_sub_ds["T_sub_ANOMALY"] = t_sub_ds["T_sub_ANOMALY_DENOISED"]
+    entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DENOISED_DATA_PATH, decode_times=False)
+    entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY_DENOISED'])
+else:
+    t_sub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
+    entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
+    entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
 hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
-entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
-entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
 
 entrainment_lower_threshold = 0.5 * np.nanmean(np.abs(entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']))
 
@@ -117,7 +126,7 @@ else:
                 if not SEPARATE_REGIMES:
                     cur_k = (gamma_0 / (rho_0 * c_0) + cur_entrainment_vel) / cur_hbar
                     prev_k = (gamma_0 / (rho_0 * c_0) + prev_entrainment_vel) / prev_hbar
-                    exponent = prev_k * month_to_second(prev_month) - prev_k * month_to_second(month)
+                    exponent = prev_k * month_to_second(prev_month) - cur_k * month_to_second(month)
                     # exponent = -0.5 * (prev_k + cur_k) * month_to_second(1)
                     # exponent = exponent.where(exponent <= 0, 0)
                     cur_tm_anom = (cur_entrainment_vel / (cur_k * cur_hbar)) * cur_tsub_anom + cur_heat_flux_anom / (cur_k * rho_0 * c_0 * cur_hbar) + (prev_tm_anom - (prev_entrainment_vel / (prev_k * prev_hbar)) * prev_tsub_anom - prev_heat_flux_anom / (prev_k * rho_0 * c_0 * prev_hbar)) * np.exp(exponent)
@@ -160,14 +169,14 @@ else:
             entrainment_fluxes.append(entrainment_flux)
     model_anomaly_ds = xr.concat(model_anomalies, 'TIME')
     model_anomaly_ds.to_netcdf("../datasets/model_anomaly_exponential_damping_implicit.nc")
-    # entrainment_flux_ds = xr.concat(entrainment_fluxes, 'TIME')
-    # entrainment_flux_ds = entrainment_flux_ds.drop_vars(["MONTH", "PRESSURE"])
-    # entrainment_flux_ds = entrainment_flux_ds.transpose("TIME", "LATITUDE", "LONGITUDE")
-    # surface_flux_ds = surface_flux_ds.rename("SURFACE_FLUX_ANOMALY")
-    # ekman_flux_ds = ekman_flux_ds.rename("EKMAN_FLUX_ANOMALY")
-    # entrainment_flux_ds = entrainment_flux_ds.rename("ENTRAINMENT_FLUX_ANOMALY")
-    # flux_components_ds = xr.merge([surface_flux_ds, ekman_flux_ds, entrainment_flux_ds])
-    # flux_components_ds.to_netcdf("../datasets/flux_components.nc")
+    entrainment_flux_ds = xr.concat(entrainment_fluxes, 'TIME')
+    entrainment_flux_ds = entrainment_flux_ds.drop_vars(["MONTH", "PRESSURE"])
+    entrainment_flux_ds = entrainment_flux_ds.transpose("TIME", "LATITUDE", "LONGITUDE")
+    surface_flux_ds = surface_flux_ds.rename("SURFACE_FLUX_ANOMALY")
+    ekman_flux_ds = ekman_flux_ds.rename("EKMAN_FLUX_ANOMALY")
+    entrainment_flux_ds = entrainment_flux_ds.rename("ENTRAINMENT_FLUX_ANOMALY")
+    flux_components_ds = xr.merge([surface_flux_ds, ekman_flux_ds, entrainment_flux_ds])
+    flux_components_ds.to_netcdf("../datasets/flux_components.nc")
 
 
 # make a movie

@@ -179,7 +179,7 @@ def get_anomaly(raw_ds, variable_name, monthly_mean):
     return raw_ds
 
 
-def get_eof_with_nan_consideration(dataset, mask, modes=3, time_name="TIME", lat_name="LATITUDE", long_name="LONGITUDE", max_iterations=50, tolerance=1e-4):
+def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, time_name="TIME", lat_name="LATITUDE", long_name="LONGITUDE", max_iterations=50, tolerance=1e-4):
     # if some values in the dataset are NaN (if they are absurd e.g. infinite, set to NaN beforehand), then estimate
     # the true value of the NaN with the column mean then perform EOF
     time_size = dataset.sizes[time_name]
@@ -203,12 +203,30 @@ def get_eof_with_nan_consideration(dataset, mask, modes=3, time_name="TIME", lat
     weight_map = np.clip(weight_map, 1e-3, None)    # prevent small values to avoid big numbers from divide
 
     mask_nan = np.isnan(X0)
-    column_mean = np.nanmean(X0, axis=0)    # initial guess for NaN position from column mean
-    column_mean = np.where(np.isfinite(column_mean), column_mean, 0.0)
-    X_with_guesses = np.where(mask_nan, column_mean[None, :], X0)
+    if monthly_mean_ds is not None:
+        # get month in year
+        time_vals = dataset[time_name].values
+        month_in_year = np.mod(np.floor(time_vals + 0.5).astype(int), 12)
+        month_in_year[month_in_year == 0] = 12
+        month_da = xr.DataArray(month_in_year, coords={time_name: dataset[time_name]}, dims=(time_name,))
+
+        monthly_mean_to_fill = monthly_mean_ds.sel({"MONTH": month_da})   # get monthly mean
+
+        monthly_mean_to_fill_np = monthly_mean_to_fill.to_numpy()  # apply ocean and valid column mask
+        monthly_mean_to_fill_np = monthly_mean_to_fill_np[:, ocean]
+        monthly_mean_to_fill_np = monthly_mean_to_fill_np[:, valid_cols]
+
+        X_with_guesses = X0.copy()
+        X_with_guesses[mask_nan] = monthly_mean_to_fill_np[mask_nan]     # replace NaN with monthly mean
+    else:
+        # fallback: global column mean (your original method)
+        column_mean = np.nanmean(X0, axis=0)
+        column_mean = np.where(np.isfinite(column_mean), column_mean, 0.0)
+        X_with_guesses = np.where(mask_nan, column_mean[None, :], X0)
     prev = X_with_guesses.copy()
 
     for iteration in range(max_iterations):     # iterate to improve guess
+        print(iteration)
         X_mean = np.mean(X_with_guesses, axis=0)
         X_centered = X_with_guesses - X_mean        # remove mean (add it again later) so we focus on anomaly
         X_weighted = X_centered * weight_map        # apply weight
@@ -226,6 +244,7 @@ def get_eof_with_nan_consideration(dataset, mask, modes=3, time_name="TIME", lat
             error = np.nanmean((X_new[mask_nan] - prev[mask_nan]) ** 2)
         else:
             error = 0.0
+        print(error)
         if error < tolerance:
             break
         prev = X_with_guesses

@@ -4,7 +4,7 @@ negative. Here I try a few attempts to salvage it. Will it work? well, does a fi
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
-from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset, make_movie, get_eof, get_simple_eof
+from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset, make_movie, get_eof, get_eof_with_nan_consideration
 import xeofs as xe
 
 NOISY_DATASET_PATH = "../datasets/model_anomaly_exponential_damping_implicit.nc"
@@ -16,11 +16,16 @@ print(noisy_ds)
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH, time_standard=True)
 map_mask = temperature_ds['BATHYMETRY_MASK'].sel(PRESSURE=2.5)
 
-# eof in the rather complicated way
-# eof_ds, variance = get_eof(noisy_ds["ARGO_TEMPERATURE_ANOMALY"], map_mask, modes=1)
-# print("Variance explained:", variance[:3].sum().item())
+# eof with predictive replacement of NaN; first change unphysical values to NaN
+noisy_ds["ARGO_TEMPERATURE_ANOMALY"] = noisy_ds["ARGO_TEMPERATURE_ANOMALY"].where((noisy_ds["ARGO_TEMPERATURE_ANOMALY"] > -10) & (noisy_ds["ARGO_TEMPERATURE_ANOMALY"] < 10))
+n_modes = 8
+monthly_mean = get_monthly_mean(noisy_ds["ARGO_TEMPERATURE_ANOMALY"])
+eof_ds, variance = get_eof_with_nan_consideration(noisy_ds["ARGO_TEMPERATURE_ANOMALY"], map_mask, modes=n_modes, monthly_mean_ds=monthly_mean)
+print("Variance explained:", variance[:n_modes].sum().item())
+make_movie(eof_ds, -10, 10)
 
 # simple eof
-simple_eof_ds, variance = get_simple_eof(noisy_ds["ARGO_TEMPERATURE_ANOMALY"], mask=map_mask, modes=5, clean_nan=True)
-print("Variance explained:", variance[:3].sum().item())
-make_movie(simple_eof_ds)
+# n_modes_simple = 5
+# simple_eof_ds, variance = get_eof(noisy_ds["ARGO_TEMPERATURE_ANOMALY"], mask=map_mask, modes=n_modes_simple, clean_nan=True)
+# print("Variance explained:", variance[:n_modes_simple].sum().item())
+# make_movie(simple_eof_ds)
