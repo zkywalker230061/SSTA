@@ -273,7 +273,7 @@ def get_eof(dataset, mask=None, modes=3, clean_nan=False):
     return reconstructed, explained_variance
 
 
-def make_movie(dataset, vmin, vmax):
+def make_movie(dataset, vmin, vmax, colorbar_label=None):
     times = dataset.TIME.values
 
     fig, ax = plt.subplots()
@@ -283,7 +283,7 @@ def make_movie(dataset, vmin, vmax):
                                dataset.isel(TIME=0), cmap='RdBu_r')
     title = ax.set_title(f'Time = {times[0]}')
 
-    cbar = plt.colorbar(pcolormesh, ax=ax, label='Modelled anomaly from surface heat flux')
+    cbar = plt.colorbar(pcolormesh, ax=ax, label=colorbar_label)
     ax.set_xlabel('Longitude')
     ax.set_ylabel('Latitude')
 

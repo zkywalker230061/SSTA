@@ -30,7 +30,6 @@ gamma_0 = 10.0
 
 if USE_ALL_CONTRIBUTIONS:
     heat_flux_ds = xr.open_dataset(HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH, decode_times=False)
-    print(heat_flux_ds)
     heat_flux_ds['NET_HEAT_FLUX'] = heat_flux_ds['avg_slhtf'] + heat_flux_ds['avg_snlwrf'] + heat_flux_ds[
         'avg_snswrf'] + heat_flux_ds['avg_ishf']
 else:
