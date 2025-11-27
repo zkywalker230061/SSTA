@@ -13,26 +13,32 @@ EKMAN_ANOMALY_DATA_PATH = "../datasets/Ekman_Current_Anomaly.nc"
 TEMP_DATA_PATH = "../datasets/RG_ArgoClim_Temperature_2019.nc"
 MLD_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
 ENTRAINMENT_VEL_DATA_PATH = "../datasets/Entrainment_Velocity-(2004-2018).nc"
+ENTRAINMENT_VEL_DENOISED_DATA_PATH = "../datasets/entrainment_vel_denoised.nc"
 H_BAR_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
 T_SUB_DATA_PATH = "../datasets/t_sub.nc"
+T_SUB_DENOISED_DATA_PATH = "../datasets/t_sub_denoised.nc"
 USE_ALL_CONTRIBUTIONS = True
+USE_SURFACE_FLUX = True
 USE_EKMAN_TERM = True
 USE_ENTRAINMENT = True     # something broken with entrainment; if False, use gamma_0 for damping
 INTEGRATE_EXPLICIT = False
 SEPARATE_REGIMES = False        # if True, then consider entrainment only when it is above entrainment_lower_threshold
+USE_DENOISED_VALUES = True
 rho_0 = 1025.0
 c_0 = 4100.0
 gamma_0 = 10.0
 
-# lists for statistics
-
 if USE_ALL_CONTRIBUTIONS:
     heat_flux_ds = xr.open_dataset(HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH, decode_times=False)
+    print(heat_flux_ds)
     heat_flux_ds['NET_HEAT_FLUX'] = heat_flux_ds['avg_slhtf'] + heat_flux_ds['avg_snlwrf'] + heat_flux_ds[
         'avg_snswrf'] + heat_flux_ds['avg_ishf']
 else:
     heat_flux_ds = xr.open_dataset(HEAT_FLUX_DATA_PATH, decode_times=True)
     heat_flux_ds['NET_HEAT_FLUX'] = heat_flux_ds['slhf'] + heat_flux_ds['sshf']
+
+if not USE_SURFACE_FLUX:        # yes, the method is poor but it works!
+    heat_flux_ds['NET_HEAT_FLUX'] = heat_flux_ds['NET_HEAT_FLUX'] - heat_flux_ds['NET_HEAT_FLUX']
 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
 heat_flux_monthly_mean = get_monthly_mean(heat_flux_ds['NET_HEAT_FLUX'])
@@ -47,10 +53,16 @@ if USE_EKMAN_TERM:      # it's bad naming but nevertheless the case that heat_fl
 
 mld_ds = xr.open_dataset(MLD_DATA_PATH, decode_times=False)
 
-t_sub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
+if USE_DENOISED_VALUES:
+    t_sub_ds = xr.open_dataset(T_SUB_DENOISED_DATA_PATH, decode_times=False)
+    t_sub_ds["T_sub_ANOMALY"] = t_sub_ds["T_sub_ANOMALY_DENOISED"]
+    entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DENOISED_DATA_PATH, decode_times=False)
+    entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY_DENOISED'])
+else:
+    t_sub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
+    entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
+    entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
 hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
-entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
-entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
 
 entrainment_lower_threshold = 0.5 * np.nanmean(np.abs(entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']))
 
@@ -100,51 +112,56 @@ else:
             prev_tm_anom = xr.where(np.isfinite(prev_tm_anom), prev_tm_anom, 0)     # reset NaN to 0; I'd rather this reset to the 'last useful value', but can't figure out how to do that now
             prev_heat_flux_anom = heat_flux_anomaly_ds.sel(TIME=prev_month)['NET_HEAT_FLUX_ANOMALY']
             prev_entrainment_vel = entrainment_vel_ds.sel(MONTH=prev_month_in_year)['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
+            #prev_entrainment_vel = entrainment_vel_ds.sel(TIME=prev_month)['ENTRAINMENT_VELOCITY']
             prev_hbar = hbar_ds.sel(MONTH=prev_month_in_year)['MONTHLY_MEAN_MLD_PRESSURE']
 
             cur_tsub_anom = t_sub_ds.sel(TIME=month)['T_sub_ANOMALY']
             cur_heat_flux_anom = heat_flux_anomaly_ds.sel(TIME=month)['NET_HEAT_FLUX_ANOMALY']
             cur_entrainment_vel = entrainment_vel_ds.sel(MONTH=month_in_year)['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
+            #cur_entrainment_vel = entrainment_vel_ds.sel(TIME=month)['ENTRAINMENT_VELOCITY']
             cur_hbar = hbar_ds.sel(MONTH=month_in_year)['MONTHLY_MEAN_MLD_PRESSURE']
             if not USE_ENTRAINMENT:         # ignore entrainment altogether
                 cur_tm_anom = cur_heat_flux_anom / gamma_0 + (prev_tm_anom - prev_heat_flux_anom / gamma_0) * np.exp(gamma_0 / (rho_0 * c_0 * prev_hbar) * month_to_second(prev_month) - gamma_0 / (rho_0 * c_0 * cur_hbar) * month_to_second(month))
+            else:
+                if not SEPARATE_REGIMES:
+                    cur_k = (gamma_0 / (rho_0 * c_0) + cur_entrainment_vel) / cur_hbar
+                    prev_k = (gamma_0 / (rho_0 * c_0) + prev_entrainment_vel) / prev_hbar
+                    exponent = prev_k * month_to_second(prev_month) - cur_k * month_to_second(month)
+                    # exponent = -0.5 * (prev_k + cur_k) * month_to_second(1)
+                    # exponent = exponent.where(exponent <= 0, 0)
+                    cur_tm_anom = (cur_entrainment_vel / (cur_k * cur_hbar)) * cur_tsub_anom + cur_heat_flux_anom / (cur_k * rho_0 * c_0 * cur_hbar) + (prev_tm_anom - (prev_entrainment_vel / (prev_k * prev_hbar)) * prev_tsub_anom - prev_heat_flux_anom / (prev_k * rho_0 * c_0 * prev_hbar)) * np.exp(exponent)
 
-            if not SEPARATE_REGIMES:
-                cur_k = (gamma_0 / (rho_0 * c_0) + cur_entrainment_vel) / cur_hbar
-                prev_k = (gamma_0 / (rho_0 * c_0) + prev_entrainment_vel) / prev_hbar
-                cur_tm_anom = (cur_entrainment_vel / (cur_k * cur_hbar)) * cur_tsub_anom + cur_heat_flux_anom / (cur_k * rho_0 * c_0 * cur_hbar) + (prev_tm_anom - (prev_entrainment_vel / (prev_k * prev_hbar)) * prev_tsub_anom - prev_heat_flux_anom / (prev_k * rho_0 * c_0 * prev_hbar)) * np.exp(prev_k * month_to_second(prev_month) - cur_k * month_to_second(month))
+                else:       # if treating entrainment, we have to be careful not to divide by zero
+                    no_entrainment_mask = np.abs(cur_entrainment_vel) <= entrainment_lower_threshold     # mask for when entrainment does not apply
+                    entrainment_mask = np.abs(cur_entrainment_vel) > entrainment_lower_threshold     # opposite to no_entrainment_mask
 
-            else:       # if treating entrainment, we have to be careful not to divide by zero
-                no_entrainment_mask = np.abs(cur_entrainment_vel) <= entrainment_lower_threshold     # mask for when entrainment does not apply
-                entrainment_mask = np.abs(cur_entrainment_vel) > entrainment_lower_threshold     # opposite to no_entrainment_mask
+                    no_entrainment_mask = xr.DataArray(no_entrainment_mask, coords=cur_entrainment_vel.coords, dims=cur_entrainment_vel.dims)
+                    entrainment_mask = xr.DataArray(entrainment_mask, coords=cur_entrainment_vel.coords, dims=cur_entrainment_vel.dims)
 
-                no_entrainment_mask = xr.DataArray(no_entrainment_mask, coords=cur_entrainment_vel.coords, dims=cur_entrainment_vel.dims)
-                entrainment_mask = xr.DataArray(entrainment_mask, coords=cur_entrainment_vel.coords, dims=cur_entrainment_vel.dims)
+                    cur_tm_anom = np.full_like(cur_tsub_anom, np.nan, dtype=float)  # initialise cur_tm
+                    if np.any(entrainment_mask):
+                        cur_entrainment_vel_entrainment_mask = np.where(entrainment_mask, cur_entrainment_vel, np.nan)
+                        prev_entrainment_vel_entrainment_mask = np.where(entrainment_mask, prev_entrainment_vel, np.nan)
+                        cur_hbar_entrainment_mask = np.where(entrainment_mask, cur_hbar, np.nan)
+                        prev_hbar_entrainment_mask = np.where(entrainment_mask, prev_hbar, np.nan)
 
-                cur_tm_anom = np.full_like(cur_tsub_anom, np.nan, dtype=float)  # initialise cur_tm
-                if np.any(entrainment_mask):
-                    cur_entrainment_vel_entrainment_mask = np.where(entrainment_mask, cur_entrainment_vel, np.nan)
-                    prev_entrainment_vel_entrainment_mask = np.where(entrainment_mask, prev_entrainment_vel, np.nan)
-                    cur_hbar_entrainment_mask = np.where(entrainment_mask, cur_hbar, np.nan)
-                    prev_hbar_entrainment_mask = np.where(entrainment_mask, prev_hbar, np.nan)
+                        exponent = (prev_entrainment_vel_entrainment_mask / prev_hbar_entrainment_mask * month_to_second(prev_month) - cur_entrainment_vel_entrainment_mask / cur_hbar_entrainment_mask * month_to_second(month))
+                        exponent = np.clip(exponent, -600, 600)     # prevent absurd values
+                        exponent = np.exp(exponent)
 
-                    exponent = (prev_entrainment_vel_entrainment_mask / prev_hbar_entrainment_mask * month_to_second(prev_month) - cur_entrainment_vel_entrainment_mask / cur_hbar_entrainment_mask * month_to_second(month))
-                    exponent = np.clip(exponent, -600, 600)     # prevent absurd values
-                    exponent = np.exp(exponent)
+                        cur_tm_anom_entrain = cur_tsub_anom + cur_heat_flux_anom / (cur_entrainment_vel_entrainment_mask * rho_0 * c_0) + (prev_tm_anom - prev_tsub_anom - prev_heat_flux_anom / (prev_entrainment_vel_entrainment_mask * rho_0 * c_0)) * exponent
+                    else:
+                        cur_tm_anom_entrain = np.full_like(cur_tsub_anom, np.nan, dtype=float)
+                    if np.any(no_entrainment_mask):     # ignore entrainment in the same way as previously
+                        cur_hbar_no_entrainment_mask = np.where(no_entrainment_mask, cur_hbar, np.nan)
+                        prev_hbar_no_entrainment_mask = np.where(no_entrainment_mask, prev_hbar, np.nan)
 
-                    cur_tm_anom_entrain = cur_tsub_anom + cur_heat_flux_anom / (cur_entrainment_vel_entrainment_mask * rho_0 * c_0) + (prev_tm_anom - prev_tsub_anom - prev_heat_flux_anom / (prev_entrainment_vel_entrainment_mask * rho_0 * c_0)) * exponent
-                else:
-                    cur_tm_anom_entrain = np.full_like(cur_tsub_anom, np.nan, dtype=float)
-                if np.any(no_entrainment_mask):     # ignore entrainment in the same way as previously
-                    cur_hbar_no_entrainment_mask = np.where(no_entrainment_mask, cur_hbar, np.nan)
-                    prev_hbar_no_entrainment_mask = np.where(no_entrainment_mask, prev_hbar, np.nan)
-
-                    exponent_no_entrainment = gamma_0 / (rho_0 * c_0 * prev_hbar_no_entrainment_mask) * month_to_second(prev_month) - gamma_0 / (rho_0 * c_0 * cur_hbar_no_entrainment_mask) * month_to_second(month)
-                    exponent_no_entrainment = np.exp(exponent_no_entrainment)
-                    cur_tm_anom_no_entrain = cur_heat_flux_anom / gamma_0 + (prev_tm_anom - prev_heat_flux_anom / gamma_0) * exponent_no_entrainment
-                else:
-                    cur_tm_anom_no_entrain = np.full_like(cur_tsub_anom, np.nan, dtype=float)
-                cur_tm_anom = xr.where(no_entrainment_mask, cur_tm_anom_no_entrain, cur_tm_anom_entrain)
+                        exponent_no_entrainment = gamma_0 / (rho_0 * c_0 * prev_hbar_no_entrainment_mask) * month_to_second(prev_month) - gamma_0 / (rho_0 * c_0 * cur_hbar_no_entrainment_mask) * month_to_second(month)
+                        exponent_no_entrainment = np.exp(exponent_no_entrainment)
+                        cur_tm_anom_no_entrain = cur_heat_flux_anom / gamma_0 + (prev_tm_anom - prev_heat_flux_anom / gamma_0) * exponent_no_entrainment
+                    else:
+                        cur_tm_anom_no_entrain = np.full_like(cur_tsub_anom, np.nan, dtype=float)
+                    cur_tm_anom = xr.where(no_entrainment_mask, cur_tm_anom_no_entrain, cur_tm_anom_entrain)
             cur_tm_anom = cur_tm_anom.drop_vars('MONTH', errors='ignore')
             cur_tm_anom = cur_tm_anom.expand_dims(TIME=[month])
             model_anomalies.append(cur_tm_anom)
@@ -188,7 +205,6 @@ def update(frame):
     cbar.update_normal(pcolormesh)
     title.set_text(f'Year: {year}; Month: {month}')
     return [pcolormesh, title]
-
 
 animation = FuncAnimation(fig, update, frames=len(times), interval=300, blit=False)
 plt.show()

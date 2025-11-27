@@ -1,5 +1,14 @@
 import xarray as xr
 import pandas as pd
+#import eofs
+import xeofs as xe
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+import matplotlib
+import numpy as np
+from scipy.linalg import svd
+
+matplotlib.use('TkAgg')
 
 
 def _time_standard(ds: xr.Dataset, mid_month: bool = False) -> xr.Dataset:
@@ -168,3 +177,127 @@ def get_anomaly(raw_ds, variable_name, monthly_mean):
     anomaly_ds = anomaly_ds.drop_vars("MONTH")
     raw_ds[variable_name+'_ANOMALY'] = anomaly_ds
     return raw_ds
+
+
+def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, time_name="TIME", lat_name="LATITUDE", long_name="LONGITUDE", max_iterations=50, tolerance=1e-4):
+    # if some values in the dataset are NaN (if they are absurd e.g. infinite, set to NaN beforehand), then estimate
+    # the true value of the NaN with the column mean then perform EOF
+    time_size = dataset.sizes[time_name]
+    lat_size = dataset.sizes[lat_name]
+    long_size = dataset.sizes[long_name]
+
+    ocean = mask.to_numpy().astype(bool)    # ocean mask
+    X0_full = dataset.to_numpy()
+    X0 = X0_full[:, ocean]                  # apply ocean mask
+
+    valid_cols = ~np.all(np.isnan(X0), axis=0)  # if the whole column is NaN, remove the column
+    X0 = X0[:, valid_cols]
+    ocean_valid = np.zeros_like(ocean, dtype=bool)
+    ocean_valid[ocean] = valid_cols     # mask with only valid columns
+
+    # weight by latitude to account for varying grid size
+    lat = dataset[lat_name].to_numpy()
+    lat_weighted = np.sqrt(np.cos(np.deg2rad(lat)))
+    weight_map = np.repeat(lat_weighted[:, None], long_size, axis=1)
+    weight_map = weight_map[ocean][valid_cols]      # apply ocean and valid column masks
+    weight_map = np.clip(weight_map, 1e-3, None)    # prevent small values to avoid big numbers from divide
+
+    mask_nan = np.isnan(X0)
+    if monthly_mean_ds is not None:
+        # get month in year
+        time_vals = dataset[time_name].values
+        month_in_year = np.mod(np.floor(time_vals + 0.5).astype(int), 12)
+        month_in_year[month_in_year == 0] = 12
+        month_da = xr.DataArray(month_in_year, coords={time_name: dataset[time_name]}, dims=(time_name,))
+
+        monthly_mean_to_fill = monthly_mean_ds.sel({"MONTH": month_da})   # get monthly mean
+
+        monthly_mean_to_fill_np = monthly_mean_to_fill.to_numpy()  # apply ocean and valid column mask
+        monthly_mean_to_fill_np = monthly_mean_to_fill_np[:, ocean]
+        monthly_mean_to_fill_np = monthly_mean_to_fill_np[:, valid_cols]
+
+        X_with_guesses = X0.copy()
+        X_with_guesses[mask_nan] = monthly_mean_to_fill_np[mask_nan]     # replace NaN with monthly mean
+    else:
+        # fallback: global column mean (your original method)
+        column_mean = np.nanmean(X0, axis=0)
+        column_mean = np.where(np.isfinite(column_mean), column_mean, 0.0)
+        X_with_guesses = np.where(mask_nan, column_mean[None, :], X0)
+    prev = X_with_guesses.copy()
+
+    for iteration in range(max_iterations):     # iterate to improve guess
+        print(iteration)
+        X_mean = np.mean(X_with_guesses, axis=0)
+        X_centered = X_with_guesses - X_mean        # remove mean (add it again later) so we focus on anomaly
+        X_weighted = X_centered * weight_map        # apply weight
+
+        U, s, Vt = np.linalg.svd(X_weighted, full_matrices=False)       # perform singular value decomposition
+        U_modes = U[:, :modes]      # reduce to number of desired modes
+        s_modes = s[:modes]
+        Vt_modes = Vt[:modes, :]
+
+        X_weighted_reconstructed = (U_modes * s_modes) @ Vt_modes   # reconstruct NaN data
+        X_reconstructed = X_weighted_reconstructed / weight_map + X_mean    # de-weight and re-add mean
+        X_new = X_with_guesses.copy()
+        X_new[mask_nan] = X_reconstructed[mask_nan]
+        if np.any(mask_nan):    # if converging, then stop iterating
+            error = np.nanmean((X_new[mask_nan] - prev[mask_nan]) ** 2)
+        else:
+            error = 0.0
+        print(error)
+        if error < tolerance:
+            break
+        prev = X_with_guesses
+        X_with_guesses = X_new
+    reconstructed_ds = np.full((time_size, lat_size, long_size), np.nan)
+    reconstructed_ds[:, ocean_valid] = X_with_guesses   # reconstruct full dataset
+    smoothed_ds = xr.DataArray(reconstructed_ds, dims=dataset.dims, coords=dataset.coords)
+    explained_variance = (s ** 2) / (s ** 2).sum()
+    return smoothed_ds, explained_variance
+
+
+def get_eof(dataset, mask=None, modes=3, clean_nan=False):
+    if mask is not None:
+        ocean = mask.to_numpy().astype(bool)
+        dataset = dataset.where(ocean)
+    if clean_nan:
+        dataset = dataset.dropna(dim="LATITUDE", how="all").dropna(dim="LONGITUDE", how="all")
+        dataset = dataset.fillna(dataset.mean(dim="TIME"))
+
+    model = xe.single.EOF(n_modes=modes)
+    model.fit(dataset, dim="TIME")
+    components = model.components()  # spatial EOFs
+    scores = model.scores()  # PC time series
+    explained_variance = model.explained_variance_ratio()
+    reconstructed = model.inverse_transform(scores)  # smoothed reconstruction using first 3 modes
+    return reconstructed, explained_variance
+
+
+def make_movie(dataset, vmin, vmax):
+    times = dataset.TIME.values
+
+    fig, ax = plt.subplots()
+    # ax = plt.axes(projection=ccrs.PlateCarree())
+    # ax.coastlines()
+    pcolormesh = ax.pcolormesh(dataset.LONGITUDE.values, dataset.LATITUDE.values,
+                               dataset.isel(TIME=0), cmap='RdBu_r')
+    title = ax.set_title(f'Time = {times[0]}')
+
+    cbar = plt.colorbar(pcolormesh, ax=ax, label='Modelled anomaly from surface heat flux')
+    ax.set_xlabel('Longitude')
+    ax.set_ylabel('Latitude')
+
+    def update(frame):
+        month = int((times[frame] + 0.5) % 12)
+        if month == 0:
+            month = 12
+        year = 2004 + int((times[frame]) / 12)
+        pcolormesh.set_array(dataset.isel(TIME=frame).values.ravel())
+        #pcolormesh.set_clim(vmin=float(model_anomaly_ds.isel(TIME=frame).min()), vmax=float(model_anomaly_ds.isel(TIME=frame).max()))
+        pcolormesh.set_clim(vmin=vmin, vmax=vmax)
+        cbar.update_normal(pcolormesh)
+        title.set_text(f'Year: {year}; Month: {month}')
+        return [pcolormesh, title]
+
+    animation = FuncAnimation(fig, update, frames=len(times), interval=300, blit=False)
+    plt.show()
