@@ -10,6 +10,8 @@ import calendar
 import pandas as pd
 import seaborn as sns
 import ffmpeg as ffmpeg
+from scipy.stats import gaussian_kde
+from scipy.stats import zscore
 
 #%%
 #---1. Read Files ----------------------------------------------------------
@@ -19,84 +21,44 @@ explicit_path = r"C:\Users\jason\MSciProject\Explicit_Scheme_Test_ConstDamp(10)"
 crank_path = r"C:\Users\jason\MSciProject\Crack_Scheme_Test_ConstDamp(10)"
 observed_path = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature(T_m).nc"
 chris_path = r"C:\Users\jason\MSciProject\model_anomaly_exponential_damping_implicit.nc"
+all_anomalies_path = r"C:\Users\jason\MSciProject\all_anomalies.nc"
 
 
 
 
 # --- Load and Prepare Data (assuming helper functions are correct) --------
 observed_temp = xr.open_dataset(observed_path, decode_times=False)
-implicit = load_and_prepare_dataset(implicit_path)
-explicit = load_and_prepare_dataset(explicit_path)
-crank = load_and_prepare_dataset(crank_path)
-semi_implicit = load_and_prepare_dataset(semi_implicit_path)
-chris = load_and_prepare_dataset(chris_path)
+# implicit = load_and_prepare_dataset(implicit_path)
+# explicit = load_and_prepare_dataset(explicit_path)
+# crank = load_and_prepare_dataset(crank_path)
+# semi_implicit = load_and_prepare_dataset(semi_implicit_path)
+# chris = load_and_prepare_dataset(chris_path)
+all_anomalies = load_and_prepare_dataset(all_anomalies_path)
+
 
 
 # --- Extracting the correct DataArray -------------------
+# temperature = observed_temp['__xarray_dataarray_variable__']
+# implicit = implicit["T_model_anom_implicit"]
+# explicit = explicit["T_model_anom_explicit"]
+# crank = crank["T_model_anom_crank_nicolson"]
+# semi_implicit = semi_implicit["T_model_anom_semi_implicit"]
+# chris = chris["ARGO_TEMPERATURE_ANOMALY"]
+
 temperature = observed_temp['__xarray_dataarray_variable__']
-implicit = implicit["T_model_anom_implicit"]
-explicit = explicit["T_model_anom_explicit"]
-crank = crank["T_model_anom_crank_nicolson"]
-semi_implicit = semi_implicit["T_model_anom_semi_implicit"]
-chris = chris["ARGO_TEMPERATURE_ANOMALY"]
+implicit = all_anomalies["IMPLICIT"]
+explicit = all_anomalies["EXPLICIT"]
+semi_implicit = all_anomalies["SEMI_IMPLICIT"]
+chris = all_anomalies["CHRIS_CAPPED_EXPONENT"]
+chris_mean_k = all_anomalies["CHRIS_MEAN_K"]
+
+
 
 #---- Defining the Anomaly Temperature Dataset ----------------------
 temperature_monthly_mean = get_monthly_mean(temperature)
 temperature_anomaly = get_anomaly(temperature, temperature_monthly_mean)
 
-
-#-----2. Defining Error Function Calculation-------------------
-# def create_output_array(name, long_name):
-#     """Pre-allocates an xr.DataArray with the correct coords."""
-#     return xr.DataArray(
-#         np.zeros,
-#         coords=temperature_anomaly.coords,
-#         dims=temperature_anomaly.dims,
-#         name=name,
-#         attrs={**temperature_anomaly.attrs,
-#                'units': 'Wm^-2',
-#                'long_name': long_name}
-#     )
-
-
-# times = implicit.TIME.values
-# t0 = times[0]
-# def calculate_error(test_data, observed_data):
-#     error = test_data.isel(TIME=slice(1,None)) - observed_data.isel(TIME=slice(1,None))
-#     error_mean = error.mean(dim=["LATITUDE", "LONGITUDE"], skipna=True)
-#     error_std = error.std(dim=["LATITUDE", "LONGITUDE"], skipna=True)
-#     return error, error_mean, error_std
-
-# error_simp, error_mean_simp, error_std_simp = calculate_error(semi_implicit, temperature)
-
-# plt.hist(error_mean_simp, bins=80)
-# plt.title("Semi Implicit")
-# plt.show()
-
-# error_exp, error_mean_exp, error_std_exp = calculate_error(explicit, temperature)
-# plt.hist(error_mean_simp, bins=80)
-# plt.title("Explicit")
-# plt.show()
-
-# error_imp, error_mean_imp, error_std_imp = calculate_error(implicit, temperature)
-# plt.hist(error_mean_imp, bins=80)
-# plt.title("Implicit")
-# plt.show()
-
-# error_crank, error_mean_crank, error_std_crank = calculate_error(crank, temperature)
-# plt.hist(error_mean_crank, bins=80)
-# plt.title("Crank")
-# plt.show()
-
-# error_chris, error_mean_chris, error_std_chris = calculate_error(chris, temperature)
-# plt.hist(error_mean_chris, bins=80)
-# plt.title("Chris")
-# plt.show()
-
-
-# def calculate_spatial_error(test_data, observed_data):
-#     spatial_error_list = []
-
+#%%
 
 #---New Approach-------------------------------
 def consistent_mask(test_data, observed_data):
@@ -162,17 +124,17 @@ ax.legend()
 
 plt.show()
 
-temp_masked = consistent_mask(crank, temperature_anomaly)
-error_crank = calculate_error(crank, temp_masked)
-error_crank_flat = error_crank.values.flatten()
+temp_masked = consistent_mask(chris_mean_k, temperature_anomaly)
+error_chris_mean = calculate_error(chris_mean_k, temp_masked)
+error_chris_mean_flat = error_chris_mean.values.flatten()
 fig, ax = plt.subplots(1, 1, figsize=(10,6))
-sns.histplot(error_crank_flat[~np.isnan(error_crank_flat)], bins=1000)
+sns.histplot(error_chris_mean_flat[~np.isnan(error_chris_mean_flat)], bins=1000)
 ax.set_xlabel("Error (K)")
 ax.set_ylabel("Error Freq")
-ax.set_title("Crank Scheme Temporal Error Distribution")
+ax.set_title("Chris Mean Scheme Temporal Error Distribution")
 # ax.set_xlim(-19e30,19e30)
-ax.axvline(min(error_crank_flat), color='red', linestyle='--', label=f'Max Negative Error = {max(error_crank_flat):.4f})')
-ax.axvline(max(error_crank_flat), color='red', linestyle='--', label=f'Max Positive Error = {max(error_crank_flat):.4f})')
+ax.axvline(min(error_chris_mean_flat), color='red', linestyle='--', label=f'Max Negative Error = {max(error_chris_mean_flat):.4f})')
+ax.axvline(max(error_chris_mean_flat), color='red', linestyle='--', label=f'Max Positive Error = {max(error_chris_mean_flat):.4f})')
 ax.legend()
 
 plt.show()
@@ -193,8 +155,67 @@ ax.legend()
 
 plt.show()
 
-
 #%%
+fig, ax = plt.subplots(1, 1, figsize=(10,6))
+sns.kdeplot(error_imp_flat[~np.isnan(error_imp_flat)], label="Implicit Scheme")
+sns.kdeplot(error_simp_flat[~np.isnan(error_simp_flat)], label="Semi-Implicit Scheme")
+sns.kdeplot(error_chris_mean_flat[~np.isnan(error_chris_mean_flat)], label="Chris Mean K Scheme")
+sns.kdeplot(error_chris_flat[~np.isnan(error_chris_flat)], label="Chris Scheme")
+ax.set_xlabel("Error (K)")
+ax.set_ylabel("Error Freq")
+ax.set_title("Temporal Error Distribution")
+# ax.set_xlim(-19e30,19e30)
+ax.legend()
+
+
+plt.show()
+#%%
+
+
+# Previous graph difficult to interpret
+# Consulted ChatGPT to help with log scale plotting
+plt.figure(figsize=(10, 6))
+
+for arr, label in [
+    (error_imp_flat[~np.isnan(error_imp_flat)], "Implicit Scheme"),
+    (error_simp_flat[~np.isnan(error_simp_flat)], "Semi-Implicit Scheme"),
+    (error_chris_mean_flat[~np.isnan(error_chris_mean_flat)], "Chris Mean K Scheme"),
+    (error_chris_flat[~np.isnan(error_chris_flat)], "Chris Scheme")
+]:
+    sns.kdeplot(arr, bw_adjust=1.0, label=label)
+
+plt.xlim(-10, 10)        
+plt.yscale("log")      
+plt.ylim(1e-4, 1e2)
+plt.title("Temporal Error Distribution (zoomed, log-scale)")
+plt.xlabel("Error (K)")
+plt.ylabel("PDF (log scale)")
+plt.legend()
+plt.show()
+#%%
+# 1. Standardise (z-score) each dataset
+implicit_z      = zscore(error_imp_flat, nan_policy='omit')
+semi_implicit_z = zscore(error_simp_flat, nan_policy='omit')
+chris_meanK_z   = zscore(error_chris_mean_flat, nan_policy='omit')
+chris_z         = zscore(error_chris_flat, nan_policy='omit')
+
+plt.figure(figsize=(10, 5))
+
+sns.kdeplot(implicit_z,      label='Implicit Scheme',        bw_adjust=3)
+sns.kdeplot(semi_implicit_z, label='Semi-Implicit Scheme',   bw_adjust=3)
+sns.kdeplot(chris_meanK_z,   label='Chris Mean K Scheme',    bw_adjust=3)
+sns.kdeplot(chris_z,         label='Chris Scheme',           bw_adjust=3)
+
+plt.xlim(-4, 4)                    
+plt.xlabel('Standardised Error (z-score)')
+plt.ylabel('Density')
+plt.title('Standardised Temporal Error Distributions')
+plt.legend()
+plt.tight_layout()
+plt.show()
+#%%
+
+
 # x_array = np.linspace(1,179,179)
 
 # fig, ax = plt.subplots(1,2, figsize=(16,12))
@@ -219,7 +240,7 @@ plt.show()
 ds_exp = error_exp
 ds_imp = error_imp
 ds_simp = error_simp
-ds_crank = error_crank
+ds_chris_mean = error_chris_mean
 ds_chris = error_chris
 
 #%%
@@ -264,7 +285,7 @@ anim = FuncAnimation(
 _ = anim
 
 HTML(anim.to_jshtml())
-anim.save(r"C:\Users\jason\MSciProject\explicit_animation.gif", writer="pillow", fps=4)
+#anim.save(r"C:\Users\jason\MSciProject\explicit_animation.gif", writer="pillow", fps=4)
 
 
 #%%
@@ -308,7 +329,7 @@ anim = FuncAnimation(
 _ = anim
 
 HTML(anim.to_jshtml())
-anim.save(r"C:\Users\jason\MSciProject\implicit_animation.gif", writer="pillow", fps=4)
+#anim.save(r"C:\Users\jason\MSciProject\implicit_animation.gif", writer="pillow", fps=4)
 
 #%%
 #Semi-Implicit Scheme Spatial Mean Error
@@ -340,7 +361,7 @@ def update(frame_idx):
     month_num = int(ds_simp["TIME"].values[frame_idx])
     year = 2004 + (month_num - 1)//12
     moy = ((month_num -1) %12) + 1
-    title.set_text(f"Implicit Scheme, Month {moy} in Year {year}")
+    title.set_text(f"Semi-Implicit Scheme, Month {moy} in Year {year}")
     return [im, title]
 
 anim = FuncAnimation(
@@ -351,20 +372,20 @@ anim = FuncAnimation(
 _ = anim
 
 HTML(anim.to_jshtml())
-anim.save(r"C:\Users\jason\MSciProject\semi_implicit_animation.gif", writer="pillow", fps=4)
+#anim.save(r"C:\Users\jason\MSciProject\semi_implicit_animation.gif", writer="pillow", fps=4)
 #%%
-#Crank Scheme Spatial Mean Error
+#Chris Mean Scheme Spatial Mean Error
 
-v = np.nanmax(np.abs(ds_crank))
+v = np.nanmax(np.abs(ds_chris_mean))
 vmin, vmax = -v,v
 
 # Coords
-lats = ds_crank["LATITUDE"].values
-lons = ds_crank["LONGITUDE"].values
+lats = ds_chris_mean["LATITUDE"].values
+lons = ds_chris_mean["LONGITUDE"].values
 
 fig, ax = plt.subplots(figsize=(7, 4))
 im = ax.imshow(
-    ds_crank.isel(TIME=0).values,
+    ds_chris_mean.isel(TIME=0).values,
     extent=[lons.min(), lons.max(), lats.min(), lats.max()],
     origin="lower",
     vmin=vmin, vmax=vmax,
@@ -377,12 +398,12 @@ ax.set_xlabel("Longitude")
 ax.set_ylabel("Latitude")
 
 def update(frame_idx):
-    arr = ds_crank.isel(TIME=frame_idx).values
+    arr = ds_chris_mean.isel(TIME=frame_idx).values
     im.set_data(arr)
-    month_num = int(ds_crank["TIME"].values[frame_idx])
+    month_num = int(ds_chris_mean["TIME"].values[frame_idx])
     year = 2004 + (month_num - 1)//12
     moy = ((month_num -1) %12) + 1
-    title.set_text(f"Implicit Scheme, Month {moy} in Year {year}")
+    title.set_text(f"Chris Mean Scheme, Month {moy} in Year {year}")
     return [im, title]
 
 anim = FuncAnimation(
@@ -393,7 +414,7 @@ anim = FuncAnimation(
 _ = anim
 
 HTML(anim.to_jshtml())
-anim.save(r"C:\Users\jason\MSciProject\crank_animation.gif", writer="pillow", fps=4)
+#anim.save(r"C:\Users\jason\MSciProject\crank_animation.gif", writer="pillow", fps=4)
 
 #%%
 #Chris Integration Scheme Spatial Mean Error
@@ -437,7 +458,7 @@ anim = FuncAnimation(
 _ = anim
 
 HTML(anim.to_jshtml())
-anim.save(r"C:\Users\jason\MSciProject\chris_animation.gif", writer="pillow", fps=4)
+#anim.save(r"C:\Users\jason\MSciProject\chris_animation.gif", writer="pillow", fps=4)
 #%%
 
 

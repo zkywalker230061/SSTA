@@ -72,6 +72,8 @@ explicit_daily = explicit_daily["T_model_anom_explicit"]
 implicit_daily = implicit_daily["T_model_anom_implicit"]
 semi_implicit_daily = semi_implicit_daily["T_model_anom_semi_implcit"]
 crank_daily = crank_daily["T_model_anom_crank_nicolson"]
+
+#%%
 # --- Model Constants ------------------------------------------------------
 RHO_O = 1025.0  # kg/m^3
 C_O = 4100.0  # J/(kg K)
