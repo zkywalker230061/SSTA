@@ -162,6 +162,7 @@ def simulation_error_analysis(
         # get error of this month
         # error = np.sqrt(np.mean(month_error**2))
         error = np.mean(abs(month_error))
+        # error = np.mean(month_error)
         error_list.append(error)
     error_da = xr.concat(error_list, "TIME")
     error_da.attrs['units'] = t_anomaly.attrs.get('units')
@@ -265,83 +266,133 @@ def main():
     # plt.legend()
     # plt.show()
 
-    semi_implicit_ds = load_and_prepare_dataset(
-        "../datasets/_Semi_Implicit_Scheme_Test_ConstDamp(10)"
+    # ------------------------------------------------------------------------
+    # semi_implicit_ds = load_and_prepare_dataset(
+    #     "../datasets/_Semi_Implicit_Scheme_Test_ConstDamp(10)"
+    # )
+    # # display(semi_implicit_ds)
+    # semi_implicit = semi_implicit_ds["T_model_anom_semi_implicit"]
+    # semi_implicit_error = simulation_error_analysis(
+    #     semi_implicit
+    # )
+    # # display(semi_implicit_error)
+
+    # explicit_ds = load_and_prepare_dataset(
+    #     "../datasets/Simulated_SSTA-Explicit.nc"
+    # )
+    # # display(explicit_ds)
+    # explicit = explicit_ds["ANOMALY_MLD_TEMPERATURE"]
+    # explicit = explicit.drop_vars(['MONTH'])
+    # explicit_error = simulation_error_analysis(
+    #     explicit
+    # )
+    # # display(explicit_error)
+
+    # crack_ds = load_and_prepare_dataset(
+    #     "../datasets/_Crack_Scheme_Test_ConstDamp(10)"
+    # )
+    # # display(crack_ds)
+    # crack = crack_ds["T_model_anom_crank_nicolson"]
+    # crack_error = simulation_error_analysis(
+    #     crack
+    # )
+    # # display(crack_error)
+
+    # implicit_ds = load_and_prepare_dataset(
+    #     "../datasets/Simulated_SSTA-Implicit.nc"
+    # )
+    # # display(implicit_ds)
+    # implicit = implicit_ds["ANOMALY_MLD_TEMPERATURE"]
+    # implicit = implicit.drop_vars(['MONTH'])
+    # implicit_error = simulation_error_analysis(
+    #     implicit
+    # )
+    # # display(implicit_error)
+
+    # chris_meank_ds = load_and_prepare_dataset(
+    #     "../datasets/models_with_entrainment/mean_k.nc",
+    # )
+    # # display(chris_meank_ds)
+    # chris_meank = chris_meank_ds["ARGO_TEMPERATURE_ANOMALY"]
+    # chris_meank_error = simulation_error_analysis(
+    #     chris_meank
+    # )
+
+    # chris_prevk_ds = load_and_prepare_dataset(
+    #     "../datasets/models_with_entrainment/prev_k.nc",
+    # )
+    # # display(chris_prevk_ds)
+    # chris_prevk = chris_prevk_ds["ARGO_TEMPERATURE_ANOMALY"]
+    # chris_prevk_error = simulation_error_analysis(
+    #     chris_prevk
+    # )
+
+    # chris_capped_ds = load_and_prepare_dataset(
+    #     "../datasets/models_with_entrainment/exponent_capped.nc",
+    # )
+    # # display(chris_capped_ds)
+    # chris_capped = chris_capped_ds["ARGO_TEMPERATURE_ANOMALY"]
+    # chris_capped_error = simulation_error_analysis(
+    #     chris_capped
+    # )
+
+    # chris_tsub_denoised_ds = load_and_prepare_dataset(
+    #     "../datasets/models_with_entrainment/mean_k_denoised.nc",
+    # )
+    # # display(chris_tsub_denoised_ds)
+    # chris_tsub_denoised = chris_tsub_denoised_ds["ARGO_TEMPERATURE_ANOMALY"]
+    # chris_tsub_denoised_error = simulation_error_analysis(
+    #     chris_tsub_denoised
+    # )
+
+    ds = load_and_prepare_dataset(
+        "../datasets/models_with_entrainment/all_anomalies.nc",
     )
-    # display(semi_implicit_ds)
-    semi_implicit = semi_implicit_ds["T_model_anom_semi_implicit"]
+    display(ds)
+
+    semi_implicit = ds["SEMI_IMPLICIT"]
     semi_implicit_error = simulation_error_analysis(
         semi_implicit
     )
-    # display(semi_implicit_error)
 
-    explicit_ds = load_and_prepare_dataset(
-        "../datasets/Simulated_SSTA-Explicit.nc"
-    )
-    # display(explicit_ds)
-    explicit = explicit_ds["ANOMALY_MLD_TEMPERATURE"]
-    explicit = explicit.drop_vars(['MONTH'])
+    explicit = ds["EXPLICIT"]
     explicit_error = simulation_error_analysis(
         explicit
     )
-    # display(explicit_error)
 
-    crack_ds = load_and_prepare_dataset(
-        "../datasets/_Crack_Scheme_Test_ConstDamp(10)"
-    )
-    # display(crack_ds)
-    crack = crack_ds["T_model_anom_crank_nicolson"]
-    crack_error = simulation_error_analysis(
-        crack
-    )
-    # display(crack_error)
-
-    implicit_ds = load_and_prepare_dataset(
-        "../datasets/Simulated_SSTA-Implicit.nc"
-    )
-    # display(implicit_ds)
-    implicit = implicit_ds["ANOMALY_MLD_TEMPERATURE"]
-    implicit = implicit.drop_vars(['MONTH'])
+    implicit = ds["IMPLICIT"]
     implicit_error = simulation_error_analysis(
         implicit
     )
-    # display(implicit_error)
 
-    chris_meank_ds = load_and_prepare_dataset(
-        "../datasets/models_with_entrainment/mean_k.nc",
-    )
-    # display(chris_meank_ds)
-    chris_meank = chris_meank_ds["ARGO_TEMPERATURE_ANOMALY"]
-    chris_meank_error = simulation_error_analysis(
-        chris_meank
-    )
-
-    chris_prevk_ds = load_and_prepare_dataset(
-        "../datasets/models_with_entrainment/prev_k.nc",
-    )
-    # display(chris_prevk_ds)
-    chris_prevk = chris_prevk_ds["ARGO_TEMPERATURE_ANOMALY"]
+    chris_prevk = ds["CHRIS_PREV_K"]
     chris_prevk_error = simulation_error_analysis(
         chris_prevk
     )
 
-    chris_capped_ds = load_and_prepare_dataset(
-        "../datasets/models_with_entrainment/exponent_capped.nc",
+    chris_meank = ds["CHRIS_MEAN_K"]
+    chris_meank_error = simulation_error_analysis(
+        chris_meank
     )
-    # display(chris_capped_ds)
-    chris_capped = chris_capped_ds["ARGO_TEMPERATURE_ANOMALY"]
+
+    chris_capped = ds["CHRIS_CAPPED_EXPONENT"]
     chris_capped_error = simulation_error_analysis(
         chris_capped
     )
 
+    chris_prev_cur = ds["CHRIS_PREV_CUR"]
+    chris_prev_cur_error = simulation_error_analysis(
+        chris_prev_cur
+    )
+
     plt.figure(figsize=(12, 6))
-    # plt.plot(
-    #     explicit_error['TIME'], explicit_error,
-    #     marker='o',
-    #     linestyle='-',
-    #     label='Explicit Scheme Error',
-    #     color='#FF9999'
-    # )
+    plt.plot(
+        explicit_error['TIME'], explicit_error,
+        marker='o',
+        linestyle='-',
+        label='Explicit Scheme Error',
+        color='#FF9999'
+    )
     plt.plot(
         semi_implicit_error['TIME'], semi_implicit_error,
         marker='o',
@@ -349,13 +400,13 @@ def main():
         label='Semi-Implicit Scheme Error',
         color='#66CCFF'
     )
-    plt.plot(
-        crack_error['TIME'], crack_error,
-        marker='o',
-        linestyle='-',
-        label='Crank-Nicolson Scheme Error',
-        color='#99FF99'
-    )
+    # plt.plot(
+    #     crack_error['TIME'], crack_error,
+    #     marker='o',
+    #     linestyle='-',
+    #     label='Crank-Nicolson Scheme Error',
+    #     color='#99FF99'
+    # )
     plt.plot(
         implicit_error['TIME'], implicit_error,
         marker='o',
@@ -385,6 +436,13 @@ def main():
         label="Chris' Scheme with Entrainment Error (Capped Exponent)",
         color='#66FF66'
     )
+    plt.plot(
+        chris_prev_cur_error['TIME'], chris_prev_cur_error,
+        marker='o',
+        linestyle='-',
+        label="Chris' Scheme with Entrainment Error (prev-cur)",
+        color='#6666FF'
+    )
     plt.ylim(-0.5, 2)
     # plt.xticks(explicit_error['TIME'])
     plt.xlabel('Months')
@@ -395,11 +453,12 @@ def main():
 
     print("explicit", explicit_error.mean().item())
     print("semi", semi_implicit_error.mean().item())
-    print("crank", crack_error.mean().item())
+    # print("crank", crack_error.mean().item())
     print("implicit", implicit_error.mean().item())
     print("chris with entrain mean k", chris_meank_error.mean().item())
     print("chris with entrain prev k", chris_prevk_error.mean().item())
     print("chris with entrain capped", chris_capped_error.mean().item())
+    print("chris with entrain prev-cur", chris_prev_cur_error.mean().item())
 
 
 if __name__ == "__main__":

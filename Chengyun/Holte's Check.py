@@ -127,16 +127,16 @@ def main():
         vmin=-40, vmax=20
     )
     plt.show()
-    print(diff_da.max().item(), diff_da.min().item())
-    print(diff_da.mean().item(), diff_da.std().item())
+    print("[", diff_da.max().item(), diff_da.min().item(), "]")
+    print(diff_da.mean().item(), "+-", diff_da.std().item(), "dbar")
 
     diff_dt.sel(MONTH=1).plot(
         figsize=(12, 6), cmap='RdBu_r', levels=200,
         vmin=-40, vmax=20
     )
     plt.show()
-    print(diff_dt.max().item(), diff_dt.min().item())
-    print(diff_dt.mean().item(), diff_dt.std().item())
+    print("[", diff_dt.max().item(), diff_dt.min().item(), "]")
+    print(diff_dt.mean().item(), "+-", diff_dt.std().item(), "dbar")
 
     mean_error_da = get_mean_of_error(diff_da)
     mean_error_da_std = diff_da.std(dim=['LATITUDE', 'LONGITUDE'])
