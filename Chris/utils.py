@@ -179,9 +179,9 @@ def get_anomaly(raw_ds, variable_name, monthly_mean):
     return raw_ds
 
 
-def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, time_name="TIME", lat_name="LATITUDE", long_name="LONGITUDE", max_iterations=50, tolerance=1e-4):
+def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, time_name="TIME", lat_name="LATITUDE", long_name="LONGITUDE", max_iterations=50, tolerance=1e-6):
     # if some values in the dataset are NaN (if they are absurd e.g. infinite, set to NaN beforehand), then estimate
-    # the true value of the NaN with the column mean then perform EOF
+    # the true value of the NaN with the column mean (==mean at each point over all time) then perform EOF
     time_size = dataset.sizes[time_name]
     lat_size = dataset.sizes[lat_name]
     long_size = dataset.sizes[long_name]
@@ -209,60 +209,75 @@ def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, t
         month_in_year = np.mod(np.floor(time_vals + 0.5).astype(int), 12)
         month_in_year[month_in_year == 0] = 12
         month_da = xr.DataArray(month_in_year, coords={time_name: dataset[time_name]}, dims=(time_name,))
+        monthly_mean_to_fill = monthly_mean_ds.sel({"MONTH": month_da})
 
-        monthly_mean_to_fill = monthly_mean_ds.sel({"MONTH": month_da})   # get monthly mean
+        column_mean = dataset.mean(time_name, skipna=True)
+        monthly_mean_to_fill = monthly_mean_to_fill.fillna(column_mean)
 
-        monthly_mean_to_fill_np = monthly_mean_to_fill.to_numpy()  # apply ocean and valid column mask
-        monthly_mean_to_fill_np = monthly_mean_to_fill_np[:, ocean]
-        monthly_mean_to_fill_np = monthly_mean_to_fill_np[:, valid_cols]
+        # create
+        monthly_mean_to_fill_np = monthly_mean_to_fill.to_numpy()
+        monthly_mean_to_fill_np_mask = monthly_mean_to_fill_np[:, ocean]  # apply ocean mask
+        monthly_mean_to_fill_np_mask = monthly_mean_to_fill_np_mask[:, valid_cols]
 
         X_with_guesses = X0.copy()
-        X_with_guesses[mask_nan] = monthly_mean_to_fill_np[mask_nan]     # replace NaN with monthly mean
+        X_with_guesses[mask_nan] = monthly_mean_to_fill_np_mask[mask_nan]  # fill missing values
     else:
-        # fallback: global column mean (your original method)
+        # without monthly means, just use the mean over the entire dataset (per-column mean)
         column_mean = np.nanmean(X0, axis=0)
         column_mean = np.where(np.isfinite(column_mean), column_mean, 0.0)
         X_with_guesses = np.where(mask_nan, column_mean[None, :], X0)
-    prev = X_with_guesses.copy()
 
-    for iteration in range(max_iterations):     # iterate to improve guess
+
+    # EM iterations to reconstruct incomplete values
+    for iteration in range(max_iterations):
         print(iteration)
-        X_mean = np.mean(X_with_guesses, axis=0)
-        X_centered = X_with_guesses - X_mean        # remove mean (add it again later) so we focus on anomaly
-        X_weighted = X_centered * weight_map        # apply weight
+        X_mean = np.nanmean(X_with_guesses, axis=0)     # get mean over time axis
+        X_centered = X_with_guesses - X_mean[None, :]
+        X_weighted = X_centered * weight_map[None, :]       # latitude weight
 
-        U, s, Vt = np.linalg.svd(X_weighted, full_matrices=False)       # perform singular value decomposition
-        U_modes = U[:, :modes]      # reduce to number of desired modes
-        s_modes = s[:modes]
-        Vt_modes = Vt[:modes, :]
+        U, s, Vt = np.linalg.svd(X_weighted, full_matrices=False)   # singular-value decomposition
+        X_weighted_reconstructed = (U * s) @ Vt
+        X_reconstructed = X_weighted_reconstructed / weight_map[None, :] + X_mean[None, :]  # remove weight, readd mean
 
-        X_weighted_reconstructed = (U_modes * s_modes) @ Vt_modes   # reconstruct NaN data
-        X_reconstructed = X_weighted_reconstructed / weight_map + X_mean    # de-weight and re-add mean
         X_new = X_with_guesses.copy()
         X_new[mask_nan] = X_reconstructed[mask_nan]
-        if np.any(mask_nan):    # if converging, then stop iterating
-            error = np.nanmean((X_new[mask_nan] - prev[mask_nan]) ** 2)
+        if np.any(mask_nan):
+            error = np.nanmean((X_new[mask_nan] - X_with_guesses[mask_nan]) ** 2)
         else:
             error = 0.0
         print(error)
-        if error < tolerance:
-            break
-        prev = X_with_guesses
         X_with_guesses = X_new
+        if error < tolerance:   # if converge, stop iterating
+            break
+
+    X_mean = np.nanmean(X_with_guesses, axis=0)
+    X_mean = np.where(np.isfinite(X_mean), X_mean, 0.0)
+    X_centered = X_with_guesses - X_mean[None, :]
+    X_weighted = X_centered * weight_map[None, :]
+
+    U, s, Vt = np.linalg.svd(X_weighted, full_matrices=False)   # SVD again, to take only desired EOF modes
+
+    U_modes = U[:, :modes]      # remove unwanted mods
+    s_modes = s[:modes]
+    Vt_modes = Vt[:modes, :]
+    X_weighted_reconstructed = (U_modes * s_modes) @ Vt_modes
+    X_reconstructed = X_weighted_reconstructed / weight_map[None, :] + X_mean[None, :]
+
     reconstructed_ds = np.full((time_size, lat_size, long_size), np.nan)
-    reconstructed_ds[:, ocean_valid] = X_with_guesses   # reconstruct full dataset
+    reconstructed_ds[:, ocean_valid] = X_reconstructed
     smoothed_ds = xr.DataArray(reconstructed_ds, dims=dataset.dims, coords=dataset.coords)
+
     explained_variance = (s ** 2) / (s ** 2).sum()
     return smoothed_ds, explained_variance
 
 
-def get_eof(dataset, mask=None, modes=3, clean_nan=False):
+def get_eof(dataset, modes, mask=None, clean_nan=False):
     if mask is not None:
         ocean = mask.to_numpy().astype(bool)
         dataset = dataset.where(ocean)
     if clean_nan:
         dataset = dataset.dropna(dim="LATITUDE", how="all").dropna(dim="LONGITUDE", how="all")
-        dataset = dataset.fillna(dataset.mean(dim="TIME"))
+        #dataset = dataset.fillna(dataset.mean(dim="TIME"))
 
     model = xe.single.EOF(n_modes=modes)
     model.fit(dataset, dim="TIME")

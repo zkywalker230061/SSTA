@@ -125,8 +125,8 @@ else:
                 if not SEPARATE_REGIMES:
                     cur_k = (gamma_0 / (rho_0 * c_0) + cur_entrainment_vel) / cur_hbar
                     prev_k = (gamma_0 / (rho_0 * c_0) + prev_entrainment_vel) / prev_hbar
-                    exponent = prev_k * month_to_second(prev_month) - cur_k * month_to_second(month)
-                    # exponent = -0.5 * (prev_k + cur_k) * month_to_second(1)
+                    # exponent = prev_k * month_to_second(prev_month) - cur_k * month_to_second(month)
+                    exponent = -0.5 * (prev_k + cur_k) * month_to_second(1)
                     # exponent = exponent.where(exponent <= 0, 0)
                     cur_tm_anom = (cur_entrainment_vel / (cur_k * cur_hbar)) * cur_tsub_anom + cur_heat_flux_anom / (cur_k * rho_0 * c_0 * cur_hbar) + (prev_tm_anom - (prev_entrainment_vel / (prev_k * prev_hbar)) * prev_tsub_anom - prev_heat_flux_anom / (prev_k * rho_0 * c_0 * prev_hbar)) * np.exp(exponent)
 

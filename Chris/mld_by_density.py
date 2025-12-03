@@ -4,6 +4,8 @@ import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 
+from SSTA.Chris.utils import make_movie
+
 TEMP_DATA_PATH = "../datasets/Temperature_Monthly_Mean.nc"
 SAL_DATA_PATH = "../datasets/Salinity_Monthly_Mean.nc"
 THRESHOLD = 1.015       # relative to the near-surface potential density
