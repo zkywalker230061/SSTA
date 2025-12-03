@@ -3,7 +3,7 @@ import numpy as np
 import xarray as xr
 from utils_Tm_Sm import vertical_integral
 from grad_field import compute_gradient_lat, compute_gradient_lon
-from utils_read_nc import fix_rg_time
+from utils_read_nc import fix_rg_time, month_idx
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 import cartopy.crs as ccrs

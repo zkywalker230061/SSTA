@@ -136,13 +136,13 @@ print('grad_mag:\n',grad_mag)
 
 
 
-output_path1 = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature_Seasonal_Cycle_Mean.nc"
-output_path2 = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature_Gradient_Lat.nc"
-output_path3 = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature_Gradient_Lon.nc"
+# output_path1 = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature_Seasonal_Cycle_Mean.nc"
+# output_path2 = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature_Gradient_Lat.nc"
+# output_path3 = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature_Gradient_Lon.nc"
 
-temp_mld_bar.to_dataset(name="temp_mld_mean").to_netcdf(output_path1)
-gradient_lat.to_dataset(name="temp_gradient_lat").to_netcdf(output_path2)
-gradient_lon.to_dataset(name="temp_gradient_lon").to_netcdf(output_path3)
+# temp_mld_bar.to_dataset(name="temp_mld_mean").to_netcdf(output_path1)
+# gradient_lat.to_dataset(name="temp_gradient_lat").to_netcdf(output_path2)
+# gradient_lon.to_dataset(name="temp_gradient_lon").to_netcdf(output_path3)
 
 #%%
 print(matplotlib.__version__)
