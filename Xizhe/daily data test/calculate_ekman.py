@@ -166,7 +166,7 @@ def daily_to_monthly_mean_leapyear(da):
 
 
 if __name__ == "__main__":
-    windstress_file_path = '/Users/julia/Desktop/SSTA/datasets/ERA5-ARGO_Mean_Turbulent_Surface_Stress_Daily_2004.nc'
+    windstress_file_path = '/Users/julia/Desktop/SSTA/datasets/ERA5-ARGO_Mean_Turbulent_Surface_Stress_Daily-2005.nc'
     grad_lat_file_path = '/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature_Gradient_Lat.nc'
     grad_lon_file_path = '/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature_Gradient_Lon.nc'
 
@@ -230,7 +230,7 @@ if __name__ == "__main__":
 
     date = 1
     month_in_year = (date % 12) + 0.5
-    year = 2004 
+    year = 2005 
 
 
     #---Map Plot for Ekman Current Anomaly on a date ------------------------------------------

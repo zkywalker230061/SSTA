@@ -5,7 +5,7 @@ import xarray as xr
 import numpy as np
 import matplotlib.ticker as mticker
 import matplotlib.pyplot as plt
-from utils_read_nc import get_monthly_mean, get_anomaly, load_and_prepare_dataset, load_pressure_data, get_monthly_mean_for_366
+from utils_read_nc import get_monthly_mean, get_anomaly, load_and_prepare_dataset, load_pressure_data, get_monthly_mean_from_year, tile_monthly_to_daily
 from matplotlib.animation import FuncAnimation
 import matplotlib
 import cartopy.crs as ccrs
@@ -14,10 +14,17 @@ from cartopy.mpl.ticker import (LongitudeFormatter, LatitudeFormatter, LatitudeL
 # --- File Paths (assuming these are correct) ------------------------------------------------
 MLD_TEMP_PATH = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature(T_m).nc"
 MLD_DEPTH_PATH = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
-HEAT_FLUX_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/ERA5-ARGO_Mean_Surface_Heat_Flux_Daily_2004.nc"
+HEAT_FLUX_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/ERA5-ARGO_Mean_Surface_Heat_Flux_Daily_2004.nc" 
 TURBULENT_SURFACE_STRESS = '/Users/julia/Desktop/SSTA/datasets/datasets/ERA5-ARGO_Mean_Turbulent_Surface_Stress_Daily_2004.nc'
 EK_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Ekman Current Anomaly - Daily 2004 - Test"
 CHRIS_SCHEME_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/model_anomaly_exponential_damping_implicit.nc"
+
+# --- Model Constants -----------------------------------------------------------------------
+YEAR = 2004
+RHO_O = 1025.0  # kg/m^3
+C_O = 4100.0  # J/(kg K)
+SECONDS_DAY = 24 * 60 * 60  # s
+GAMMA = 10  # bulk damping factor
 
 # --- Load and Prepare Data (assuming helper functions are correct) -------------------------
 mld_temperature_ds = xr.open_dataset(MLD_TEMP_PATH, decode_times=False)
@@ -31,13 +38,15 @@ temperature_monthly_mean = get_monthly_mean(temperature)
 temperature_anomaly = get_anomaly(temperature, temperature_monthly_mean)
 
 # mld_depth_ds = mld_depth_ds.rename({'MONTH': 'TIME'})
+print(heat_flux_ds)
 
+#%%
 heat_flux = (heat_flux_ds['avg_slhtf'] + heat_flux_ds['avg_ishf'] +
              heat_flux_ds['avg_snswrf'] + heat_flux_ds['avg_snlwrf'])
 heat_flux.attrs.update(units='W m**-2', long_name='Net Surface Heat Flux')
 heat_flux.name = 'NET_HEAT_FLUX'
 
-heat_flux_monthly_mean = get_monthly_mean_for_366(heat_flux)
+heat_flux_monthly_mean = get_monthly_mean_from_year(heat_flux, year=YEAR)
 heat_flux_anomaly = get_anomaly(heat_flux, heat_flux_monthly_mean)
 # heat_flux_anomaly = heat_flux_anomaly.drop_vars(['MONTH'])
 print('heat flux anomaly:\n', heat_flux_anomaly)
@@ -46,14 +55,8 @@ ekman_anomaly = ekman_ds['Q_Ek_anom']
 
 chris_ds = chris_ds['ARGO_TEMPERATURE_ANOMALY']
 
-# --- Model Constants -----------------------------------------------------------------------
-RHO_O = 1025.0  # kg/m^3
-C_O = 4100.0  # J/(kg K)
-SECONDS_DAY = 24 * 60 * 60  # s
-GAMMA = 0.3  # bulk damping factor
-times = ekman_anomaly.TIME.values
+times = heat_flux_anomaly.TIME.values
 t0 = times[0]
-month_lengths = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 # --- Helper to create efficient output arrays ---------------------------------------------
 def create_output_array(name, long_name):
@@ -72,18 +75,9 @@ def create_output_array(name, long_name):
                'long_name': long_name}
     )
 
-def tile_monthly_to_daily(gradient_monthly, tile_array):
-    daily_list = []
-    for i in range(12):
-        monthly_field = gradient_monthly.isel(MONTH=i)
-        repeated = monthly_field.expand_dims(TIME=tile_array[i]).copy()
-        daily_list.append(repeated)
-    
-    daily_gradient = xr.concat(daily_list, dim="TIME")
-    return daily_gradient
 
-mld_depth_ds = tile_monthly_to_daily(mld_depth_ds, month_lengths)
-mld_depth_ds = mld_depth_ds.assign_coords(TIME=ekman_anomaly.TIME)
+mld_depth_ds = tile_monthly_to_daily(mld_depth_ds, year=YEAR)
+mld_depth_ds = mld_depth_ds.assign_coords(TIME=heat_flux_anomaly.TIME)
 
 
 # --- Model Computation Functions ----------------------------------------------------------
@@ -118,7 +112,7 @@ def compute_implicit(start_time=1) -> xr.DataArray:
         # b^{n+1}
         forcing_term = (
             heat_flux_anomaly.sel(TIME=day, method='nearest', tolerance=0.51)
-            # ekman_anomaly.sel(TIME=day, method='nearest', tolerance=0.51)
+            + ekman_anomaly.sel(TIME=day, method='nearest', tolerance=0.51)
         ) / denominator
 
         # T^{n+1} = (T^n + dt*b^{n+1}) / (1 + dt*a^{n+1})
@@ -161,8 +155,7 @@ def compute_explicit(start_time=1) -> xr.DataArray:
         # *** LOGIC FIX ***: Use prev_time, not moy_n, to select forcing data.
         forcing_term = (
             heat_flux_anomaly.sel(TIME=prev_time, method='nearest', tolerance=0.51)
-            # ekman_anomaly.sel(TIME=prev_time, method='nearest', tolerance=0.51)
-        ) / denominator
+            + ekman_anomaly.sel(TIME=prev_time, method='nearest', tolerance=0.51)) / denominator
 
         # T^{n+1} = (1 - dt*a^n)T^n + dt*b^n
         T_next = (1 - SECONDS_DAY * damp_factor) * T_prev + SECONDS_DAY * forcing_term
@@ -208,7 +201,7 @@ def compute_semi_implicit(start_time=1) -> xr.DataArray:
         # b^{n+1}
         forcing_term = (
             heat_flux_anomaly.sel(TIME=day, method='nearest', tolerance=0.51)
-            # ekman_anomaly.sel(TIME=day, method='nearest', tolerance=0.51)
+            + ekman_anomaly.sel(TIME=day, method='nearest', tolerance=0.51)
         ) / denominator_n
 
         # T^{n+1} = (T^n + dt*b^{n+1}) / (1 + dt*a^{n+1})
@@ -260,7 +253,7 @@ def compute_crank(start_time=1) -> xr.DataArray:
         # b^{n+1}
         forcing_term_n = (
             heat_flux_anomaly.sel(TIME=day, method='nearest', tolerance=0.51)
-            # ekman_anomaly.sel(TIME=day, method='nearest', tolerance=0.51)
+            + ekman_anomaly.sel(TIME=day, method='nearest', tolerance=0.51)
         )/ denominator_n
 
         forcing_term_nplus1 = (
@@ -323,7 +316,7 @@ gl1.xformatter = LongitudeFormatter()
 gl1.yformatter = LatitudeFormatter()
 gl1.ylabel_style = {'size': 12, 'color': 'gray'}
 gl1.xlabel_style = {'size': 12, 'color': 'gray'}
-ax1.set_title(f'Explicit — t={anim_times[0]}')
+ax1.set_title(f'Explicit — t={anim_times[0]} in year{YEAR}')
 
 # Implicit panel
 ax2 = plt.subplot(2, 2, 2, projection=ccrs.PlateCarree())
@@ -367,7 +360,7 @@ gl3.xformatter = LongitudeFormatter()
 gl3.yformatter = LatitudeFormatter()
 gl3.ylabel_style = {'size': 12, 'color': 'gray'}
 gl3.xlabel_style = {'size': 12, 'color': 'gray'}
-ax3.set_title(f'Semi-Implicit — t={anim_times[0]}')
+ax3.set_title(f'Semi-Implicit — t={anim_times[0]} in year{YEAR}')
 
 # Crank Nicolson panel
 ax4 = plt.subplot(2, 2, 4, projection=ccrs.PlateCarree())
@@ -388,7 +381,7 @@ gl4.xformatter = LongitudeFormatter()
 gl4.yformatter = LatitudeFormatter()
 gl4.ylabel_style = {'size': 12, 'color': 'gray'}
 gl4.xlabel_style = {'size': 12, 'color': 'gray'}
-ax4.set_title(f'Crank Nicolson — t={anim_times[0]}')
+ax4.set_title(f'Crank Nicolson — t={anim_times[0]} in year{YEAR}')
 
 
 #--------- Chris Plot Settings--------------------------------
@@ -419,7 +412,7 @@ gl5.xformatter = LongitudeFormatter()
 gl5.yformatter = LatitudeFormatter()
 gl5.ylabel_style = {'size': 12, 'color': 'gray'}
 gl5.xlabel_style = {'size': 12, 'color': 'gray'}
-ax5.set_title(f'Explicit — t={anim_times_chris[0]}')
+ax5.set_title(f'Explicit — t={anim_times_chris[0]} in year{YEAR}')
 
 
 ax6 = plt.subplot(1,2,2, projection = ccrs.PlateCarree())
@@ -440,7 +433,7 @@ gl6.xformatter = LongitudeFormatter()
 gl6.yformatter = LatitudeFormatter()
 gl6.ylabel_style = {'size': 12, 'color': 'gray'}
 gl6.xlabel_style = {'size': 12, 'color': 'gray'}
-ax6.set_title(f'Observation — t={anim_times_chris[0]}')
+ax6.set_title(f'Observation — t={anim_times_chris[0]} in year{YEAR}')
 
 # ----Observed Tm'-----------------------------------------------------
 
@@ -473,11 +466,10 @@ def update(frame):
    
     # Update titles
     current_time = anim_times[frame]
-    month_in_year = (current_time % 12) + 0.5  # 0.5 (Jan) to 11.5 (Dec)
-    ax1.set_title(f'Explicit — Time: {current_time} (Month: {month_in_year:.1f})')
-    ax2.set_title(f'Implicit — Time: {current_time} (Month: {month_in_year:.1f})')
-    ax3.set_title(f'Semi-Implicit — Time: {current_time} (Month: {month_in_year:.1f})')
-    ax4.set_title(f'Crank Nicolson — Time: {current_time} (Month: {month_in_year:.1f})')
+    ax1.set_title(f'Explicit — Day: {current_time} in year{YEAR}')
+    ax2.set_title(f'Implicit — Day: {current_time} in year{YEAR}')
+    ax3.set_title(f'Semi-Implicit — Day: {current_time} in year{YEAR}')
+    ax4.set_title(f'Crank Nicolson — Day: {current_time} in year{YEAR}')
     return [mesh_exp, mesh_imp, mesh_semi_imp, mesh_crank]
 
 
@@ -486,21 +478,19 @@ def update_chris(frame):
     mesh_chris.set_array(Z_chris.ravel())
     # Update titles
     current_time = anim_times_chris[frame]
-    month_in_year = (current_time % 12) + 0.5  # 0.5 (Jan) to 11.5 (Dec)
-    ax5.set_title(f'Chris Scheme — Time: {current_time} (Month: {month_in_year:.1f})')
+    ax5.set_title(f'Chris Scheme — Day: {current_time} in year{YEAR}')
 
     Z_obs = temperature_anomaly.isel(TIME=frame).values
     mesh_observed.set_array(Z_obs.ravel())
     # Update titles
     current_time = anim_times_chris[frame]
-    month_in_year = (current_time % 12) + 0.5  # 0.5 (Jan) to 11.5 (Dec)
-    ax6.set_title(f'Observation — Time: {current_time} (Month: {month_in_year:.1f})')
+    ax6.set_title(f'Observation — Day: {current_time} in year{YEAR}')
     return [mesh_chris, mesh_observed]
 
 
 # Create and show animation
-animation = FuncAnimation(fig, update, frames=len(anim_times), interval=600, blit=False)
-animation_chris = FuncAnimation(fig_chris, update_chris, frames=len(anim_times_chris), interval=600, blit=False)
+animation = FuncAnimation(fig, update, frames=len(anim_times), interval=300, blit=False)
+animation_chris = FuncAnimation(fig_chris, update_chris, frames=len(anim_times_chris), interval=300, blit=False)
 
 # plt.tight_layout()
 plt.show()

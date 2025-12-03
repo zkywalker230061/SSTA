@@ -60,6 +60,9 @@ def fix_longitude_coord(ds):
     return ds
 
 def month_idx (time_da: xr.DataArray) -> xr.DataArray:
+    """
+    Create a new non-dimensional coordinate 'MONTH' (1-12) for 180-months time axis. (Monthly Data)
+    """
     n = time_da.sizes['TIME']
     # Repeat 1..12 along TIME; align coords to TIME
     month_idx = (xr.DataArray(np.arange(n) % 12 + 1, dims=['TIME'])
@@ -67,23 +70,35 @@ def month_idx (time_da: xr.DataArray) -> xr.DataArray:
     month_idx.name = 'MONTH'
     return month_idx
 
-def month_idx_for_366 (da: xr.DataArray) -> xr.DataArray:
+def month_idx_from_year (da: xr.DataArray, year = 2004) -> xr.DataArray:
     """
-    Creates a new non-dimensional coordinate 'MONTH' (1-12) for a 366-day time axis.
+    Creates a new non-dimensional coordinate 'MONTH' (1-12) for a 366-day time axis. (Daily Data)
     """
-    month_lengths = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    if da.sizes["TIME"] != sum(month_lengths):
-        raise ValueError("TIME length is not 366; check your data or month_lengths.")
+    is_leap = (year % 4 == 0) and (year % 100 != 0 or year % 400 == 0)
+
+    if is_leap:
+        month_lengths = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    else:
+        month_lengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+    expected_days = sum(month_lengths)
+    n_time = da.sizes["TIME"]
+
+    if n_time != expected_days:
+        raise ValueError(
+            f"TIME length is {n_time}, but a {year} calendar year "
+            f"requires {expected_days} days."
+        )
     
     month_index = np.repeat(np.arange(1, 13), month_lengths)
     da = da.assign_coords(MONTH=("TIME", month_index))
     return da
 
-def get_monthly_mean_for_366(da: xr.DataArray,) -> xr.DataArray:
+def get_monthly_mean_from_year(da: xr.DataArray, year=2004) -> xr.DataArray:
     if 'TIME' not in da.dims:
         raise ValueError("The DataArray must have a TIME dimension.")
     
-    m = month_idx_for_366(da['TIME'])
+    m = month_idx_from_year(da['TIME'], year=year)
     monthly_mean_da = da.groupby(m['MONTH']).mean('TIME', keep_attrs=True)
     return monthly_mean_da
 
@@ -152,7 +167,6 @@ def load_pressure_data(path: str, varname: str, *, time_mode: str = "datetime",)
     """Load MLD in PRESSURE units, fix time, convert to meters (positive down)."""
 
     ds = xr.open_dataset(path, engine="netcdf4", decode_times=False, mask_and_scale=True)
-    #ds = fix_rg_time(ds, mode=time_mode)
 
     pressure = ds[varname] # Coordinates = (TIME: 180, LATITUDE: 145, LONGITUDE: 360)
     lat_1D = ds["LATITUDE"]
@@ -160,10 +174,6 @@ def load_pressure_data(path: str, varname: str, *, time_mode: str = "datetime",)
     depth_m   = mld_dbar_to_meter(pressure, lat_3D)
     depth_m   = fix_longitude_coord(depth_m)
 
-    # print('depth_bar:\n',depth_bar, depth_bar.shape)
-    # print(lat_3D)
-    # print('depth_m:\n',depth_m)
-    # print('depth_m after fix_longitude:\n', depth_m)
     return depth_m
 
 def load_and_prepare_dataset(
@@ -244,6 +254,22 @@ def mld_dbar_to_meter(p_mld: xr.DataArray, lat_3D: xr.DataArray) -> xr.DataArray
     h_m.attrs.update({"units": "m", "positive": "down", "note": "TEOS-10 gsw.z_from_p"})
     return h_m
 
+def tile_monthly_to_daily(gradient_monthly, year = 2004):
+    is_leap = (year % 4 == 0) and (year % 100 != 0 or year % 400 == 0)
+
+    if is_leap:
+        month_lengths = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    else:
+        month_lengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+    daily_list = []
+    for i in range(12):
+        monthly_field = gradient_monthly.isel(MONTH=i)
+        repeated = monthly_field.expand_dims(TIME=month_lengths[i]).copy()
+        daily_list.append(repeated)
+    
+    daily_gradient = xr.concat(daily_list, dim="TIME")
+    return daily_gradient
 
 if __name__ == "__main__":
     file_path = '/Users/julia/Desktop/SSTA/datasets/windstress.nc'
@@ -256,4 +282,4 @@ if __name__ == "__main__":
     #print(ds)
     ds= fix_rg_time(ds)
     print (ds['TIME'])
-    #print(ds['avg_iews'].values)
+
