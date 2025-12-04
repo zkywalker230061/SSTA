@@ -5,8 +5,7 @@ import matplotlib.pyplot as plt
 from utils_read_nc import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
 import cartopy.crs as ccrs
-from cartopy.mpl.ticker import (LongitudeFormatter, LatitudeFormatter,
-                                LatitudeLocator)
+from cartopy.mpl.ticker import (LongitudeFormatter, LatitudeFormatter, LatitudeLocator)
 
 
 #---1. Read Files ----------------------------------------------------------
@@ -19,7 +18,7 @@ EK_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Ekman_Current_Anomaly.nc"
 HEAT_FLUX_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/ERA5-ARGO_Mean_Surface_Heat_Flux.nc"
 
 # --- Load and Prepare Data (assuming helper functions are correct) --------
-observed_temp = xr.open_dataset(observed_path, decode_times=False)
+observed_temp_ds = xr.open_dataset(observed_path, decode_times=False)
 # implicit = load_and_prepare_dataset(implicit_path)
 # explicit = load_and_prepare_dataset(explicit_path)
 # crank = load_and_prepare_dataset(crank_path)
@@ -29,7 +28,7 @@ ekman_anom_ds = load_and_prepare_dataset(EK_DATA_PATH)
 
 
 # --- Extracting the correct DataArray -------------------
-temperature = observed_temp['__xarray_dataarray_variable__']
+temperature = observed_temp_ds['__xarray_dataarray_variable__']
 # implicit = implicit["T_model_anom_implicit"]
 # explicit = explicit["T_model_anom_explicit"]
 # crank = crank["T_model_anom_crank_nicolson"]
@@ -125,7 +124,7 @@ ax2.set_title("Air Sea Heat Flux Anomaly Standard Deviation")
 ax2.set_xlabel("Longitude")
 ax2.set_ylabel("Latitude")
 ax2.coastlines()
-plt.savefig('Anomaly Standard Deviation')
+# plt.savefig('Anomaly Standard Deviation')
 plt.show()
 
 
