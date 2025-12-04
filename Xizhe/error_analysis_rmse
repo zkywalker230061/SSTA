@@ -17,6 +17,7 @@ observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature(T_m)
 EK_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Ekman_Current_Anomaly.nc"
 HEAT_FLUX_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/ERA5-ARGO_Mean_Surface_Heat_Flux.nc"
 all_anomalies_path = "/Users/julia/Desktop/SSTA/datasets/all_anomalies.nc"
+hopohopo_path = "/Users/julia/Desktop/SSTA/datasets/chris_prev_cur_scheme_denoised.nc"
 
 
 observed_temp_ds = xr.open_dataset(observed_path, decode_times=False) 
@@ -26,6 +27,7 @@ all_anomalies = load_and_prepare_dataset(all_anomalies_path)
 # crank_ds = load_and_prepare_dataset(crank_path)
 # semi_implicit_ds = load_and_prepare_dataset(semi_implicit_path)
 # chris_ds = load_and_prepare_dataset(chris_path)
+hopohopo = load_and_prepare_dataset(hopohopo_path)
 
 
 observed_temperature = observed_temp_ds['__xarray_dataarray_variable__']
@@ -37,7 +39,8 @@ schemes = {
     "Implicit": all_anomalies["IMPLICIT"],
     "Semi-Implicit": all_anomalies["SEMI_IMPLICIT"],
     "Chris Mean K": all_anomalies["CHRIS_MEAN_K"],
-    "Chris Capped": all_anomalies["CHRIS_CAPPED_EXPONENT"]
+    "Chris Capped": all_anomalies["CHRIS_CAPPED_EXPONENT"],
+    "Hopohopo": hopohopo["__xarray_dataarray_variable__"]
 }
 
 
@@ -65,17 +68,20 @@ for key in schemes:
     schemes[key] = schemes[key].isel(TIME=slice(1, None))
 
 
-plt.figure(figsize=(15, 5))
+fig, axes = plt.subplots(3, 2, figsize=(12,7))
 
-for i, (scheme_name, model_da) in enumerate(schemes.items()):
+for ax, (scheme_name, model_da) in zip(axes.flat, schemes.items()):
     # Calculate RMSE over the 'TIME' dimension
 
     rmse_map = calculate_RMSE(observed_temperature_anomaly, model_da, dim='TIME')
     
     # Plotting
-    ax = plt.subplot(3, 2, i + 1)
-    rmse_map.plot(ax=ax, cmap='viridis', cbar_kwargs={'label': 'RMSE (°C)'}, vmin = 0, vmax = 15)
+    # ax = plt.subplot(3, 2, i + 1)
+    rmse_map.plot(ax=ax, cmap='RdBu_r', cbar_kwargs={'label': 'RMSE (K)'}, vmin = 0, vmax = 10)
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Lattitude")
     ax.set_title(f'{scheme_name} Scheme - Overall RMSE')
-
-# plt.tight_layout()
+    max_rmse = rmse_map.max().item()
+    print(scheme_name, max_rmse)
+plt.tight_layout()
 plt.show()

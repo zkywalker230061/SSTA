@@ -15,11 +15,14 @@ plt.rcParams['figure.figsize'] = [12, 8]
 #--- 1. Configuration & Data Loading ---------------------------------------
 all_anomalies_path = "/Users/julia/Desktop/SSTA/datasets/all_anomalies.nc"
 observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature(T_m).nc"
+hopohopo_path = "/Users/julia/Desktop/SSTA/datasets/chris_prev_cur_scheme_denoised.nc"
 
 
 # Load Data
 observed_temp_ds = xr.open_dataset(observed_path, decode_times=False) 
 all_anomalies = load_and_prepare_dataset(all_anomalies_path)
+hopohopo = load_and_prepare_dataset(hopohopo_path)
+
 
 # Extract Variables
 temperature = observed_temp_ds['__xarray_dataarray_variable__']
@@ -33,7 +36,9 @@ schemes = {
     "Implicit": all_anomalies["IMPLICIT"],
     "Semi-Implicit": all_anomalies["SEMI_IMPLICIT"],
     "Chris Mean K": all_anomalies["CHRIS_MEAN_K"],
-    "Chris Capped": all_anomalies["CHRIS_CAPPED_EXPONENT"]
+    "Chris Capped": all_anomalies["CHRIS_CAPPED_EXPONENT"],
+    "Hopohopo": hopohopo["__xarray_dataarray_variable__"]
+
 }
 
 #%%
@@ -108,12 +113,12 @@ for i, (name, err_data) in enumerate(error_distributions.items()):
     ax.set_title(f"{name} Scheme Error Distribution")
     ax.set_xlabel("Error (K)")
     ax.set_ylabel("Frequency")
-    
+
     # Add text annotation to show the width of this region
     iqr_width = q75 - q25
     # Place text near the top of the range
     y_limits = ax.get_ylim()
-    ax.text((q25+q75)/2, y_limits[1]*0.9, f"IQR Width:\n{iqr_width:.3f} K", 
+    ax.text(5, y_limits[1]*0.5, f"IQR Width:\n{iqr_width:.3f} K", 
             horizontalalignment='center', color='darkgreen', fontweight='bold')
 
     ax.legend(loc='upper right')
@@ -167,6 +172,8 @@ plt.axhline(0.75, color='gray', linestyle=':', alpha=0.5)
 plt.text(plt.xlim()[0], 0.25, " 25%", verticalalignment='bottom', color='gray')
 plt.text(plt.xlim()[0], 0.75, " 75%", verticalalignment='bottom', color='gray')
 
+plt.axhspan(0.25, 0.75, color='grey' , alpha=0.2)
+
 # Formatting
 plt.title("Cumulative Distribution Function (CDF) of Errors")
 plt.xlabel("Error (K)")
@@ -176,3 +183,4 @@ plt.grid(True, alpha=0.3)
 plt.legend()
 
 plt.show()
+# %%
