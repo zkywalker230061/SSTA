@@ -7,6 +7,10 @@ from matplotlib.animation import FuncAnimation
 import matplotlib
 import numpy as np
 from scipy.linalg import svd
+import wpca
+from wpca import EMPCA
+import wpca
+from ppca import PPCA
 
 matplotlib.use('TkAgg')
 
@@ -182,6 +186,7 @@ def get_anomaly(raw_ds, variable_name, monthly_mean):
 def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, time_name="TIME", lat_name="LATITUDE", long_name="LONGITUDE", max_iterations=50, tolerance=1e-6):
     # if some values in the dataset are NaN (if they are absurd e.g. infinite, set to NaN beforehand), then estimate
     # the true value of the NaN with the column mean (==mean at each point over all time) then perform EOF
+    # based off various EMPCA packages, none of which really worked too well, hence the need for a homegrown solution
     time_size = dataset.sizes[time_name]
     lat_size = dataset.sizes[lat_name]
     long_size = dataset.sizes[long_name]
@@ -214,7 +219,7 @@ def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, t
         column_mean = dataset.mean(time_name, skipna=True)
         monthly_mean_to_fill = monthly_mean_to_fill.fillna(column_mean)
 
-        # create
+        # convert to numpy to fill in the nans with guesses
         monthly_mean_to_fill_np = monthly_mean_to_fill.to_numpy()
         monthly_mean_to_fill_np_mask = monthly_mean_to_fill_np[:, ocean]  # apply ocean mask
         monthly_mean_to_fill_np_mask = monthly_mean_to_fill_np_mask[:, valid_cols]
@@ -227,14 +232,14 @@ def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, t
         column_mean = np.where(np.isfinite(column_mean), column_mean, 0.0)
         X_with_guesses = np.where(mask_nan, column_mean[None, :], X0)
 
-
-    # EM iterations to reconstruct incomplete values
+    # EM iterations to reconstruct incomplete values following https://ahippert.github.io/pdfs/igarss_2020.pdf
     for iteration in range(max_iterations):
         print(iteration)
         X_mean = np.nanmean(X_with_guesses, axis=0)     # get mean over time axis
         X_centered = X_with_guesses - X_mean[None, :]
         X_weighted = X_centered * weight_map[None, :]       # latitude weight
 
+        # use SVD to estimate what the missing NaNs should be.
         U, s, Vt = np.linalg.svd(X_weighted, full_matrices=False)   # singular-value decomposition
         X_weighted_reconstructed = (U * s) @ Vt
         X_reconstructed = X_weighted_reconstructed / weight_map[None, :] + X_mean[None, :]  # remove weight, readd mean
@@ -271,6 +276,63 @@ def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, t
     return smoothed_ds, explained_variance
 
 
+def get_eof_from_ppca_py(dataset, mask, modes, monthly_mean_ds=None, time_name="TIME", lat_name="LATITUDE", long_name="LONGITUDE", max_iterations=50, tolerance=1e-6):
+    # use a python package rather than a home-grown solution; https://github.com/brdav/ppca-cpp
+    # M. Tipping & C. Bishop. Probabilistic Principal Component Analysis. JRSS B, 1999.
+    # seems not to work so well. prefer homegrown solution. long processing time and results seem weird.
+
+    # same initial processing as homegrown way (except 'flatten' to deal with ocean masking)
+    time_size = dataset.sizes[time_name]
+    lat_size = dataset.sizes[lat_name]
+    long_size = dataset.sizes[long_name]
+
+    ocean = mask.to_numpy().astype(bool)        # ocean mask
+    X_full = dataset.to_numpy()
+    X_flat = X_full.reshape(time_size, -1)
+    ocean_flat = ocean.flatten()
+    ocean_indices = np.where(ocean_flat)[0]
+    X = X_flat[:, ocean_flat]                   # apply ocean mask
+
+    if monthly_mean_ds is not None:
+        time_vals = dataset[time_name].values
+        month_in_year = np.mod(np.floor(time_vals + 0.5).astype(int), 12)
+        month_in_year[month_in_year == 0] = 12
+        month_da = xr.DataArray(month_in_year, coords={time_name: dataset[time_name]}, dims=(time_name,))
+        monthly_mean_to_fill = monthly_mean_ds.sel({"MONTH": month_da}).to_numpy()
+        monthly_mean_to_fill = monthly_mean_to_fill.reshape(time_size, -1)
+        monthly_mean_to_fill = monthly_mean_to_fill[:, ocean_flat]  # apply ocean mask
+        X = np.where(np.isnan(X), monthly_mean_to_fill, X)
+
+    valid_cols = ~np.all(np.isnan(X), axis=0)       # remove column if all nan
+    X_valid = X[:, valid_cols]
+    ocean_valid_flat = ocean_indices[valid_cols]  # indices in full flattened grid
+
+    # weighting by latitude
+    lat = dataset[lat_name].to_numpy()
+    lat_weighted = np.sqrt(np.cos(np.deg2rad(lat)))  # 1D over lat
+    weight_map = np.repeat(lat_weighted[:, None], long_size, axis=1)
+    weight_flat = weight_map.flatten()[ocean_flat][valid_cols]
+    X_valid = X_valid * weight_flat[None, :]
+
+    model = PPCA(n_components=modes)        # use PPCA_py package to compute
+    model.fit(X_valid)
+
+    # reconstruct principal components
+    principal_components = (X_valid - model.mean_) @ model.components_.T
+    X_reconstructed = principal_components @ model.components_ + model.mean_
+    X_reconstructed = X_reconstructed / weight_flat[None, :]
+
+    reconstructed_ds = np.full((time_size, lat_size * long_size), np.nan)
+    reconstructed_ds[:, ocean_valid_flat] = X_reconstructed
+    reconstructed_ds = reconstructed_ds.reshape((time_size, lat_size, long_size))
+    reconstructed_ds = xr.DataArray(reconstructed_ds, dims=dataset.dims, coords=dataset.coords)
+
+    EOFs = model.components_
+    explained_variance = model.explained_variance_
+
+    return reconstructed_ds, EOFs, model, explained_variance
+
+
 def get_eof(dataset, modes, mask=None, clean_nan=False):
     if mask is not None:
         ocean = mask.to_numpy().astype(bool)
@@ -284,7 +346,7 @@ def get_eof(dataset, modes, mask=None, clean_nan=False):
     components = model.components()  # spatial EOFs
     scores = model.scores()  # PC time series
     explained_variance = model.explained_variance_ratio()
-    reconstructed = model.inverse_transform(scores)  # smoothed reconstruction using first 3 modes
+    reconstructed = model.inverse_transform(scores)
     return reconstructed, explained_variance
 
 

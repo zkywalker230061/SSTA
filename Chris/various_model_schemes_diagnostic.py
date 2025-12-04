@@ -2,7 +2,7 @@ import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 
-from SSTA.Chris.utils import make_movie, get_eof, get_eof_with_nan_consideration
+from SSTA.Chris.utils import make_movie, get_eof, get_eof_with_nan_consideration, get_eof_from_ppca_py
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 
 ALL_SCHEMES_DATA_PATH = "../datasets/all_anomalies.nc"
@@ -27,11 +27,13 @@ TEMP_DATA_PATH = "../datasets/RG_ArgoClim_Temperature_2019.nc"
 temp_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
 map_mask = temp_ds['BATHYMETRY_MASK'].sel(PRESSURE=2.5).drop_vars("PRESSURE")
 
-temp_n_modes = 20
+temp_n_modes = 3
 monthly_mean = get_monthly_mean(all_schemes_ds["CHRIS_PREV_CUR_NAN"])
-temp_anomaly_eof, temp_explained_variance = get_eof_with_nan_consideration(all_schemes_ds["CHRIS_PREV_CUR_NAN"], modes=temp_n_modes, mask=map_mask, tolerance=1e-15, monthly_mean_ds=monthly_mean)
+# temp_anomaly_eof, temp_explained_variance = get_eof_with_nan_consideration(all_schemes_ds["CHRIS_PREV_CUR_NAN"], modes=temp_n_modes, mask=map_mask, tolerance=1e-15, monthly_mean_ds=monthly_mean)
 
 # temp_anomaly_eof, temp_explained_variance = get_eof(all_schemes_ds["CHRIS_MEAN_K"], modes=temp_n_modes, mask=map_mask, clean_nan=True)
+
+temp_anomaly_eof, eofs, model, temp_explained_variance = get_eof_from_ppca_py(all_schemes_ds["CHRIS_PREV_CUR_NAN"], modes=temp_n_modes, mask=map_mask, tolerance=1e-15)
 
 
 print("Variance explained:", temp_explained_variance[:temp_n_modes].sum().item())
