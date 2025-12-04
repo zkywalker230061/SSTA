@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import xesmf as xe  # NOTE: This argolise must be run under conda environment with xesmf installed.
 
 from rgargo_read import load_and_prepare_dataset
-# from rgargo_plot import visualise_dataset
+from rgargo_plot import visualise_dataset
 from error_analysis import get_mean_of_error
 
 MONTHS = {
@@ -166,6 +166,46 @@ def main():
     )
     plt.legend()
     plt.show()
+
+    holte_hbar_da_max = holte_hbar_da.max(dim=['MONTH'])
+    holte_hbar_dt_max = holte_hbar_dt.max(dim=['MONTH'])
+    argo_hbar_max = argo_hbar.max(dim=['MONTH'])
+
+    visualise_dataset(
+        argo_hbar_max,
+        cmap='Blues',
+        vmin=0,
+        vmax=500,
+    )
+    visualise_dataset(
+        holte_hbar_da_max,
+        cmap='Blues',
+        vmin=0,
+        vmax=500,
+    )
+    visualise_dataset(
+        holte_hbar_dt_max,
+        cmap='Blues',
+        vmin=0,
+        vmax=500,
+    )
+
+    argo_hbar_max.plot(
+        figsize=(12, 6), cmap='Blues', levels=200,
+        vmin=0, vmax=500
+    )
+    plt.show()
+    holte_hbar_da_max.plot(
+        figsize=(12, 6), cmap='Blues', levels=200,
+        vmin=0, vmax=500
+    )
+    plt.show()
+    holte_hbar_dt_max.plot(
+        figsize=(12, 6), cmap='Blues', levels=200,
+        vmin=0, vmax=500
+    )
+    plt.show()
+
 
 
 if __name__ == "__main__":
