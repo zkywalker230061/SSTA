@@ -183,7 +183,7 @@ def get_anomaly(raw_ds, variable_name, monthly_mean):
     return raw_ds
 
 
-def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, time_name="TIME", lat_name="LATITUDE", long_name="LONGITUDE", max_iterations=50, tolerance=1e-6):
+def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, time_name="TIME", lat_name="LATITUDE", long_name="LONGITUDE", max_iterations=50, tolerance=1e-6, start_mode=0):
     # if some values in the dataset are NaN (if they are absurd e.g. infinite, set to NaN beforehand), then estimate
     # the true value of the NaN with the column mean (==mean at each point over all time) then perform EOF
     # based off various EMPCA packages, none of which really worked too well, hence the need for a homegrown solution
@@ -241,11 +241,19 @@ def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, t
 
         # use SVD to estimate what the missing NaNs should be.
         U, s, Vt = np.linalg.svd(X_weighted, full_matrices=False)   # singular-value decomposition
-        X_weighted_reconstructed = (U * s) @ Vt
-        X_reconstructed = X_weighted_reconstructed / weight_map[None, :] + X_mean[None, :]  # remove weight, readd mean
+        #X_weighted_reconstructed = (U * s) @ Vt
+        #X_reconstructed = X_weighted_reconstructed / weight_map[None, :] + X_mean[None, :]  # remove weight, readd mean
+
+        k_opt = modes       # TODO: choose the actual optimum; this is just a placeholder for now; see paper
+        # initial observation suggests this doesn't actually do much... but decent practice I suppose.
+        U_k = U[:, :k_opt]
+        s_k = s[:k_opt]
+        Vt_k = Vt[:k_opt, :]
+        X_weighted_reconstructed_truncated = (U_k * s_k) @ Vt_k
+        X_reconstructed_truncated = X_weighted_reconstructed_truncated / weight_map[None, :] + X_mean[None, :]
 
         X_new = X_with_guesses.copy()
-        X_new[mask_nan] = X_reconstructed[mask_nan]
+        X_new[mask_nan] = X_reconstructed_truncated[mask_nan]
         if np.any(mask_nan):
             error = np.nanmean((X_new[mask_nan] - X_with_guesses[mask_nan]) ** 2)
         else:
@@ -262,18 +270,19 @@ def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, t
 
     U, s, Vt = np.linalg.svd(X_weighted, full_matrices=False)   # SVD again, to take only desired EOF modes
 
-    U_modes = U[:, :modes]      # remove unwanted mods
-    s_modes = s[:modes]
-    Vt_modes = Vt[:modes, :]
+    U_modes = U[:, start_mode:modes]      # remove unwanted mods
+    s_modes = s[start_mode:modes]
+    Vt_modes = Vt[start_mode:modes, :]
     X_weighted_reconstructed = (U_modes * s_modes) @ Vt_modes
     X_reconstructed = X_weighted_reconstructed / weight_map[None, :] + X_mean[None, :]
+    PCs = U[:, start_mode:modes] * s[start_mode:modes]
 
     reconstructed_ds = np.full((time_size, lat_size, long_size), np.nan)
     reconstructed_ds[:, ocean_valid] = X_reconstructed
     smoothed_ds = xr.DataArray(reconstructed_ds, dims=dataset.dims, coords=dataset.coords)
 
     explained_variance = (s ** 2) / (s ** 2).sum()
-    return smoothed_ds, explained_variance
+    return smoothed_ds, explained_variance, PCs
 
 
 def get_eof_from_ppca_py(dataset, mask, modes, monthly_mean_ds=None, time_name="TIME", lat_name="LATITUDE", long_name="LONGITUDE", max_iterations=50, tolerance=1e-6):
@@ -338,7 +347,7 @@ def get_eof(dataset, modes, mask=None, clean_nan=False):
         ocean = mask.to_numpy().astype(bool)
         dataset = dataset.where(ocean)
     if clean_nan:
-        dataset = dataset.dropna(dim="LATITUDE", how="all").dropna(dim="LONGITUDE", how="all")
+        dataset = dataset.dropna(dim="LATITUDE", how="any").dropna(dim="LONGITUDE", how="any")
         #dataset = dataset.fillna(dataset.mean(dim="TIME"))
 
     model = xe.single.EOF(n_modes=modes)
@@ -346,8 +355,23 @@ def get_eof(dataset, modes, mask=None, clean_nan=False):
     components = model.components()  # spatial EOFs
     scores = model.scores()  # PC time series
     explained_variance = model.explained_variance_ratio()
-    reconstructed = model.inverse_transform(scores)
-    return reconstructed, explained_variance
+
+    # bootstrapping for significant modes, from https://xeofs.readthedocs.io/en/latest/content/user_guide/auto_examples/4validation/plot_bootstrap.html#sphx-glr-content-user-guide-auto-examples-4validation-plot-bootstrap-py
+    # n_boot = 50
+    # bs = xe.validation.EOFBootstrapper(n_bootstraps=n_boot)
+    # bs.fit(model)
+    # bs_expvar = bs.explained_variance()
+    # ci_expvar = bs_expvar.quantile([0.025, 0.975], "n")  # 95% confidence intervals
+    # q025 = ci_expvar.sel(quantile=0.025)
+    # q975 = ci_expvar.sel(quantile=0.975)
+    # is_significant = q025 - q975.shift({"mode": -1}) > 0
+    # n_significant_modes = (
+    #     is_significant.where(is_significant is True).cumsum(skipna=False).max().fillna(0)
+    # )
+    # print("{:} modes are significant at alpha=0.05".format(n_significant_modes.values))
+
+    #reconstructed = model.inverse_transform(scores)
+    return components, explained_variance, scores
 
 
 def make_movie(dataset, vmin, vmax, colorbar_label=None):
