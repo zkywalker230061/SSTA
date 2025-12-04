@@ -13,17 +13,13 @@ plt.rcParams['figure.figsize'] = [12, 8]
 
 #%%
 #--- 1. Configuration & Data Loading ---------------------------------------
-BASE_PATH = "/Users/julia/Desktop/SSTA/datasets"
+all_anomalies_path = "/Users/julia/Desktop/SSTA/datasets/all_anomalies.nc"
+observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature(T_m).nc"
 
-paths = {
-    "observed": f"{BASE_PATH}/Mixed_Layer_Temperature(T_m).nc",
-    "all_anomalies": f"{BASE_PATH}/all_anomalies.nc",
-    # Note: I have commented out unused paths to keep the namespace clean
-}
 
 # Load Data
-observed_temp_ds = xr.open_dataset(paths["observed"], decode_times=False) 
-all_anomalies = load_and_prepare_dataset(paths["all_anomalies"])
+observed_temp_ds = xr.open_dataset(observed_path, decode_times=False) 
+all_anomalies = load_and_prepare_dataset(all_anomalies_path)
 
 # Extract Variables
 temperature = observed_temp_ds['__xarray_dataarray_variable__']
