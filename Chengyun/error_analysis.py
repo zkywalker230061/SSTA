@@ -156,19 +156,24 @@ def simulation_error_analysis(
     if 'TIME' not in simulation_da.dims:
         raise ValueError("The Anomaly DataArray must have a TIME dimension.")
     error_list = []
+    month_error_list = []
     for month_num in simulation_da.coords['TIME']:
         month_num = month_num.values
         month_error = simulation_da.sel(TIME=month_num) - t_anomaly.sel(TIME=month_num)
-        # get error of this month
-        # error = np.sqrt(np.mean(month_error**2))
-        error = np.mean(abs(month_error))
-        # error = np.mean(month_error)
+        # error = np.mean(abs(month_error))
+        error = np.mean(month_error)
         error_list.append(error)
+        month_error_list.append(month_error)
     error_da = xr.concat(error_list, "TIME")
     error_da.attrs['units'] = t_anomaly.attrs.get('units')
     error_da.attrs['long_name'] = f"Error of {t_anomaly.attrs.get('long_name')}"
     error_da.name = f"ERROR_{t_anomaly.name}"
-    return error_da
+    month_error_da = xr.concat(month_error_list, "TIME")
+    month_error_da.attrs['units'] = t_anomaly.attrs.get('units')
+    month_error_da.attrs['long_name'] = f"Monthly Error of {t_anomaly.attrs.get('long_name')}"
+    month_error_da.name = f"MONTHLY_ERROR_{t_anomaly.name}"
+
+    return error_da, month_error_da
 
 
 def main():
@@ -351,48 +356,48 @@ def main():
     display(ds)
 
     semi_implicit = ds["SEMI_IMPLICIT"]
-    semi_implicit_error = simulation_error_analysis(
+    semi_implicit_error, semi_implicit_monthly_error = simulation_error_analysis(
         semi_implicit
     )
 
     explicit = ds["EXPLICIT"]
-    explicit_error = simulation_error_analysis(
+    explicit_error, explicit_monthly_error = simulation_error_analysis(
         explicit
     )
 
     implicit = ds["IMPLICIT"]
-    implicit_error = simulation_error_analysis(
+    implicit_error, implicit_monthly_error = simulation_error_analysis(
         implicit
     )
 
     chris_prevk = ds["CHRIS_PREV_K"]
-    chris_prevk_error = simulation_error_analysis(
+    chris_prevk_error, chris_prevk_monthly_error = simulation_error_analysis(
         chris_prevk
     )
 
     chris_meank = ds["CHRIS_MEAN_K"]
-    chris_meank_error = simulation_error_analysis(
+    chris_meank_error, chris_meank_monthly_error = simulation_error_analysis(
         chris_meank
     )
 
     chris_capped = ds["CHRIS_CAPPED_EXPONENT"]
-    chris_capped_error = simulation_error_analysis(
+    chris_capped_error, chris_capped_monthly_error = simulation_error_analysis(
         chris_capped
     )
 
-    chris_prev_cur = ds["CHRIS_PREV_CUR"]
-    chris_prev_cur_error = simulation_error_analysis(
-        chris_prev_cur
-    )
+    # chris_prev_cur = ds["CHRIS_PREV_CUR"]
+    # chris_prev_cur_error, chris_prev_cur_monthly_error = simulation_error_analysis(
+    #     chris_prev_cur
+    # )
 
     plt.figure(figsize=(12, 6))
-    plt.plot(
-        explicit_error['TIME'], explicit_error,
-        marker='o',
-        linestyle='-',
-        label='Explicit Scheme Error',
-        color='#FF9999'
-    )
+    # plt.plot(
+    #     explicit_error['TIME'], explicit_error,
+    #     marker='o',
+    #     linestyle='-',
+    #     label='Explicit Scheme Error',
+    #     color='#FF9999'
+    # )
     plt.plot(
         semi_implicit_error['TIME'], semi_implicit_error,
         marker='o',
@@ -427,23 +432,25 @@ def main():
         marker='o',
         linestyle='-',
         label="Chris' Scheme with Entrainment Error (Prev K)",
-        color='#FF66CC'
+        color='#FF66CC',
+        alpha=0.5
     )
     plt.plot(
         chris_capped_error['TIME'], chris_capped_error,
         marker='o',
         linestyle='-',
         label="Chris' Scheme with Entrainment Error (Capped Exponent)",
-        color='#66FF66'
+        color='#66FF66',
+        alpha=0.5
     )
-    plt.plot(
-        chris_prev_cur_error['TIME'], chris_prev_cur_error,
-        marker='o',
-        linestyle='-',
-        label="Chris' Scheme with Entrainment Error (prev-cur)",
-        color='#6666FF'
-    )
-    plt.ylim(-0.5, 2)
+    # plt.plot(
+    #     chris_prev_cur_error['TIME'], chris_prev_cur_error,
+    #     marker='o',
+    #     linestyle='-',
+    #     label="Chris' Scheme with Entrainment Error (prev-cur)",
+    #     color='#6666FF'
+    # )
+    plt.ylim(-0.5, 0.5)
     # plt.xticks(explicit_error['TIME'])
     plt.xlabel('Months')
     plt.ylabel('RMSE')
@@ -458,7 +465,31 @@ def main():
     print("chris with entrain mean k", chris_meank_error.mean().item())
     print("chris with entrain prev k", chris_prevk_error.mean().item())
     print("chris with entrain capped", chris_capped_error.mean().item())
-    print("chris with entrain prev-cur", chris_prev_cur_error.mean().item())
+    # print("chris with entrain prev-cur", chris_prev_cur_error.mean().item())
+
+    semi_implicit_error_time_mean = semi_implicit_monthly_error.mean(dim=['TIME'])
+    explicit_error_time_mean = explicit_monthly_error.mean(dim=['TIME'])
+    implicit_error_time_mean = implicit_monthly_error.mean(dim=['TIME'])
+    chris_meank_error_time_mean = chris_meank_monthly_error.mean(dim=['TIME'])
+    chris_prevk_error_time_mean = chris_prevk_monthly_error.mean(dim=['TIME'])
+    chris_capped_error_time_mean = chris_capped_monthly_error.mean(dim=['TIME'])
+    # chris_prev_cur_error_time_mean = chris_prev_cur_monthly_error.mean(dim=['TIME'])
+
+    vmin, vmax = -0.1, 0.1
+    semi_implicit_error_time_mean.plot(cmap='RdBu_r', vmin=vmin, vmax=vmax)
+    plt.show()
+    explicit_error_time_mean.plot(cmap='RdBu_r', vmin=vmin, vmax=vmax)
+    plt.show()
+    implicit_error_time_mean.plot(cmap='RdBu_r', vmin=vmin, vmax=vmax)
+    plt.show()
+    chris_meank_error_time_mean.plot(cmap='RdBu_r', vmin=vmin, vmax=vmax)
+    plt.show()
+    chris_prevk_error_time_mean.plot(cmap='RdBu_r', vmin=vmin, vmax=vmax)
+    plt.show()
+    chris_capped_error_time_mean.plot(cmap='RdBu_r', vmin=vmin, vmax=vmax)
+    plt.show()
+    # chris_prev_cur_error_time_mean.plot(cmap='RdBu_r', vmin=vmin, vmax=vmax)
+    # plt.show()
 
 
 if __name__ == "__main__":
