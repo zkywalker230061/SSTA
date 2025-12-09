@@ -129,7 +129,7 @@ MONTHS = {
 
 
 def get_monthly_mean(
-    da: xr.DataArray,
+        da: xr.DataArray,
 ) -> xr.DataArray:
     """
     Get the monthly mean of the DataArray.
@@ -154,7 +154,7 @@ def get_monthly_mean(
     monthly_means = []
     for _, month_num in MONTHS.items():
         monthly_means.append(
-            da.sel(TIME=da['TIME'][month_num-1::12]).mean(dim='TIME')
+            da.sel(TIME=da['TIME'][month_num - 1::12]).mean(dim='TIME')
         )
     monthly_mean_da = xr.concat(monthly_means, dim='MONTH')
     monthly_mean_da = monthly_mean_da.assign_coords(MONTH=list(MONTHS.values()))
@@ -179,11 +179,12 @@ def get_anomaly(raw_ds, variable_name, monthly_mean):
         anomalies.append(anomaly)
     anomaly_ds = xr.concat(anomalies, "TIME")
     anomaly_ds = anomaly_ds.drop_vars("MONTH")
-    raw_ds[variable_name+'_ANOMALY'] = anomaly_ds
+    raw_ds[variable_name + '_ANOMALY'] = anomaly_ds
     return raw_ds
 
 
-def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, time_name="TIME", lat_name="LATITUDE", long_name="LONGITUDE", max_iterations=50, tolerance=1e-6, start_mode=0):
+def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, time_name="TIME", lat_name="LATITUDE",
+                                   long_name="LONGITUDE", max_iterations=50, tolerance=1e-6, start_mode=0):
     # if some values in the dataset are NaN (if they are absurd e.g. infinite, set to NaN beforehand), then estimate
     # the true value of the NaN with the column mean (==mean at each point over all time) then perform EOF
     # based off various EMPCA packages, none of which really worked too well, hence the need for a homegrown solution
@@ -191,21 +192,21 @@ def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, t
     lat_size = dataset.sizes[lat_name]
     long_size = dataset.sizes[long_name]
 
-    ocean = mask.to_numpy().astype(bool)    # ocean mask
+    ocean = mask.to_numpy().astype(bool)  # ocean mask
     X0_full = dataset.to_numpy()
-    X0 = X0_full[:, ocean]                  # apply ocean mask
+    X0 = X0_full[:, ocean]  # apply ocean mask
 
     valid_cols = ~np.all(np.isnan(X0), axis=0)  # if the whole column is NaN, remove the column
     X0 = X0[:, valid_cols]
     ocean_valid = np.zeros_like(ocean, dtype=bool)
-    ocean_valid[ocean] = valid_cols     # mask with only valid columns
+    ocean_valid[ocean] = valid_cols  # mask with only valid columns
 
     # weight by latitude to account for varying grid size
     lat = dataset[lat_name].to_numpy()
     lat_weighted = np.sqrt(np.cos(np.deg2rad(lat)))
     weight_map = np.repeat(lat_weighted[:, None], long_size, axis=1)
-    weight_map = weight_map[ocean][valid_cols]      # apply ocean and valid column masks
-    weight_map = np.clip(weight_map, 1e-3, None)    # prevent small values to avoid big numbers from divide
+    weight_map = weight_map[ocean][valid_cols]  # apply ocean and valid column masks
+    weight_map = np.clip(weight_map, 1e-3, None)  # prevent small values to avoid big numbers from divide
 
     mask_nan = np.isnan(X0)
     if monthly_mean_ds is not None:
@@ -235,16 +236,16 @@ def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, t
     # EM iterations to reconstruct incomplete values following https://ahippert.github.io/pdfs/igarss_2020.pdf
     for iteration in range(max_iterations):
         print(iteration)
-        X_mean = np.nanmean(X_with_guesses, axis=0)     # get mean over time axis
+        X_mean = np.nanmean(X_with_guesses, axis=0)  # get mean over time axis
         X_centered = X_with_guesses - X_mean[None, :]
-        X_weighted = X_centered * weight_map[None, :]       # latitude weight
+        X_weighted = X_centered * weight_map[None, :]  # latitude weight
 
         # use SVD to estimate what the missing NaNs should be.
-        U, s, Vt = np.linalg.svd(X_weighted, full_matrices=False)   # singular-value decomposition
+        U, s, Vt = np.linalg.svd(X_weighted, full_matrices=False)  # singular-value decomposition
         #X_weighted_reconstructed = (U * s) @ Vt
         #X_reconstructed = X_weighted_reconstructed / weight_map[None, :] + X_mean[None, :]  # remove weight, readd mean
 
-        k_opt = modes       # TODO: choose the actual optimum; this is just a placeholder for now; see paper
+        k_opt = modes  # TODO: choose the actual optimum; this is just a placeholder for now; see paper
         # initial observation suggests this doesn't actually do much... but decent practice I suppose.
         U_k = U[:, :k_opt]
         s_k = s[:k_opt]
@@ -260,7 +261,7 @@ def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, t
             error = 0.0
         print(error)
         X_with_guesses = X_new
-        if error < tolerance:   # if converge, stop iterating
+        if error < tolerance:  # if converge, stop iterating
             break
 
     X_mean = np.nanmean(X_with_guesses, axis=0)
@@ -268,9 +269,9 @@ def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, t
     X_centered = X_with_guesses - X_mean[None, :]
     X_weighted = X_centered * weight_map[None, :]
 
-    U, s, Vt = np.linalg.svd(X_weighted, full_matrices=False)   # SVD again, to take only desired EOF modes
+    U, s, Vt = np.linalg.svd(X_weighted, full_matrices=False)  # SVD again, to take only desired EOF modes
 
-    U_modes = U[:, start_mode:modes]      # remove unwanted mods
+    U_modes = U[:, start_mode:modes]  # remove unwanted mods
     s_modes = s[start_mode:modes]
     Vt_modes = Vt[start_mode:modes, :]
     X_weighted_reconstructed = (U_modes * s_modes) @ Vt_modes
@@ -285,7 +286,8 @@ def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, t
     return smoothed_ds, explained_variance, PCs
 
 
-def get_eof_from_ppca_py(dataset, mask, modes, monthly_mean_ds=None, time_name="TIME", lat_name="LATITUDE", long_name="LONGITUDE", max_iterations=50, tolerance=1e-6):
+def get_eof_from_ppca_py(dataset, mask, modes, monthly_mean_ds=None, time_name="TIME", lat_name="LATITUDE",
+                         long_name="LONGITUDE", max_iterations=50, tolerance=1e-6):
     # use a python package rather than a home-grown solution; https://github.com/brdav/ppca-cpp
     # M. Tipping & C. Bishop. Probabilistic Principal Component Analysis. JRSS B, 1999.
     # seems not to work so well. prefer homegrown solution. long processing time and results seem weird.
@@ -295,12 +297,12 @@ def get_eof_from_ppca_py(dataset, mask, modes, monthly_mean_ds=None, time_name="
     lat_size = dataset.sizes[lat_name]
     long_size = dataset.sizes[long_name]
 
-    ocean = mask.to_numpy().astype(bool)        # ocean mask
+    ocean = mask.to_numpy().astype(bool)  # ocean mask
     X_full = dataset.to_numpy()
     X_flat = X_full.reshape(time_size, -1)
     ocean_flat = ocean.flatten()
     ocean_indices = np.where(ocean_flat)[0]
-    X = X_flat[:, ocean_flat]                   # apply ocean mask
+    X = X_flat[:, ocean_flat]  # apply ocean mask
 
     if monthly_mean_ds is not None:
         time_vals = dataset[time_name].values
@@ -312,7 +314,7 @@ def get_eof_from_ppca_py(dataset, mask, modes, monthly_mean_ds=None, time_name="
         monthly_mean_to_fill = monthly_mean_to_fill[:, ocean_flat]  # apply ocean mask
         X = np.where(np.isnan(X), monthly_mean_to_fill, X)
 
-    valid_cols = ~np.all(np.isnan(X), axis=0)       # remove column if all nan
+    valid_cols = ~np.all(np.isnan(X), axis=0)  # remove column if all nan
     X_valid = X[:, valid_cols]
     ocean_valid_flat = ocean_indices[valid_cols]  # indices in full flattened grid
 
@@ -323,7 +325,7 @@ def get_eof_from_ppca_py(dataset, mask, modes, monthly_mean_ds=None, time_name="
     weight_flat = weight_map.flatten()[ocean_flat][valid_cols]
     X_valid = X_valid * weight_flat[None, :]
 
-    model = PPCA(n_components=modes)        # use PPCA_py package to compute
+    model = PPCA(n_components=modes)  # use PPCA_py package to compute
     model.fit(X_valid)
 
     # reconstruct principal components
@@ -402,3 +404,12 @@ def make_movie(dataset, vmin, vmax, colorbar_label=None):
 
     animation = FuncAnimation(fig, update, frames=len(times), interval=300, blit=False)
     plt.show()
+
+
+def remove_empty_attributes(dataset):
+    for variable in dataset.variables:
+        attributes = dataset[variable].attrs
+        for key, value in list(attributes.items()):
+            if value is None:
+                attributes[key] = ""
+    return dataset
