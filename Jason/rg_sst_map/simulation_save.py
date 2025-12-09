@@ -2,8 +2,9 @@
 Simulation adapted from code made by Chris and Chengyun
 Adapted an Implicit scheme and various other schemes
 """
-
 #%%
+# ---- Importing Libraries -----------------------
+
 import gsw
 import netCDF4 as nc
 import xarray as xr
@@ -19,6 +20,9 @@ from cartopy.mpl.ticker import (LongitudeFormatter, LatitudeFormatter,
                                 LatitudeLocator)
 matplotlib.use('TkAgg')
 
+
+# ----------- File Paths for Simulation ------------------------------
+
 #HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "../datasets/heat_flux_interpolated_all_contributions.nc"
 #HEAT_FLUX_DATA_PATH = "../datasets/heat_flux_interpolated.nc"
 MLD_TEMP_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature(T_m).nc"
@@ -27,27 +31,36 @@ MLD_DEPTH_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure-Seasona
 HEAT_FLUX_DATA_PATH = r"C:\Users\jason\MSciProject\ERA5-ARGO_Mean_Surface_Heat_Flux.nc"
 EK_DATA_PATH = r"C:\Users\jason\MSciProject\Ekman_Current_Anomaly.nc"
 CHRIS_SCHEME_DATA_PATH = r"C:\Users\jason\MSciProject\model_anomaly_exponential_damping_implicit.nc"
+ENT_DATA_PATH = r"C:\Users\jason\MSciProject\Entrainment_Heat_Flux_Anomaly-(2004-2018).nc"
+FLUX_COMPONENT_PATH = r"C:\Users\jason\MSciProject\flux_components.nc"
+# explicit_daily_path = r"C:\Users\jason\MSciProject\sim_explicit_Scheme_Test_ConstDamp(10)_daily_2004.nc"
+# implicit_daily_path = r"C:\Users\jason\MSciProject\sim_implicit_Scheme_Test_ConstDamp(10)_daily_2004.nc"
+# semi_implicit_daily_path = r"C:\Users\jason\MSciProject\sim_semi_implicit_Scheme_Test_ConstDamp(10)_daily_2004.nc"
+# crank_daily_path = r"C:\Users\jason\MSciProject\sim_crank_Scheme_Test_ConstDamp(10)_daily_2004.nc"
 
 
-explicit_daily_path = r"C:\Users\jason\MSciProject\sim_explicit_Scheme_Test_ConstDamp(10)_daily_2004.nc"
-implicit_daily_path = r"C:\Users\jason\MSciProject\sim_implicit_Scheme_Test_ConstDamp(10)_daily_2004.nc"
-semi_implicit_daily_path = r"C:\Users\jason\MSciProject\sim_semi_implicit_Scheme_Test_ConstDamp(10)_daily_2004.nc"
-crank_daily_path = r"C:\Users\jason\MSciProject\sim_crank_Scheme_Test_ConstDamp(10)_daily_2004.nc"
-
-
-# --- Load and Prepare Data (assuming helper functions are correct) --------
+# --- Load and Prepare Data --------
 mld_temperature_ds = xr.open_dataset(MLD_TEMP_PATH, decode_times=False)
 mld_depth_ds = load_pressure_data(MLD_DEPTH_PATH, 'MONTHLY_MEAN_MLD_PRESSURE')
 heat_flux_ds = load_and_prepare_dataset(HEAT_FLUX_DATA_PATH)
 ekman_ds = load_and_prepare_dataset(EK_DATA_PATH)
 chris_ds = load_and_prepare_dataset(CHRIS_SCHEME_DATA_PATH)
+entrainment_ds = load_and_prepare_dataset(ENT_DATA_PATH)
+flux_component_ds = load_and_prepare_dataset(FLUX_COMPONENT_PATH)
 
+print(flux_component_ds)
+#%%
+# ---- Calculating Temperature and Heat Flux Anomalies --------------------------
+
+# Calculating Temperature Anomaly
 temperature = mld_temperature_ds['__xarray_dataarray_variable__']
 temperature_monthly_mean = get_monthly_mean(temperature)
 temperature_anomaly = get_anomaly(temperature, temperature_monthly_mean)
 
+# Renamed MLD depth TIME coordinate for consistency amongst datasets
 mld_depth_ds = mld_depth_ds.rename({'MONTH': 'TIME'})
 
+# Calculating Heat Flux Anomaly 
 heat_flux = (heat_flux_ds['avg_slhtf'] + heat_flux_ds['avg_ishf'] +
              heat_flux_ds['avg_snswrf'] + heat_flux_ds['avg_snlwrf'])
 heat_flux.attrs.update(units='W m**-2', long_name='Net Surface Heat Flux')
@@ -56,28 +69,22 @@ heat_flux_monthly_mean = get_monthly_mean(heat_flux)
 heat_flux_anomaly = get_anomaly(heat_flux, heat_flux_monthly_mean)
 heat_flux_anomaly = heat_flux_anomaly.drop_vars(['MONTH'])
 
+
+# Calculating Ekman Anomaly (Already done in file) 
 ekman_anomaly = ekman_ds['Q_Ek_anom']
 
+# Calculating Entrainment Anomaly (Already done in file) 
+entrainment_anomaly = entrainment_ds["ENTRAINMENT_ANOMALY"]
+
+# Calculating Chris Scheme Anomaly (Already done in file)
 chris_ds = chris_ds['ARGO_TEMPERATURE_ANOMALY']
 
 
 
-explicit_daily = load_and_prepare_dataset(explicit_daily_path)
-implicit_daily = load_and_prepare_dataset(implicit_daily_path)
-semi_implicit_daily = load_and_prepare_dataset(semi_implicit_daily_path)
-crank_daily = load_and_prepare_dataset(crank_daily_path)
-
-
-explicit_daily = explicit_daily["T_model_anom_explicit"]
-implicit_daily = implicit_daily["T_model_anom_implicit"]
-semi_implicit_daily = semi_implicit_daily["T_model_anom_semi_implcit"]
-crank_daily = crank_daily["T_model_anom_crank_nicolson"]
-
-#%%
 # --- Model Constants ------------------------------------------------------
 RHO_O = 1025.0  # kg/m^3
 C_O = 4100.0  # J/(kg K)
-SECONDS_MONTH = 30.4375 * 24 * 60 * 60  # s
+SECONDS_MONTH = 30 * 24 * 60 * 60  # s
 GAMMA = 10.0  # bulk damping factor
 
 # Get time coordinates
@@ -130,6 +137,7 @@ def compute_implicit(start_time=1) -> xr.DataArray:
         forcing_term = (
             heat_flux_anomaly.sel(TIME=moy_n_plus_1, method='nearest', tolerance=0.51) +
             ekman_anomaly.sel(TIME=moy_n_plus_1, method='nearest', tolerance=0.51)
+            #+ entrainment_anomaly.sel(TIME=moy_n_plus_1, method="nearest", tolerance=0.51)
         ) / denominator
 
         # T^{n+1} = (T^n + dt*b^{n+1}) / (1 + dt*a^{n+1})
@@ -174,6 +182,7 @@ def compute_explicit(start_time=1) -> xr.DataArray:
         forcing_term = (
             heat_flux_anomaly.sel(TIME=prev_time, method='nearest', tolerance=0.51) +
             ekman_anomaly.sel(TIME=prev_time, method='nearest', tolerance=0.51)
+            #+ entrainment_anomaly.sel(TIME=prev_time, method='nearest', tolerance=0.51)
         ) / denominator
 
         # T^{n+1} = (1 - dt*a^n)T^n + dt*b^n
@@ -221,6 +230,7 @@ def compute_semi_implicit(start_time=1) -> xr.DataArray:
         forcing_term = (
             heat_flux_anomaly.sel(TIME=moy_n, method='nearest', tolerance=0.51) +
             ekman_anomaly.sel(TIME=moy_n, method='nearest', tolerance=0.51)
+            #+ entrainment_anomaly.sel(TIME=moy_n, method='nearest', tolerance=0.51)
         ) / denominator_n
 
         # T^{n+1} = (T^n + dt*b^{n+1}) / (1 + dt*a^{n+1})
@@ -272,11 +282,13 @@ def compute_crank(start_time=1) -> xr.DataArray:
         forcing_term_n = (
             heat_flux_anomaly.sel(TIME=moy_n, method='nearest', tolerance=0.51) +
             ekman_anomaly.sel(TIME=moy_n, method='nearest', tolerance=0.51)
+            #+ entrainment_anomaly.sel(TIME=moy_n, method='nearest', tolerance=0.51)
         )/ denominator_n
 
         forcing_term_nplus1 = (
         (heat_flux_anomaly.sel(TIME=moy_n_plus_1, method='nearest', tolerance=0.51) +
             ekman_anomaly.sel(TIME=moy_n_plus_1, method='nearest', tolerance=0.51))
+            #+ entrainment_anomaly.sel(TIME=moy_n_plus_1, method='nearest', tolerance=0.51)
         ) / denominator_n_plus_1
 
         # T^{n+1} = (T^n + dt*b^{n+1}) / (1 + dt*a^{n+1})
@@ -297,6 +309,10 @@ sim_explicit = compute_explicit(start_time=0)
 sim_semi_implicit = compute_semi_implicit(start_time=0)
 sim_crank = compute_crank(start_time=0)
 
+sim_implicit.to_netcdf(r"C:\Users\jason\MSciProject\sim_implicit_scheme_no_entrainment(10).nc")
+sim_explicit.to_netcdf(r"C:\Users\jason\MSciProject\sim_explicit_scheme_no_entrainment(10).nc")
+sim_semi_implicit.to_netcdf(r"C:\Users\jason\MSciProject\sim_implicit_scheme_no_entrainment(10).nc")
+sim_implicit.to_netcdf(r"C:\Users\jason\MSciProject\sim_implicit_scheme_no_entrainment(10).nc")
 # --- Side-by-side animation -------------------------------------------------
 print("Starting animation...")
 # Use the time grid from one of the simulations
@@ -509,15 +525,7 @@ animation = FuncAnimation(fig, update, frames=len(anim_times), interval=600, bli
 animation_chris = FuncAnimation(fig_chris, update_chris, frames=len(anim_times_chris), interval=600, blit=False)
 
 # plt.tight_layout()
-#plt.show()
-
-# print("Test\n", chris_ds.values)
-# print(sim_explicit)
-sim_semi_implicit.to_netcdf(path="Semi_Implicit_Scheme_Test_ConstDamp(10)")
-sim_implicit.to_netcdf(path="Implicit_Scheme_Test_ConstDamp(10)")
-sim_explicit.to_netcdf(path="Explicit_Scheme_Test_ConstDamp(10)")
-sim_crank.to_netcdf(path="Crack_Scheme_Test_ConstDamp(10)")
-
+plt.show()
 
 
 # %%
