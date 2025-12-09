@@ -9,10 +9,10 @@ import matplotlib
 
 matplotlib.use('TkAgg')
 
-INCLUDE_SURFACE = True;
-INCLUDE_EKMAN = True;
-INCLUDE_ENTRAINMENT = True;
-CLEAN_CHRIS_PREV_CUR = True;        # only really useful when entrainment is turned on
+INCLUDE_SURFACE = True
+INCLUDE_EKMAN = True
+INCLUDE_ENTRAINMENT = True
+CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turned on
 
 HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "../datasets/heat_flux_interpolated_all_contributions.nc"
 HEAT_FLUX_DATA_PATH = "../datasets/heat_flux_interpolated.nc"
@@ -21,7 +21,8 @@ TEMP_DATA_PATH = "../datasets/RG_ArgoClim_Temperature_2019.nc"
 MLD_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
 ENTRAINMENT_VEL_DATA_PATH = "../datasets/Entrainment_Velocity-(2004-2018).nc"
 ENTRAINMENT_VEL_DENOISED_DATA_PATH = "../datasets/entrainment_vel_denoised.nc"
-H_BAR_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
+#H_BAR_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
+H_BAR_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
 T_SUB_DATA_PATH = "../datasets/t_sub.nc"
 T_SUB_DENOISED_DATA_PATH = "../datasets/t_sub_denoised.nc"
 rho_0 = 1025.0
@@ -39,6 +40,7 @@ surface_flux_da = heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY']
 
 ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
 ekman_anomaly_da = ekman_anomaly_ds['Q_Ek_anom']
+ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
 
 hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
 hbar_da = hbar_ds["MONTHLY_MEAN_MLD_PRESSURE"]
@@ -56,6 +58,8 @@ def month_to_second(month):
 
 
 delta_t = month_to_second(1)
+
+# initialise lists for temperature anomalies for each model
 chris_prev_cur_model_anomalies = []
 chris_mean_k_model_anomalies = []
 chris_prev_k_model_anomalies = []
@@ -63,6 +67,16 @@ chris_capped_exponent_model_anomalies = []
 explicit_model_anomalies = []
 implicit_model_anomalies = []
 semi_implicit_model_anomalies = []
+
+# initialise lists for entrainment fluxes for each model; for categorising each component
+entrainment_fluxes_prev_cur = []
+entrainment_fluxes_mean_k = []
+entrainment_fluxes_prev_k = []
+entrainment_fluxes_capped_exponent = []
+entrainment_fluxes_explicit = []
+entrainment_fluxes_implicit = []
+entrainment_fluxes_semi_implicit = []
+
 added_baseline = False
 for month in heat_flux_anomaly_ds.TIME.values:
     # find the previous and current month from 1 to 12 to access the monthly-averaged data (hbar, entrainment vel.)
@@ -96,8 +110,6 @@ for month in heat_flux_anomaly_ds.TIME.values:
         prev_explicit_k_tm_anom = explicit_model_anomalies[-1].isel(TIME=-1)
         prev_implicit_k_tm_anom = implicit_model_anomalies[-1].isel(TIME=-1)
         prev_semi_implicit_k_tm_anom = semi_implicit_model_anomalies[-1].isel(TIME=-1)
-
-        #prev_tm_anom = xr.where(np.isfinite(prev_tm_anom), prev_tm_anom,0)  # reset NaN to 0; I'd rather this reset to the 'last useful value', but can't figure out how to do that now
 
         # get previous data
         prev_tsub_anom = t_sub_da.sel(TIME=prev_month)
@@ -197,6 +209,30 @@ for month in heat_flux_anomaly_ds.TIME.values:
         cur_semi_implicit_k_tm_anom = cur_semi_implicit_k_tm_anom.expand_dims(TIME=[month])
         semi_implicit_model_anomalies.append(cur_semi_implicit_k_tm_anom)
 
+        # get entrainment flux components; for categorising each component
+        if INCLUDE_ENTRAINMENT:
+            entrainment_flux_prev_cur = rho_0 * c_0 * cur_entrainment_vel * (cur_tsub_anom - cur_chris_prev_cur_tm_anom)
+            entrainment_fluxes_prev_cur.append(entrainment_flux_prev_cur)
+
+            entrainment_flux_mean_k = rho_0 * c_0 * cur_entrainment_vel * (cur_tsub_anom - cur_chris_mean_k_tm_anom)
+            entrainment_fluxes_mean_k.append(entrainment_flux_mean_k)
+
+            entrainment_flux_prev_k = rho_0 * c_0 * cur_entrainment_vel * (cur_tsub_anom - cur_chris_prev_k_tm_anom)
+            entrainment_fluxes_prev_k.append(entrainment_flux_prev_k)
+
+            entrainment_flux_capped_exponent = rho_0 * c_0 * cur_entrainment_vel * (cur_tsub_anom - cur_chris_capped_exponent_k_tm_anom)
+            entrainment_fluxes_capped_exponent.append(entrainment_flux_capped_exponent)
+
+            entrainment_flux_explicit = rho_0 * c_0 * cur_entrainment_vel * (cur_tsub_anom - cur_explicit_k_tm_anom)
+            entrainment_fluxes_explicit.append(entrainment_flux_explicit)
+
+            entrainment_flux_implicit = rho_0 * c_0 * cur_entrainment_vel * (cur_tsub_anom - cur_implicit_k_tm_anom)
+            entrainment_fluxes_implicit.append(entrainment_flux_implicit)
+
+            entrainment_flux_semi_implicit = rho_0 * c_0 * cur_entrainment_vel * (cur_tsub_anom - cur_semi_implicit_k_tm_anom)
+            entrainment_fluxes_semi_implicit.append(entrainment_flux_semi_implicit)
+
+
 # concatenate anomalies into a ds
 chris_prev_cur_model_anomaly_ds = xr.concat(chris_prev_cur_model_anomalies, 'TIME')
 chris_mean_k_model_anomaly_ds = xr.concat(chris_mean_k_model_anomalies, 'TIME')
@@ -228,10 +264,70 @@ if CLEAN_CHRIS_PREV_CUR:
     all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"] = eof_ds.rename("CHRIS_PREV_CUR_CLEAN")
 
 # save
-all_anomalies_ds.to_netcdf("../datasets/all_anomalies.nc")
+# all_anomalies_ds.to_netcdf("../datasets/all_anomalies_10.nc")
 
-# make_movie(all_anomalies_ds["IMPLICIT"], -4, 4)
-# make_movie(all_anomalies_ds["CHRIS_PREV_CUR"], -4, 4)
-# make_movie(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"], -4, 4)
+# format entrainment flux datasets
+if INCLUDE_ENTRAINMENT:
+    entrainment_flux_prev_cur_ds = xr.concat(entrainment_fluxes_prev_cur, 'TIME')
+    entrainment_flux_prev_cur_ds = entrainment_flux_prev_cur_ds.drop_vars(["MONTH", "PRESSURE"])
+    entrainment_flux_prev_cur_ds = entrainment_flux_prev_cur_ds.transpose("TIME", "LATITUDE", "LONGITUDE")
+    entrainment_flux_prev_cur_ds = entrainment_flux_prev_cur_ds.rename("ENTRAINMENT_FLUX_PREV_CUR_ANOMALY")
+
+    entrainment_flux_mean_k_ds = xr.concat(entrainment_fluxes_mean_k, 'TIME')
+    entrainment_flux_mean_k_ds = entrainment_flux_mean_k_ds.drop_vars(["MONTH", "PRESSURE"])
+    entrainment_flux_mean_k_ds = entrainment_flux_mean_k_ds.transpose("TIME", "LATITUDE", "LONGITUDE")
+    entrainment_flux_mean_k_ds = entrainment_flux_mean_k_ds.rename("ENTRAINMENT_FLUX_MEAN_K_ANOMALY")
+
+    entrainment_flux_prev_k_ds = xr.concat(entrainment_fluxes_prev_k, 'TIME')
+    entrainment_flux_prev_k_ds = entrainment_flux_prev_k_ds.drop_vars(["MONTH", "PRESSURE"])
+    entrainment_flux_prev_k_ds = entrainment_flux_prev_k_ds.transpose("TIME", "LATITUDE", "LONGITUDE")
+    entrainment_flux_prev_k_ds = entrainment_flux_prev_k_ds.rename("ENTRAINMENT_FLUX_PREV_K_ANOMALY")
+
+    entrainment_flux_capped_exponent_ds = xr.concat(entrainment_fluxes_capped_exponent, 'TIME')
+    entrainment_flux_capped_exponent_ds = entrainment_flux_capped_exponent_ds.drop_vars(["MONTH", "PRESSURE"])
+    entrainment_flux_capped_exponent_ds = entrainment_flux_capped_exponent_ds.transpose("TIME", "LATITUDE", "LONGITUDE")
+    entrainment_flux_capped_exponent_ds = entrainment_flux_capped_exponent_ds.rename("ENTRAINMENT_FLUX_CAPPED_EXPONENT_ANOMALY")
+
+    entrainment_flux_explicit_ds = xr.concat(entrainment_fluxes_explicit, 'TIME')
+    entrainment_flux_explicit_ds = entrainment_flux_explicit_ds.drop_vars(["MONTH", "PRESSURE"])
+    entrainment_flux_explicit_ds = entrainment_flux_explicit_ds.transpose("TIME", "LATITUDE", "LONGITUDE")
+    entrainment_flux_explicit_ds = entrainment_flux_explicit_ds.rename("ENTRAINMENT_FLUX_EXPLICIT_ANOMALY")
+
+    entrainment_flux_implicit_ds = xr.concat(entrainment_fluxes_implicit, 'TIME')
+    entrainment_flux_implicit_ds = entrainment_flux_implicit_ds.drop_vars(["MONTH", "PRESSURE"])
+    entrainment_flux_implicit_ds = entrainment_flux_implicit_ds.transpose("TIME", "LATITUDE", "LONGITUDE")
+    entrainment_flux_implicit_ds = entrainment_flux_implicit_ds.rename("ENTRAINMENT_FLUX_IMPLICIT_ANOMALY")
+
+    entrainment_flux_semi_implicit_ds = xr.concat(entrainment_fluxes_semi_implicit, 'TIME')
+    entrainment_flux_semi_implicit_ds = entrainment_flux_semi_implicit_ds.drop_vars(["MONTH", "PRESSURE"])
+    entrainment_flux_semi_implicit_ds = entrainment_flux_semi_implicit_ds.transpose("TIME", "LATITUDE", "LONGITUDE")
+    entrainment_flux_semi_implicit_ds = entrainment_flux_semi_implicit_ds.rename("ENTRAINMENT_FLUX_SEMI_IMPLICIT_ANOMALY")
+
+
+# merge the relevant fluxes into a single dataset
+flux_components_to_merge = []
+if INCLUDE_SURFACE:
+    surface_flux_da = surface_flux_da.rename("SURFACE_FLUX_ANOMALY")
+    flux_components_to_merge.append(surface_flux_da)
+if INCLUDE_EKMAN:
+    ekman_anomaly_da = ekman_anomaly_da.rename("EKMAN_FLUX_ANOMALY")
+    flux_components_to_merge.append(ekman_anomaly_da)
+if INCLUDE_ENTRAINMENT:
+    flux_components_to_merge.append(entrainment_flux_prev_cur_ds)
+    flux_components_to_merge.append(entrainment_flux_mean_k_ds)
+    flux_components_to_merge.append(entrainment_flux_prev_k_ds)
+    flux_components_to_merge.append(entrainment_flux_capped_exponent_ds)
+    flux_components_to_merge.append(entrainment_flux_explicit_ds)
+    flux_components_to_merge.append(entrainment_flux_implicit_ds)
+    flux_components_to_merge.append(entrainment_flux_semi_implicit_ds)
+
+flux_components_ds = xr.merge(flux_components_to_merge)
+flux_components_ds.to_netcdf("../datasets/flux_components.nc")
+
+# make_movie(all_anomalies_ds["EXPLICIT"], -5, 5)
+# make_movie(all_anomalies_ds["IMPLICIT"], -5, 5)
+# make_movie(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"], -5, 5)
+# make_movie(all_anomalies_ds["CHRIS_MEAN_K"], -5, 5)
+
 
 
