@@ -7,6 +7,10 @@ from matplotlib.animation import FuncAnimation
 import matplotlib
 import numpy as np
 from scipy.linalg import svd
+import wpca
+from wpca import EMPCA
+import wpca
+from ppca import PPCA
 
 matplotlib.use('TkAgg')
 
@@ -179,9 +183,10 @@ def get_anomaly(raw_ds, variable_name, monthly_mean):
     return raw_ds
 
 
-def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, time_name="TIME", lat_name="LATITUDE", long_name="LONGITUDE", max_iterations=50, tolerance=1e-4):
+def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, time_name="TIME", lat_name="LATITUDE", long_name="LONGITUDE", max_iterations=50, tolerance=1e-6, start_mode=0):
     # if some values in the dataset are NaN (if they are absurd e.g. infinite, set to NaN beforehand), then estimate
-    # the true value of the NaN with the column mean then perform EOF
+    # the true value of the NaN with the column mean (==mean at each point over all time) then perform EOF
+    # based off various EMPCA packages, none of which really worked too well, hence the need for a homegrown solution
     time_size = dataset.sizes[time_name]
     lat_size = dataset.sizes[lat_name]
     long_size = dataset.sizes[long_name]
@@ -209,71 +214,167 @@ def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, t
         month_in_year = np.mod(np.floor(time_vals + 0.5).astype(int), 12)
         month_in_year[month_in_year == 0] = 12
         month_da = xr.DataArray(month_in_year, coords={time_name: dataset[time_name]}, dims=(time_name,))
+        monthly_mean_to_fill = monthly_mean_ds.sel({"MONTH": month_da})
 
-        monthly_mean_to_fill = monthly_mean_ds.sel({"MONTH": month_da})   # get monthly mean
+        column_mean = dataset.mean(time_name, skipna=True)
+        monthly_mean_to_fill = monthly_mean_to_fill.fillna(column_mean)
 
-        monthly_mean_to_fill_np = monthly_mean_to_fill.to_numpy()  # apply ocean and valid column mask
-        monthly_mean_to_fill_np = monthly_mean_to_fill_np[:, ocean]
-        monthly_mean_to_fill_np = monthly_mean_to_fill_np[:, valid_cols]
+        # convert to numpy to fill in the nans with guesses
+        monthly_mean_to_fill_np = monthly_mean_to_fill.to_numpy()
+        monthly_mean_to_fill_np_mask = monthly_mean_to_fill_np[:, ocean]  # apply ocean mask
+        monthly_mean_to_fill_np_mask = monthly_mean_to_fill_np_mask[:, valid_cols]
 
         X_with_guesses = X0.copy()
-        X_with_guesses[mask_nan] = monthly_mean_to_fill_np[mask_nan]     # replace NaN with monthly mean
+        X_with_guesses[mask_nan] = monthly_mean_to_fill_np_mask[mask_nan]  # fill missing values
     else:
-        # fallback: global column mean (your original method)
+        # without monthly means, just use the mean over the entire dataset (per-column mean)
         column_mean = np.nanmean(X0, axis=0)
         column_mean = np.where(np.isfinite(column_mean), column_mean, 0.0)
         X_with_guesses = np.where(mask_nan, column_mean[None, :], X0)
-    prev = X_with_guesses.copy()
 
-    for iteration in range(max_iterations):     # iterate to improve guess
+    # EM iterations to reconstruct incomplete values following https://ahippert.github.io/pdfs/igarss_2020.pdf
+    for iteration in range(max_iterations):
         print(iteration)
-        X_mean = np.mean(X_with_guesses, axis=0)
-        X_centered = X_with_guesses - X_mean        # remove mean (add it again later) so we focus on anomaly
-        X_weighted = X_centered * weight_map        # apply weight
+        X_mean = np.nanmean(X_with_guesses, axis=0)     # get mean over time axis
+        X_centered = X_with_guesses - X_mean[None, :]
+        X_weighted = X_centered * weight_map[None, :]       # latitude weight
 
-        U, s, Vt = np.linalg.svd(X_weighted, full_matrices=False)       # perform singular value decomposition
-        U_modes = U[:, :modes]      # reduce to number of desired modes
-        s_modes = s[:modes]
-        Vt_modes = Vt[:modes, :]
+        # use SVD to estimate what the missing NaNs should be.
+        U, s, Vt = np.linalg.svd(X_weighted, full_matrices=False)   # singular-value decomposition
+        #X_weighted_reconstructed = (U * s) @ Vt
+        #X_reconstructed = X_weighted_reconstructed / weight_map[None, :] + X_mean[None, :]  # remove weight, readd mean
 
-        X_weighted_reconstructed = (U_modes * s_modes) @ Vt_modes   # reconstruct NaN data
-        X_reconstructed = X_weighted_reconstructed / weight_map + X_mean    # de-weight and re-add mean
+        k_opt = modes       # TODO: choose the actual optimum; this is just a placeholder for now; see paper
+        # initial observation suggests this doesn't actually do much... but decent practice I suppose.
+        U_k = U[:, :k_opt]
+        s_k = s[:k_opt]
+        Vt_k = Vt[:k_opt, :]
+        X_weighted_reconstructed_truncated = (U_k * s_k) @ Vt_k
+        X_reconstructed_truncated = X_weighted_reconstructed_truncated / weight_map[None, :] + X_mean[None, :]
+
         X_new = X_with_guesses.copy()
-        X_new[mask_nan] = X_reconstructed[mask_nan]
-        if np.any(mask_nan):    # if converging, then stop iterating
-            error = np.nanmean((X_new[mask_nan] - prev[mask_nan]) ** 2)
+        X_new[mask_nan] = X_reconstructed_truncated[mask_nan]
+        if np.any(mask_nan):
+            error = np.nanmean((X_new[mask_nan] - X_with_guesses[mask_nan]) ** 2)
         else:
             error = 0.0
         print(error)
-        if error < tolerance:
-            break
-        prev = X_with_guesses
         X_with_guesses = X_new
+        if error < tolerance:   # if converge, stop iterating
+            break
+
+    X_mean = np.nanmean(X_with_guesses, axis=0)
+    X_mean = np.where(np.isfinite(X_mean), X_mean, 0.0)
+    X_centered = X_with_guesses - X_mean[None, :]
+    X_weighted = X_centered * weight_map[None, :]
+
+    U, s, Vt = np.linalg.svd(X_weighted, full_matrices=False)   # SVD again, to take only desired EOF modes
+
+    U_modes = U[:, start_mode:modes]      # remove unwanted mods
+    s_modes = s[start_mode:modes]
+    Vt_modes = Vt[start_mode:modes, :]
+    X_weighted_reconstructed = (U_modes * s_modes) @ Vt_modes
+    X_reconstructed = X_weighted_reconstructed / weight_map[None, :] + X_mean[None, :]
+    PCs = U[:, start_mode:modes] * s[start_mode:modes]
+
     reconstructed_ds = np.full((time_size, lat_size, long_size), np.nan)
-    reconstructed_ds[:, ocean_valid] = X_with_guesses   # reconstruct full dataset
+    reconstructed_ds[:, ocean_valid] = X_reconstructed
     smoothed_ds = xr.DataArray(reconstructed_ds, dims=dataset.dims, coords=dataset.coords)
+
     explained_variance = (s ** 2) / (s ** 2).sum()
-    return smoothed_ds, explained_variance
+    return smoothed_ds, explained_variance, PCs
 
 
-def get_eof(dataset, mask=None, modes=3, clean_nan=False):
+def get_eof_from_ppca_py(dataset, mask, modes, monthly_mean_ds=None, time_name="TIME", lat_name="LATITUDE", long_name="LONGITUDE", max_iterations=50, tolerance=1e-6):
+    # use a python package rather than a home-grown solution; https://github.com/brdav/ppca-cpp
+    # M. Tipping & C. Bishop. Probabilistic Principal Component Analysis. JRSS B, 1999.
+    # seems not to work so well. prefer homegrown solution. long processing time and results seem weird.
+
+    # same initial processing as homegrown way (except 'flatten' to deal with ocean masking)
+    time_size = dataset.sizes[time_name]
+    lat_size = dataset.sizes[lat_name]
+    long_size = dataset.sizes[long_name]
+
+    ocean = mask.to_numpy().astype(bool)        # ocean mask
+    X_full = dataset.to_numpy()
+    X_flat = X_full.reshape(time_size, -1)
+    ocean_flat = ocean.flatten()
+    ocean_indices = np.where(ocean_flat)[0]
+    X = X_flat[:, ocean_flat]                   # apply ocean mask
+
+    if monthly_mean_ds is not None:
+        time_vals = dataset[time_name].values
+        month_in_year = np.mod(np.floor(time_vals + 0.5).astype(int), 12)
+        month_in_year[month_in_year == 0] = 12
+        month_da = xr.DataArray(month_in_year, coords={time_name: dataset[time_name]}, dims=(time_name,))
+        monthly_mean_to_fill = monthly_mean_ds.sel({"MONTH": month_da}).to_numpy()
+        monthly_mean_to_fill = monthly_mean_to_fill.reshape(time_size, -1)
+        monthly_mean_to_fill = monthly_mean_to_fill[:, ocean_flat]  # apply ocean mask
+        X = np.where(np.isnan(X), monthly_mean_to_fill, X)
+
+    valid_cols = ~np.all(np.isnan(X), axis=0)       # remove column if all nan
+    X_valid = X[:, valid_cols]
+    ocean_valid_flat = ocean_indices[valid_cols]  # indices in full flattened grid
+
+    # weighting by latitude
+    lat = dataset[lat_name].to_numpy()
+    lat_weighted = np.sqrt(np.cos(np.deg2rad(lat)))  # 1D over lat
+    weight_map = np.repeat(lat_weighted[:, None], long_size, axis=1)
+    weight_flat = weight_map.flatten()[ocean_flat][valid_cols]
+    X_valid = X_valid * weight_flat[None, :]
+
+    model = PPCA(n_components=modes)        # use PPCA_py package to compute
+    model.fit(X_valid)
+
+    # reconstruct principal components
+    principal_components = (X_valid - model.mean_) @ model.components_.T
+    X_reconstructed = principal_components @ model.components_ + model.mean_
+    X_reconstructed = X_reconstructed / weight_flat[None, :]
+
+    reconstructed_ds = np.full((time_size, lat_size * long_size), np.nan)
+    reconstructed_ds[:, ocean_valid_flat] = X_reconstructed
+    reconstructed_ds = reconstructed_ds.reshape((time_size, lat_size, long_size))
+    reconstructed_ds = xr.DataArray(reconstructed_ds, dims=dataset.dims, coords=dataset.coords)
+
+    EOFs = model.components_
+    explained_variance = model.explained_variance_
+
+    return reconstructed_ds, EOFs, model, explained_variance
+
+
+def get_eof(dataset, modes, mask=None, clean_nan=False):
     if mask is not None:
         ocean = mask.to_numpy().astype(bool)
         dataset = dataset.where(ocean)
     if clean_nan:
-        dataset = dataset.dropna(dim="LATITUDE", how="all").dropna(dim="LONGITUDE", how="all")
-        dataset = dataset.fillna(dataset.mean(dim="TIME"))
+        dataset = dataset.dropna(dim="LATITUDE", how="any").dropna(dim="LONGITUDE", how="any")
+        #dataset = dataset.fillna(dataset.mean(dim="TIME"))
 
     model = xe.single.EOF(n_modes=modes)
     model.fit(dataset, dim="TIME")
     components = model.components()  # spatial EOFs
     scores = model.scores()  # PC time series
     explained_variance = model.explained_variance_ratio()
-    reconstructed = model.inverse_transform(scores)  # smoothed reconstruction using first 3 modes
-    return reconstructed, explained_variance
+
+    # bootstrapping for significant modes, from https://xeofs.readthedocs.io/en/latest/content/user_guide/auto_examples/4validation/plot_bootstrap.html#sphx-glr-content-user-guide-auto-examples-4validation-plot-bootstrap-py
+    # n_boot = 50
+    # bs = xe.validation.EOFBootstrapper(n_bootstraps=n_boot)
+    # bs.fit(model)
+    # bs_expvar = bs.explained_variance()
+    # ci_expvar = bs_expvar.quantile([0.025, 0.975], "n")  # 95% confidence intervals
+    # q025 = ci_expvar.sel(quantile=0.025)
+    # q975 = ci_expvar.sel(quantile=0.975)
+    # is_significant = q025 - q975.shift({"mode": -1}) > 0
+    # n_significant_modes = (
+    #     is_significant.where(is_significant is True).cumsum(skipna=False).max().fillna(0)
+    # )
+    # print("{:} modes are significant at alpha=0.05".format(n_significant_modes.values))
+
+    #reconstructed = model.inverse_transform(scores)
+    return components, explained_variance, scores
 
 
-def make_movie(dataset, vmin, vmax):
+def make_movie(dataset, vmin, vmax, colorbar_label=None):
     times = dataset.TIME.values
 
     fig, ax = plt.subplots()
@@ -283,7 +384,7 @@ def make_movie(dataset, vmin, vmax):
                                dataset.isel(TIME=0), cmap='RdBu_r')
     title = ax.set_title(f'Time = {times[0]}')
 
-    cbar = plt.colorbar(pcolormesh, ax=ax, label='Modelled anomaly from surface heat flux')
+    cbar = plt.colorbar(pcolormesh, ax=ax, label=colorbar_label)
     ax.set_xlabel('Longitude')
     ax.set_ylabel('Latitude')
 

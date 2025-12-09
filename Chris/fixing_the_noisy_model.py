@@ -18,11 +18,14 @@ map_mask = temperature_ds['BATHYMETRY_MASK'].sel(PRESSURE=2.5)
 
 # eof with predictive replacement of NaN; first change unphysical values to NaN
 noisy_ds["ARGO_TEMPERATURE_ANOMALY"] = noisy_ds["ARGO_TEMPERATURE_ANOMALY"].where((noisy_ds["ARGO_TEMPERATURE_ANOMALY"] > -10) & (noisy_ds["ARGO_TEMPERATURE_ANOMALY"] < 10))
-n_modes = 8
+n_modes = 20
 monthly_mean = get_monthly_mean(noisy_ds["ARGO_TEMPERATURE_ANOMALY"])
-eof_ds, variance = get_eof_with_nan_consideration(noisy_ds["ARGO_TEMPERATURE_ANOMALY"], map_mask, modes=n_modes, monthly_mean_ds=monthly_mean)
+eof_ds, variance = get_eof_with_nan_consideration(noisy_ds["ARGO_TEMPERATURE_ANOMALY"], map_mask, modes=n_modes, monthly_mean_ds=None)
 print("Variance explained:", variance[:n_modes].sum().item())
-make_movie(eof_ds, -10, 10)
+make_movie(eof_ds, -4, 4)
+noisy_ds["EMEOF_DENOISED_ANOMALY"] = eof_ds
+noisy_ds.to_netcdf("../datasets/cur_prev_denoised.nc")
+
 
 # simple eof
 # n_modes_simple = 5
