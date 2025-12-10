@@ -6,6 +6,7 @@ from chris_utils import make_movie, get_eof_with_nan_consideration
 from chris_utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
 import matplotlib
+import matplotlib.pyplot as plt
 
 matplotlib.use('TkAgg')
 
@@ -14,6 +15,7 @@ INCLUDE_EKMAN = True
 INCLUDE_ENTRAINMENT = True
 CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turned on
 
+observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature(T_m).nc"
 HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/heat_flux_interpolated_all_contributions.nc"
 # HEAT_FLUX_DATA_PATH = "../datasets/heat_flux_interpolated.nc"
 EKMAN_ANOMALY_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Ekman_Current_Anomaly.nc"
@@ -26,9 +28,10 @@ H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Mixed_L
 T_SUB_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/t_sub.nc"
 rho_0 = 1025.0
 c_0 = 4100.0
-gamma_0 = 10.0
+gamma_0 = 10
 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
+observed_temp_ds = xr.open_dataset(observed_path, decode_times=False)
 
 heat_flux_ds = xr.open_dataset(HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH, decode_times=False)
 heat_flux_ds['NET_HEAT_FLUX'] = heat_flux_ds['avg_slhtf'] + heat_flux_ds['avg_snlwrf'] + heat_flux_ds['avg_snswrf'] + \
@@ -321,11 +324,68 @@ if INCLUDE_ENTRAINMENT:
     flux_components_to_merge.append(entrainment_flux_semi_implicit_ds)
 
 flux_components_ds = xr.merge(flux_components_to_merge)
-# flux_components_ds.to_netcdf("../datasets/flux_components.nc")
 
-make_movie(all_anomalies_ds["EXPLICIT"], -5, 5)
-# make_movie(all_anomalies_ds["IMPLICIT"], -5, 5)
-# make_movie(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"], -5, 5)
-# make_movie(all_anomalies_ds["CHRIS_MEAN_K"], -5, 5)
+#------------------------------------------------------------------------------------------------------------
+#%%
+def calculate_RMSE (obs, model, dim = 'TIME'):
+    """
+    Calculates Root Mean Square Error.
+    Formula: sqrt( mean( (obs - model)^2 ) )
+    """
+    error = model - obs
+    squared_error = error ** 2
+    mean_squared_error = squared_error.mean(dim=dim)
+    rmse = np.sqrt(mean_squared_error)
+    return rmse
 
 
+observed_temperature_monthly_average = get_monthly_mean(observed_temp_ds['__xarray_dataarray_variable__'])
+observed_temperature_anomaly = get_anomaly(observed_temp_ds, '__xarray_dataarray_variable__', observed_temperature_monthly_average)
+observed_temperature_anomaly = observed_temperature_anomaly['__xarray_dataarray_variable___ANOMALY']
+
+schemes = {
+    "Explicit": all_anomalies_ds["EXPLICIT"],
+    "Implicit": all_anomalies_ds["IMPLICIT"],
+    "Semi-Implicit": all_anomalies_ds["SEMI_IMPLICIT"],
+    "Chris Mean K": all_anomalies_ds["CHRIS_MEAN_K"],
+    "CHRIS_PREV_K": all_anomalies_ds["CHRIS_PREV_K"],
+    "CHRIS_PREV_CUR_CLEAN": all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"],
+    "CHRIS_CAPPED_EXPONENT": all_anomalies_ds["CHRIS_CAPPED_EXPONENT"]
+}
+
+for key in schemes:
+    schemes[key] = schemes[key].isel(TIME=slice(1, None))
+
+
+fig, axes = plt.subplots(3, 3, figsize=(12,7))
+
+
+for ax, (scheme_name, model_da) in zip(axes.flat, schemes.items()):
+    # Calculate RMSE over the 'TIME' dimension
+
+    rmse_map = calculate_RMSE(observed_temperature_anomaly, model_da, dim='TIME')
+    
+    # Plotting
+    # ax = plt.subplot(3, 2, i + 1)
+    rmse_map.plot(ax=ax, cmap='nipy_spectral', cbar_kwargs={'label': 'RMSE (K)'}, vmin = 0, vmax = 3)
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Lattitude")
+    ax.set_title(f'{scheme_name} Scheme - Overall RMSE')
+    max_rmse = rmse_map.max().item()
+    print(scheme_name, max_rmse)
+plt.tight_layout()
+fig.delaxes(axes[2, 1]) # Removes the 8th subplot (row 2, column 1)
+fig.delaxes(axes[2, 2])
+fig.text(
+    0.99, 0.01,
+    f"Gamma = {gamma_0}\n"
+    f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
+    f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
+    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
+    ha='right', va='bottom', fontsize=18
+)
+plt.show()
+
+
+
+# %%
