@@ -246,7 +246,6 @@ def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, t
         #X_reconstructed = X_weighted_reconstructed / weight_map[None, :] + X_mean[None, :]  # remove weight, readd mean
 
         k_opt = modes  # TODO: choose the actual optimum; this is just a placeholder for now; see paper
-        # initial observation suggests this doesn't actually do much... but decent practice I suppose.
         U_k = U[:, :k_opt]
         s_k = s[:k_opt]
         Vt_k = Vt[:k_opt, :]
@@ -277,13 +276,25 @@ def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, t
     X_weighted_reconstructed = (U_modes * s_modes) @ Vt_modes
     X_reconstructed = X_weighted_reconstructed / weight_map[None, :] + X_mean[None, :]
     PCs = U[:, start_mode:modes] * s[start_mode:modes]
+    EOFs = np.full((modes - start_mode, lat_size, long_size), np.nan)
+
+    # reshape EOFs to have the right latitude/longitude coordinates
+    all_positions = np.arange(lat_size * long_size).reshape(lat_size, long_size)
+    valid_positions = all_positions[ocean].reshape(-1)[valid_cols]
+
+    for k in range(modes - start_mode):
+        eof_k = Vt_modes[k, :]
+        eof_reshape = np.full((lat_size * long_size), np.nan)
+        eof_reshape[valid_positions] = eof_k
+        EOFs[k] = eof_reshape.reshape(lat_size, long_size)
 
     reconstructed_ds = np.full((time_size, lat_size, long_size), np.nan)
     reconstructed_ds[:, ocean_valid] = X_reconstructed
     smoothed_ds = xr.DataArray(reconstructed_ds, dims=dataset.dims, coords=dataset.coords)
-
     explained_variance = (s ** 2) / (s ** 2).sum()
-    return smoothed_ds, explained_variance, PCs
+    EOFs_da = xr.DataArray(EOFs, dims=("MODE", lat_name, long_name), coords={"MODE": np.arange(start_mode, modes), lat_name: dataset.coords[lat_name], long_name: dataset.coords[long_name]})
+
+    return smoothed_ds, explained_variance, PCs, EOFs_da
 
 
 def get_eof_from_ppca_py(dataset, mask, modes, monthly_mean_ds=None, time_name="TIME", lat_name="LATITUDE",
@@ -376,7 +387,7 @@ def get_eof(dataset, modes, mask=None, clean_nan=False):
     return components, explained_variance, scores
 
 
-def make_movie(dataset, vmin, vmax, colorbar_label=None):
+def make_movie(dataset, vmin, vmax, colorbar_label=None, ENSO_ds=None):
     times = dataset.TIME.values
 
     fig, ax = plt.subplots()
@@ -399,7 +410,11 @@ def make_movie(dataset, vmin, vmax, colorbar_label=None):
         #pcolormesh.set_clim(vmin=float(model_anomaly_ds.isel(TIME=frame).min()), vmax=float(model_anomaly_ds.isel(TIME=frame).max()))
         pcolormesh.set_clim(vmin=vmin, vmax=vmax)
         cbar.update_normal(pcolormesh)
-        title.set_text(f'Year: {year}; Month: {month}')
+        if (ENSO_ds is not None):
+            enso_index = ENSO_ds.isel(time=frame).value.values.item()
+            title.set_text(f'Year: {year}; Month: {month}; ENSO index: {round(enso_index, 4)}')
+        else:
+            title.set_text(f'Year: {year}; Month: {month}')
         return [pcolormesh, title]
 
     animation = FuncAnimation(fig, update, frames=len(times), interval=300, blit=False)

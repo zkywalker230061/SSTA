@@ -259,35 +259,6 @@ for variable_name in model_names:
     all_anomalies_ds[variable_name] = get_anomaly(all_anomalies_ds, variable_name, monthly_mean)[variable_name + "_ANOMALY"]
     all_anomalies_ds = all_anomalies_ds.drop_vars(variable_name + "_ANOMALY")
 
-# chris_prev_cur_monthly_mean = get_monthly_mean(all_anomalies_ds["CHRIS_PREV_CUR"])
-# all_anomalies_ds["CHRIS_PREV_CUR"] = get_anomaly(all_anomalies_ds, "CHRIS_PREV_CUR", chris_prev_cur_monthly_mean)["CHRIS_PREV_CUR_ANOMALY"]
-# all_anomalies_ds = all_anomalies_ds.drop_vars("CHRIS_PREV_CUR_ANOMALY")
-#
-# chris_mean_k_monthly_mean = get_monthly_mean(all_anomalies_ds["CHRIS_MEAN_K"])
-# all_anomalies_ds["CHRIS_MEAN_K"] = get_anomaly(all_anomalies_ds, "CHRIS_MEAN_K", chris_mean_k_monthly_mean)["CHRIS_MEAN_K_ANOMALY"]
-# all_anomalies_ds = all_anomalies_ds.drop_vars("CHRIS_MEAN_K_ANOMALY")
-#
-# chris_prev_k_monthly_mean = get_monthly_mean(all_anomalies_ds["CHRIS_PREV_K"])
-# all_anomalies_ds["CHRIS_PREV_K"] = get_anomaly(all_anomalies_ds, "CHRIS_PREV_K", chris_prev_k_monthly_mean)["CHRIS_PREV_K_ANOMALY"]
-# all_anomalies_ds = all_anomalies_ds.drop_vars("CHRIS_PREV_K_ANOMALY")
-#
-# chris_capped_exponent_monthly_mean = get_monthly_mean(all_anomalies_ds["CHRIS_CAPPED_EXPONENT"])
-# all_anomalies_ds["CHRIS_CAPPED_EXPONENT"] = get_anomaly(all_anomalies_ds, "CHRIS_CAPPED_EXPONENT", chris_capped_exponent_monthly_mean)["CHRIS_CAPPED_EXPONENT_ANOMALY"]
-# all_anomalies_ds = all_anomalies_ds.drop_vars("CHRIS_CAPPED_EXPONENT_ANOMALY")
-#
-# explicit_monthly_mean = get_monthly_mean(all_anomalies_ds["EXPLICIT"])
-# all_anomalies_ds["EXPLICIT"] = get_anomaly(all_anomalies_ds, "EXPLICIT", explicit_monthly_mean)["EXPLICIT_ANOMALY"]
-# all_anomalies_ds = all_anomalies_ds.drop_vars("EXPLICIT_ANOMALY")
-#
-#
-# implicit_monthly_mean = get_monthly_mean(test_all_anomalies_ds["IMPLICIT"])
-# all_anomalies_ds["IMPLICIT_TEST"] = get_anomaly(test_all_anomalies_ds, "IMPLICIT", implicit_monthly_mean)["IMPLICIT_ANOMALY"]
-# all_anomalies_ds = all_anomalies_ds.drop_vars("IMPLICIT_ANOMALY")
-#
-# semi_implicit_monthly_mean = get_monthly_mean(all_anomalies_ds["SEMI_IMPLICIT"])
-# all_anomalies_ds["SEMI_IMPLICIT_TEST"] = get_anomaly(all_anomalies_ds, "SEMI_IMPLICIT", semi_implicit_monthly_mean)["SEMI_IMPLICIT_ANOMALY"]
-# all_anomalies_ds = all_anomalies_ds.drop_vars("SEMI_IMPLICIT_ANOMALY")
-
 # clean up prev_cur model
 if CLEAN_CHRIS_PREV_CUR:
     all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"] = all_anomalies_ds["CHRIS_PREV_CUR"].where((all_anomalies_ds["CHRIS_PREV_CUR"] > -10) & (all_anomalies_ds["CHRIS_PREV_CUR"] < 10))
@@ -304,7 +275,7 @@ if CLEAN_CHRIS_PREV_CUR:
 all_anomalies_ds = remove_empty_attributes(all_anomalies_ds) # when doing the seasonality removal, some units are None
 all_anomalies_ds.to_netcdf("../datasets/all_anomalies.nc")
 
-# format entrainment flux datasets and remove whatever seasonal cycle may remain
+# format entrainment flux datasets
 if INCLUDE_ENTRAINMENT:
     entrainment_flux_prev_cur_ds = xr.concat(entrainment_fluxes_prev_cur, 'TIME')
     entrainment_flux_prev_cur_ds = entrainment_flux_prev_cur_ds.drop_vars(["MONTH", "PRESSURE"])
