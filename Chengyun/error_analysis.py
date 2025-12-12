@@ -161,6 +161,7 @@ def simulation_error_analysis(
         month_num = month_num.values
         month_error = simulation_da.sel(TIME=month_num) - t_anomaly.sel(TIME=month_num)
         # error = np.mean(abs(month_error))
+        # error = np.sqrt((month_error**2).mean())
         error = np.mean(month_error)
         error_list.append(error)
         month_error_list.append(month_error)

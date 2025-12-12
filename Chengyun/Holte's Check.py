@@ -170,6 +170,14 @@ def main():
     holte_hbar_da_max = holte_hbar_da.max(dim=['MONTH'])
     holte_hbar_dt_max = holte_hbar_dt.max(dim=['MONTH'])
     argo_hbar_max = argo_hbar.max(dim=['MONTH'])
+    holte_hbar_da_min = holte_hbar_da.min(dim=['MONTH'])
+    holte_hbar_dt_min = holte_hbar_dt.min(dim=['MONTH'])
+    argo_hbar_min = argo_hbar.min(dim=['MONTH'])
+
+    # TODO, temp
+    holte_hbar_da_max = holte_hbar_da_min
+    holte_hbar_dt_max = holte_hbar_dt_min
+    argo_hbar_max = argo_hbar_min
 
     visualise_dataset(
         argo_hbar_max,
@@ -205,7 +213,6 @@ def main():
         vmin=0, vmax=500
     )
     plt.show()
-
 
 
 if __name__ == "__main__":
