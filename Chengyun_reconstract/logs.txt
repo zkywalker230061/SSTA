@@ -1,0 +1,12 @@
+datasets/Temperature_Anomaly-Seasonal_Cycle_Mean.nc
+1767465355.2180328
+datasets/Salinity_Anomaly-Seasonal_Cycle_Mean.nc
+1767465383.1054637
+datasets/Temperature-Seasonal_Cycle_Mean.nc
+1767465574.4845128
+datasets/Salinity-Seasonal_Cycle_Mean.nc
+1767465925.7651596
+datasets/Temperature-(2004-2018).nc
+1767465934.1875033
+datasets/Salinity-(2004-2018).nc
+1767465943.180803
