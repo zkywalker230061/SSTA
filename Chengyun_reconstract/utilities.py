@@ -169,12 +169,12 @@ def save_file(
         Path to save the netCDF file.
     """
 
-    with open("logs.txt", "r+", encoding="utf-8") as logs:
-        if filepath in logs.read():
+    with open("logs/datasets.txt", "r+", encoding="utf-8") as logs_datasets:
+        if filepath in logs_datasets.read():
             pass
         else:
-            logs.write(filepath + "\n")
-            logs.write(str(time.time()) + "\n")
+            logs_datasets.write(filepath + "\n")
+            logs_datasets.write(str(time.time()) + "\n")
             data.to_netcdf(filepath)
 
 
