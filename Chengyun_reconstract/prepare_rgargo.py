@@ -77,8 +77,8 @@ def save_monthly_mean_temperature():
 
     t = load_and_prepare_dataset(
         "datasets/Temperature-(2004-2018).nc",
-    )
-    t_monthly_mean = get_monthly_mean(t['TEMPERATURE'])
+    )['TEMPERATURE']
+    t_monthly_mean = get_monthly_mean(t)
     save_file(
         t_monthly_mean,
         "datasets/Temperature-Seasonal_Cycle_Mean.nc"
@@ -94,8 +94,8 @@ def save_monthly_mean_salinity():
 
     s = load_and_prepare_dataset(
         "datasets/Salinity-(2004-2018).nc",
-    )
-    s_monthly_mean = get_monthly_mean(s['SALINITY'])
+    )['SALINITY']
+    s_monthly_mean = get_monthly_mean(s)
     save_file(
         s_monthly_mean,
         "datasets/Salinity-Seasonal_Cycle_Mean.nc"
@@ -111,13 +111,13 @@ def save_temperature_anomalies():
 
     t = load_and_prepare_dataset(
         "datasets/Temperature-(2004-2018).nc",
-    )
+    )['TEMPERATURE']
     t_monthly_mean = load_and_prepare_dataset(
         "datasets/Temperature-Seasonal_Cycle_Mean.nc",
-    )
+    )['MONTHLY_MEAN_TEMPERATURE']
     ta = get_anomaly(
-        t['TEMPERATURE'],
-        t_monthly_mean['MONTHLY_MEAN_TEMPERATURE']
+        t,
+        t_monthly_mean
     )
     save_file(ta, "datasets/Temperature_Anomaly-(2004-2018).nc")
 
@@ -131,13 +131,13 @@ def save_salinity_anomalies():
 
     s = load_and_prepare_dataset(
         "datasets/Salinity-(2004-2018).nc",
-    )
+    )['SALINITY']
     s_monthly_mean = load_and_prepare_dataset(
         "datasets/Salinity-Seasonal_Cycle_Mean.nc",
-    )
+    )['MONTHLY_MEAN_SALINITY']
     sa = get_anomaly(
-        s['SALINITY'],
-        s_monthly_mean['MONTHLY_MEAN_SALINITY']
+        s,
+        s_monthly_mean
     )
     save_file(sa, "datasets/Salinity_Anomaly-(2004-2018).nc")
 
@@ -151,8 +151,8 @@ def save_monthly_mean_temperature_anomalies():
 
     ta = load_and_prepare_dataset(
         "datasets/Temperature_Anomaly-(2004-2018).nc",
-    )
-    ta_monthly_mean = get_monthly_mean(ta['ANOMALY_TEMPERATURE'])
+    )['ANOMALY_TEMPERATURE']
+    ta_monthly_mean = get_monthly_mean(ta)
     save_file(
         ta_monthly_mean,
         "datasets/Temperature_Anomaly-Seasonal_Cycle_Mean.nc"
@@ -168,8 +168,8 @@ def save_monthly_mean_salinity_anomalies():
 
     sa = load_and_prepare_dataset(
         "datasets/Salinity_Anomaly-(2004-2018).nc",
-    )
-    sa_monthly_mean = get_monthly_mean(sa['ANOMALY_SALINITY'])
+    )['ANOMALY_SALINITY']
+    sa_monthly_mean = get_monthly_mean(sa)
     save_file(
         sa_monthly_mean,
         "datasets/Salinity_Anomaly-Seasonal_Cycle_Mean.nc"
