@@ -13,7 +13,7 @@ from utilities import save_file
 def save_temperature():
     """Save temperature dataset."""
 
-    with open("logs/datasets.txt", "r+", encoding="utf-8") as logs_datasets:
+    with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
         if "datasets/Temperature-(2004-2018).nc" in logs_datasets.read():
             return
 
@@ -42,7 +42,7 @@ def save_temperature():
 def save_salinity():
     """Save salinity dataset."""
 
-    with open("logs/datasets.txt", "r+", encoding="utf-8") as logs_datasets:
+    with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
         if "datasets/Salinity-(2004-2018).nc" in logs_datasets.read():
             return
 
@@ -71,7 +71,7 @@ def save_salinity():
 def save_monthly_mean_temperature():
     """Save the monthly mean temperature dataset."""
 
-    with open("logs/datasets.txt", "r+", encoding="utf-8") as logs_datasets:
+    with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
         if "datasets/Temperature-Seasonal_Cycle_Mean.nc" in logs_datasets.read():
             return
 
@@ -88,7 +88,7 @@ def save_monthly_mean_temperature():
 def save_monthly_mean_salinity():
     """Save the monthly mean salinity dataset."""
 
-    with open("logs/datasets.txt", "r+", encoding="utf-8") as logs_datasets:
+    with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
         if "datasets/Salinity-Seasonal_Cycle_Mean.nc" in logs_datasets.read():
             return
 
@@ -105,7 +105,7 @@ def save_monthly_mean_salinity():
 def save_temperature_anomalies():
     """Save temperature anomaly dataset."""
 
-    with open("logs/datasets.txt", "r+", encoding="utf-8") as logs_datasets:
+    with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
         if "datasets/Temperature_Anomaly-(2004-2018).nc" in logs_datasets.read():
             return
 
@@ -125,7 +125,7 @@ def save_temperature_anomalies():
 def save_salinity_anomalies():
     """Save salinity anomaly dataset."""
 
-    with open("logs/datasets.txt", "r+", encoding="utf-8") as logs_datasets:
+    with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
         if "datasets/Salinity_Anomaly-(2004-2018).nc" in logs_datasets.read():
             return
 
@@ -145,7 +145,7 @@ def save_salinity_anomalies():
 def save_monthly_mean_temperature_anomalies():
     """Save monthly mean temperature anomaly dataset."""
 
-    with open("logs/datasets.txt", "r+", encoding="utf-8") as logs_datasets:
+    with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
         if "datasets/Temperature_Anomaly-Seasonal_Cycle_Mean.nc" in logs_datasets.read():
             return
 
@@ -162,7 +162,7 @@ def save_monthly_mean_temperature_anomalies():
 def save_monthly_mean_salinity_anomalies():
     """Save monthly mean salinity anomaly dataset."""
 
-    with open("logs/datasets.txt", "r+", encoding="utf-8") as logs_datasets:
+    with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
         if "datasets/Salinity_Anomaly-Seasonal_Cycle_Mean.nc" in logs_datasets.read():
             return
 
