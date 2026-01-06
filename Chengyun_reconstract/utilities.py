@@ -101,7 +101,8 @@ def get_monthly_mean(
         monthly_means.append(
             da.sel(TIME=da['TIME'][month_num-1::12]).mean(dim='TIME')
         )
-    monthly_mean_da = xr.concat(monthly_means, dim='MONTH')
+    monthly_mean_da = xr.concat(monthly_means, dim='MONTH',
+                                coords='different', compat='equals')
     monthly_mean_da = monthly_mean_da.assign_coords(MONTH=list(MONTHS.values()))
     monthly_mean_da['MONTH'].attrs['units'] = 'month'
     monthly_mean_da['MONTH'].attrs['axis'] = 'M'
@@ -147,7 +148,8 @@ def get_anomaly(
         anomalies.append(
             da.sel(TIME=month_num) - monthly_mean_da.sel(MONTH=month_mean_num)
         )
-    anomaly_da = xr.concat(anomalies, "TIME")
+    anomaly_da = xr.concat(anomalies, dim="TIME",
+                           coords="different", compat='equals')
     anomaly_da.attrs['units'] = da.attrs.get('units')
     anomaly_da.attrs['long_name'] = f"Anomaly of {da.attrs.get('long_name')}"
     anomaly_da.name = f"ANOMALY_{da.name}"
@@ -173,9 +175,9 @@ def save_file(
         if filepath in logs_datasets.read():
             pass
         else:
+            data.to_netcdf(filepath)
             logs_datasets.write(filepath + "\n")
             logs_datasets.write(str(time.time()) + "\n")
-            data.to_netcdf(filepath)
 
 
 def main():
