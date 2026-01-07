@@ -30,6 +30,8 @@ CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turn
 INTEGRATE_EXPLICIT = False
 SEPARATE_REGIMES = False        # if True, then consider entrainment only when it is above entrainment_lower_threshold
 USE_DENOISED_VALUES = True
+
+USE_SMOOTHED_EKMAN = False
 rho_0 = 1025.0
 c_0 = 4100.0
 gamma_0 = 30.0
@@ -47,9 +49,15 @@ surface_flux_da = heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY']
 # ekman_anomaly_da = ekman_anomaly_ds['Q_Ek_anom']
 # ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
 
-ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_TEST_DATA_PATH, decode_times=False)
-ekman_anomaly_da = ekman_anomaly_ds['Ekman_Current_Anomaly_Test']
-ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
+if USE_SMOOTHED_EKMAN ==True:
+    ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_TEST_DATA_PATH, decode_times=False)
+    ekman_anomaly_da = ekman_anomaly_ds['Ekman_Current_Anomaly_Test']
+    ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
+
+if USE_SMOOTHED_EKMAN == False:
+    ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
+    ekman_anomaly_da = ekman_anomaly_ds['Q_Ek_anom']
+    ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
 
 hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
 hbar_da = hbar_ds["MONTHLY_MEAN_MLD_PRESSURE"]
@@ -313,7 +321,7 @@ if CLEAN_CHRIS_PREV_CUR:
 
 # save
 all_anomalies_ds = remove_empty_attributes(all_anomalies_ds) # when doing the seasonality removal, some units are None
-all_anomalies_ds.to_netcdf(r"C:\Users\jason\MSciProject\all_anomalies_test.nc")
+# all_anomalies_ds.to_netcdf(r"C:\Users\jason\MSciProject\all_anomalies_test.nc")
 
 # format entrainment flux datasets and remove whatever seasonal cycle may remain
 if INCLUDE_ENTRAINMENT:
@@ -389,11 +397,11 @@ for variable_name in variable_names:
     flux_components_ds = flux_components_ds.drop_vars(variable_name + "_ANOMALY")
 
 flux_components_ds = remove_empty_attributes(flux_components_ds)
-print(flux_components_ds)
+# print(flux_components_ds)
 
 # flux_components_ds.to_netcdf("../datasets/flux_components.nc")
 #
-# make_movie(all_anomalies_ds["EXPLICIT"], -5, 5)
-# make_movie(all_anomalies_ds["IMPLICIT"], -5, 5)
+make_movie(all_anomalies_ds["EXPLICIT"], -5, 5)
+make_movie(all_anomalies_ds["IMPLICIT"], -5, 5)
 # make_movie(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"], -5, 5)
 # make_movie(all_anomalies_ds["CHRIS_MEAN_K"], -5, 5)

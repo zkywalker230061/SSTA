@@ -1,3 +1,4 @@
+#%%
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,7 +19,7 @@ CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turn
 observed_path = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature(T_m).nc"
 HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = r"C:\Users\jason\MSciProject\heat_flux_interpolated_all_contributions.nc"
 # HEAT_FLUX_DATA_PATH = "../datasets/heat_flux_interpolated.nc"
-EKMAN_ANOMALY_DATA_PATH = r"C:\Users\jason\MSciProject\Ekman_Current_Anomaly_Test.nc"
+EKMAN_ANOMALY_DATA_PATH = r"C:\Users\jason\MSciProject\Ekman_Current_Anomaly.nc"
 TEMP_DATA_PATH = r"C:\Users\jason\MSciProject\RG_ArgoClim_Temperature_2019.nc"
 MLD_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure-(2004-2018).nc"
 ENTRAINMENT_VEL_DATA_PATH = r"C:\Users\jason\MSciProject\Entrainment_Velocity-(2004-2018).nc"
@@ -41,7 +42,7 @@ heat_flux_anomaly_ds = get_anomaly(heat_flux_ds, 'NET_HEAT_FLUX', heat_flux_mont
 surface_flux_da = heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY']
 
 ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
-ekman_anomaly_da = ekman_anomaly_ds['Ekman_Current_Anomaly_Test']
+ekman_anomaly_da = ekman_anomaly_ds['Q_Ek_anom']
 ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
 
 hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
@@ -324,7 +325,7 @@ if INCLUDE_ENTRAINMENT:
     flux_components_to_merge.append(entrainment_flux_semi_implicit_ds)
 
 flux_components_ds = xr.merge(flux_components_to_merge)
-
+print(flux_components_ds)
 #------------------------------------------------------------------------------------------------------------
 #%%
 def calculate_RMSE (obs, model, dim = 'TIME'):
@@ -362,7 +363,8 @@ fig, axes = plt.subplots(3, 3, figsize=(12,7))
 
 for ax, (scheme_name, model_da) in zip(axes.flat, schemes.items()):
     # Calculate RMSE over the 'TIME' dimension
-
+    # new_data = model_da.isel(LATITUDE=slice(0,-90) and )
+    # observed_temperature_anomaly_selected = observed_temperature_anomaly.isel(LATITUDE=slice(0,-90))
     rmse_map = calculate_RMSE(observed_temperature_anomaly, model_da, dim='TIME')
     
     # Plotting
