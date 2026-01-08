@@ -1,3 +1,8 @@
+"""
+Simulation adapted from code made by Chris and Chengyun
+Adapted an Implicit scheme and various other schemes
+"""
+
 #%%
 import gsw
 import netCDF4 as nc

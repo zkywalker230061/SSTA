@@ -1,5 +1,5 @@
 #%%
-from read_nc import fix_rg_time, fix_longitude_coord, save_with_datetime
+from read_nc import fix_rg_time, fix_longitude_coord
 from calculate_Tm_Sm import depth_dbar_to_meter, _full_field, mld_dbar_to_meter, vertical_integral, z_to_xarray
 from grad_field import compute_gradient_lat, compute_gradient_lon
 import numpy as np
@@ -12,6 +12,7 @@ from typing import Optional
 from dask.diagnostics import ProgressBar
 import matplotlib.pyplot as plt
 import matplotlib
+from scipy.ndimage import gaussian_filter
 
 #%%
 
@@ -121,8 +122,38 @@ print(dz)
 
 #%%
 #----4. Vertical Integration -------------------------------
-temp_mld_bar = vertical_integral(ds_Tbar_monthly, dz, ds_h_bar_monthly)          #??????i changed here to -z_new
+temp_mld_bar = vertical_integral(ds_Tbar_monthly, dz, ds_h_bar_monthly)
+smoothed_data = np.zeros_like(temp_mld_bar.values)
 
+for t in range(temp_mld_bar.shape[0]):
+    # Extract the 2D slice for this month
+    data_slice = temp_mld_bar.values[t, :, :]
+    
+    # 1. Create a Mask: Where is the data valid? (1 = Ocean, 0 = Land)
+    mask = ~np.isnan(data_slice)
+    
+    # 2. Replace NaNs with 0 temporarily so the filter doesn't crash
+    data_filled = data_slice.copy()
+    data_filled[~mask] = 0
+    
+    # 3. Smooth the Data (Zeros included)
+    smoothed_values = gaussian_filter(data_filled, sigma=1.0)
+    
+    # 4. Smooth the Mask (To count how much "valid weight" each pixel got)
+    smoothed_weights = gaussian_filter(mask.astype(float), sigma=1.0)
+    
+    # 5. Normalize: Divide smoothed data by smoothed weights
+    # This effectively cancels out the impact of the zeros we added
+    with np.errstate(invalid='ignore', divide='ignore'):
+        result = smoothed_values / smoothed_weights
+    
+    # 6. Re-apply the original Land Mask (Optional: keeps land as NaN)
+    result[~mask] = np.nan
+    
+    smoothed_data[t, :, :] = result
+
+temp_mld_bar.values = smoothed_data
+#%%
 print('vertical_integral:\n', temp_mld_bar)
 #%% ----5. Gradient Test --------
 gradient_lat = compute_gradient_lat(temp_mld_bar)
@@ -136,11 +167,11 @@ print('grad_mag:\n',grad_mag)
 
 
 
-output_path1 = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature_Seasonal_Cycle_Mean.nc"
-output_path2 = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature_Gradient_Lat.nc"
-output_path3 = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature_Gradient_Lon.nc"
+# output_path1 = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature_Seasonal_Cycle_Mean.nc"
+output_path2 = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature_Gradient_Lat_SmoothTest.nc"
+output_path3 = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature_Gradient_Lon_SmoothTest.nc"
 
-temp_mld_bar.to_dataset(name="temp_mld_mean").to_netcdf(output_path1)
+# temp_mld_bar.to_dataset(name="temp_mld_mean").to_netcdf(output_path1)
 gradient_lat.to_dataset(name="temp_gradient_lat").to_netcdf(output_path2)
 gradient_lon.to_dataset(name="temp_gradient_lon").to_netcdf(output_path3)
 

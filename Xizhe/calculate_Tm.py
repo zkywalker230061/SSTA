@@ -3,8 +3,8 @@ Julia Xie
 """
 
 #%%
-from read_nc import fix_rg_time, fix_longitude_coord
-from calculate_Tm_Sm import depth_dbar_to_meter, _full_field, z_to_xarray, vertical_integral, mld_dbar_to_meter
+from utils_read_nc import fix_rg_time, fix_longitude_coord
+from utils_Tm_Sm import depth_dbar_to_meter, _full_field, z_to_xarray, vertical_integral, mld_dbar_to_meter
 from grad_field import compute_gradient_lat, compute_gradient_lon
 import numpy as np
 import pandas as pd

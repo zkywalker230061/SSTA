@@ -1,13 +1,12 @@
-#%%
 import numpy as np
 import xarray as xr
-from read_nc import fix_rg_time
-import cartopy.crs as ccrs
+from utils_Tm_Sm import vertical_integral
+from grad_field import compute_gradient_lat, compute_gradient_lon
+from utils_read_nc import fix_rg_time
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 import cartopy.crs as ccrs
-from cartopy.mpl.ticker import (LongitudeFormatter, LatitudeFormatter, LatitudeLocator) 
-
+from cartopy.mpl.ticker import (LongitudeFormatter, LatitudeFormatter, LatitudeLocator)
 
 c_o = 4100                         #specific heat capacity of seawater = 4100 Jkg^-1K^-1
 omega = 2*np.pi/(24*3600)         #Earth's angular velocity
@@ -152,9 +151,9 @@ def repeat_monthly_field(ds, var_name, n_repeats=15):
 
 
 if __name__ == "__main__":
-    file_path = r"C:\Users\jason\MSciProject\era5_interpolated.nc"
-    grad_lat_file_path = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature_Gradient_Lat_SmoothTest.nc"
-    grad_lon_file_path = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature_Gradient_Lon_SmoothTest.nc"
+    file_path = '/Users/julia/Desktop/SSTA/datasets/windstress.nc'
+    grad_lat_file_path = '/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature_Gradient_Lat.nc'
+    grad_lon_file_path = '/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature_Gradient_Lon.nc'
 
     ds = xr.open_dataset(               # (TIME: 180, LATITUDE: 145, LONGITUDE: 360)
         file_path,                      # Data variables:
@@ -176,8 +175,8 @@ if __name__ == "__main__":
     
     ds_tau_x = ds['avg_iews']           # (TIME: 180, LATITUDE: 145, LONGITUDE: 360)
     ds_tau_y = ds['avg_inss']           # TIME  0.5 1.5 2.5 3.5 ... 176.5 177.5 178.5 179.5
-    dTm_dy_monthly = ds_grad_lat["temp_gradient_lat"]  # (MONTH, LAT, LON)
-    dTm_dx_monthly = ds_grad_lon["temp_gradient_lon"]  # (MONTH, LAT, LON)
+    dTm_dy_monthly = ds_grad_lat["__xarray_dataarray_variable__"]  # (MONTH, LAT, LON)
+    dTm_dx_monthly = ds_grad_lon["__xarray_dataarray_variable__"]  # (MONTH, LAT, LON)
 
     monthly_mean_tau_x = get_monthly_mean(ds_tau_x)     #(MONTH: 12, LATITUDE: 145, LONGITUDE: 360)
     monthly_mean_tau_y = get_monthly_mean(ds_tau_y)
