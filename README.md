@@ -20,8 +20,13 @@ This work is licensed under a
 The Slab Mixed Layer Model:
 ![image](.readme_archive/sml.png)
 
-Results for Monthly Mean Mixed Layer Depth ($\bar{h}$) from RG-ARGO climatology:
 
+Observed Sea Surface Temperature Anomaly (SSTA) from RG-ARGO climatology:
+
+[![Watch the video](.readme_archive/SSTA.gif)](.readme_archive/SSTA.gif)
+
+
+Results for Monthly Mean Mixed Layer Depth ($\bar{h}$) from RG-ARGO climatology:
 
 [![Watch the video](.readme_archive/hbar_jan.png)](.readme_archive/hbar.mp4)
 

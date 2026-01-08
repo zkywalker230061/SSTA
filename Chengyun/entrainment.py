@@ -17,7 +17,8 @@ from h_analysis import get_anomaly
 from rgargo_plot import visualise_dataset
 
 
-TEMP_DATA_PATH = "../datasets/Temperature-(2004-2018).nc"
+#TEMP_DATA_PATH = "../datasets/Temperature-(2004-2018).nc"
+TEMP_DATA_PATH = "../datasets/RG_ArgoClim_Temperature_2019.nc"
 MLD_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
 
 RHO_O = 1025  # kg / m^3
@@ -44,14 +45,15 @@ def find_half_temperature(depth, temperature, mld):
         The temperature at the mixed layer depth (hbar).
     """
 
-    below_mld = np.where(depth <= mld)[0]
+    above_mld = np.where(depth <= mld)[0]
+    below_mld = np.where(depth > mld)[0]
 
     # catch case where no MLD (should be only over land)
-    if len(below_mld) == 0:
+    if len(above_mld) == 0 or len(below_mld) == 0:
         return np.nan
 
+    above_mld_index = above_mld[-1]
     below_mld_index = below_mld[0]
-    above_mld_index = below_mld_index - 1
     mld_temp = np.interp(
         mld,
         [depth[above_mld_index], depth[below_mld_index]],
@@ -102,6 +104,12 @@ def save_sub_temperature_dataset():
     temp_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
     mld_ds = load_and_prepare_dataset(MLD_DATA_PATH)
 
+    # get actual temperature by combining mean with anomaly from Argo
+    tm = temp_ds["ARGO_TEMPERATURE_MEAN"]
+    ta = temp_ds["ARGO_TEMPERATURE_ANOMALY"]
+    tm = tm.expand_dims(TIME=180)
+    temp_ds["TEMPERATURE"] = tm + ta
+
     monthly_datasets = []
     for month in temp_ds.TIME.values:
         monthly_datasets.append(
@@ -113,7 +121,7 @@ def save_sub_temperature_dataset():
     # restore attributes
     t_sub['LATITUDE'].attrs = temp_ds['LATITUDE'].attrs
     t_sub['LONGITUDE'].attrs = temp_ds['LONGITUDE'].attrs
-    t_sub.attrs['units'] = temp_ds['TEMPERATURE'].attrs['units']
+    #t_sub.attrs['units'] = temp_ds['TEMPERATURE'].attrs['units']
     t_sub.attrs['long_name'] = (
         'Monthly Sub Layer Temperature Jan 2004 - Dec 2018 (15.0 year)'
     )
@@ -169,6 +177,35 @@ def save_entrainment_velocity():
     w_e_da.to_netcdf("../datasets/Entrainment_Velocity-(2004-2018).nc")
 
 
+def save_q_entrainment():
+    """Save the Q_Entrainment dataset."""
+
+    t_sub_ds = load_and_prepare_dataset(
+        "../datasets/Sub_Layer_Temperature-(2004-2018).nc"
+    )
+    t_m_ds = load_and_prepare_dataset(
+        "../datasets/Mixed_Layer_Temperature-(2004-2018).nc"
+    )
+    w_e_ds = load_and_prepare_dataset(
+        "../datasets/Entrainment_Velocity-(2004-2018).nc"
+    )
+
+    t_sub = t_sub_ds['SUB_TEMPERATURE']
+    t_m = t_m_ds['MLD_TEMPERATURE']
+    w_e = w_e_ds['ENTRAINMENT_VELOCITY']
+
+    q_entrainment = RHO_O * C_O * w_e * (t_sub - t_m)
+    q_entrainment.attrs['units'] = 'W/m^2'
+    q_entrainment.attrs['long_name'] = (
+        'Monthly Q_Entrainment Jan 2004 - Dec 2018 (15.0 year)'
+    )
+    q_entrainment.name = 'ENTRAINMENT_HEAT_FLUX'
+    display(q_entrainment)
+    q_entrainment.to_netcdf(
+        "../datasets/Entrainment_Heat_Flux-(2004-2018).nc"
+    )
+
+
 def save_q_entrainment_anomaly():
     """Save the Q_Entrainment anomaly dataset."""
 
@@ -208,29 +245,33 @@ def main():
 
     # save_sub_temperature_dataset()
 
-    # MONTH = 7
+    MONTH = 7
 
-    # t_sub = load_and_prepare_dataset(
-    #     "../datasets/Sub_Layer_Temperature-(2004-2018).nc"
-    # )['SUB_TEMPERATURE']
-    # # display(t_sub)
-    # visualise_dataset(
-    #     t_sub.sel(TIME=MONTH, method='nearest'),
-    #     cmaps='RdBu_r',
-    # )
+    t_sub = load_and_prepare_dataset(
+        "../datasets/Sub_Layer_Temperature-(2004-2018).nc"
+    )['SUB_TEMPERATURE']
+    # display(t_sub)
+    visualise_dataset(
+        t_sub.sel(TIME=MONTH, method='nearest'),
+        cmaps='RdBu_r',
+    )
 
-    # t_sub_monthly_mean = get_monthly_mean(t_sub)
-    # t_sub_anomaly = get_anomaly(t_sub, t_sub_monthly_mean)
-    # # display(t_sub_anomaly)
-    # visualise_dataset(
-    #     t_sub_anomaly.sel(TIME=MONTH, method='nearest'),
-    #     cmaps='RdBu_r',
-    #     vmin=-30, vmax=30
-    # )
+    t_sub_monthly_mean = get_monthly_mean(t_sub)
+    t_sub_anomaly = get_anomaly(t_sub, t_sub_monthly_mean)
+    print(t_sub_anomaly.max().item(), t_sub_anomaly.min().item())
+    print(abs(t_sub_anomaly).mean().item())
+    # display(t_sub_anomaly)
+    visualise_dataset(
+        t_sub_anomaly.sel(TIME=MONTH, method='nearest'),
+        cmaps='RdBu_r',
+        vmin=-2, vmax=2
+    )
 
     # save_entrainment_velocity()
 
-    save_q_entrainment_anomaly()
+    # save_q_entrainment()
+
+    # save_q_entrainment_anomaly()
 
 
 if __name__ == "__main__":
