@@ -1,37 +1,35 @@
-#%%
-# --- 1. Running Implicit Scheme ---------------------------------- 
+#%% 
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
+
 from chris_utils import make_movie, get_eof_with_nan_consideration
 from chris_utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
 import matplotlib
-from scipy.stats import kurtosis, skew
+import matplotlib.pyplot as plt
 
 matplotlib.use('TkAgg')
 
-INCLUDE_SURFACE = True
-INCLUDE_EKMAN = True
+INCLUDE_SURFACE = False
+INCLUDE_EKMAN = False
 INCLUDE_ENTRAINMENT = False
-CLEAN_CHRIS_PREV_CUR = False        # only really useful when entrainment is turned on
+CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turned on
 
-observed_path = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature(T_m).nc"
-HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = r"C:\Users\jason\MSciProject\heat_flux_interpolated_all_contributions.nc"
+observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature(T_m).nc"
+HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/heat_flux_interpolated_all_contributions.nc"
 # HEAT_FLUX_DATA_PATH = "../datasets/heat_flux_interpolated.nc"
-EKMAN_ANOMALY_DATA_PATH = r"C:\Users\jason\MSciProject\Ekman_Current_Anomaly.nc"
-TEMP_DATA_PATH = r"C:\Users\jason\MSciProject\RG_ArgoClim_Temperature_2019.nc"
-MLD_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure-(2004-2018).nc"
-ENTRAINMENT_VEL_DATA_PATH = r"C:\Users\jason\MSciProject\Entrainment_Velocity-(2004-2018).nc"
+EKMAN_ANOMALY_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Ekman_Current_Anomaly.nc"
+TEMP_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
+MLD_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
+ENTRAINMENT_VEL_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Entrainment_Velocity-(2004-2018).nc"
 # ENTRAINMENT_VEL_DENOISED_DATA_PATH = "../datasets/entrainment_vel_denoised.nc"
-H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
-H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
-T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\t_sub.nc"
+H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
+H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
+T_SUB_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/t_sub.nc"
 rho_0 = 1025.0
 c_0 = 4100.0
-gamma_0 = 10
+gamma_0 = 30
 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
 observed_temp_ds = xr.open_dataset(observed_path, decode_times=False)
@@ -195,175 +193,224 @@ if INCLUDE_ENTRAINMENT:
 
 flux_components_ds = xr.merge(flux_components_to_merge)
 
+#------------------------------------------------------------------------------------------------------------
 #%%
-#--- 2. Prepare Observed Temperature Anomaly --------------------
+def calculate_RMSE (obs, model, dim = 'TIME'):
+    """
+    Calculates Root Mean Square Error.
+    Formula: sqrt( mean( (obs - model)^2 ) )
+    """
+    error = model - obs
+    squared_error = error ** 2
+    mean_squared_error = squared_error.mean(dim=dim)
+    rmse = np.sqrt(mean_squared_error)
+    return rmse
 
-# Extract Variables
+
 observed_temperature_monthly_average = get_monthly_mean(observed_temp_ds['__xarray_dataarray_variable__'])
 observed_temperature_anomaly = get_anomaly(observed_temp_ds, '__xarray_dataarray_variable__', observed_temperature_monthly_average)
 observed_temperature_anomaly = observed_temperature_anomaly['__xarray_dataarray_variable___ANOMALY']
 
-# Prepare Implicit Scheme Monthly Average At Each Grid Point
-imp_temp_monthly_average = get_monthly_mean(implicit_model_anomaly_ds)
-#%%
-#--- 3. Helper Functions --------------------
 
-def get_phase_map_seasonal_maximum(data_monthly_mean, obs_monthly_mean):
-    # Creating Mask
-    mask_data = data_monthly_mean.notnull().all(dim="MONTH")
-    mask_obs = obs_monthly_mean.notnull().all(dim="MONTH")
 
-    # Replacing NaNs with 0
-    data_monthly_mean = data_monthly_mean.fillna(-999)
-    obs_monthly_mean = obs_monthly_mean.fillna(-999)
+fig, axes = plt.subplots(1, 1, figsize=(8,5))
 
-    data_monthly_mean_max = data_monthly_mean.argmax(dim="MONTH")
-    obs_monthly_mean_max = obs_monthly_mean.argmax(dim="MONTH")
 
-    phase_map = data_monthly_mean_max - obs_monthly_mean_max
-    
-    corrected_phase_map = ((phase_map + 6) % 12) - 6
+scheme_name = "Implicit"
+rmse_map = calculate_RMSE(observed_temperature_anomaly, implicit_model_anomaly_ds, dim='TIME')
 
-    corrected_phase_map = corrected_phase_map.where(mask_obs)
+# Plotting
+# ax = plt.subplot(3, 2, i + 1)
+rmse_map.plot(ax=axes, cmap='nipy_spectral', cbar_kwargs={'label': 'RMSE (K)'}, vmin = 0, vmax = 3)
+axes.set_xlabel("Longitude")
+axes.set_ylabel("Lattitude")
+axes.set_title(f'{scheme_name} Scheme - Overall RMSE')
+max_rmse = rmse_map.max().item()
+print(scheme_name, max_rmse)
+plt.tight_layout()
+fig.text(
+    0.99, 0.01,
+    f"Gamma = {gamma_0}\n"
+    f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
+    f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
+    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
+    ha='right', va='bottom', fontsize=18
+)
+plt.show()
 
-    return corrected_phase_map
 
-def get_phase_map_seasonal_maximum(data_monthly_mean, obs_monthly_mean):
-    # Creating Mask
-    mask_data = data_monthly_mean.notnull().all(dim="MONTH")
-    mask_obs = obs_monthly_mean.notnull().all(dim="MONTH")
-
-    # Replacing NaNs with 0
-    data_monthly_mean = data_monthly_mean.fillna(-999)
-    obs_monthly_mean = obs_monthly_mean.fillna(-999)
-
-    data_monthly_mean_max = data_monthly_mean.argmax(dim="MONTH")
-    obs_monthly_mean_max = obs_monthly_mean.argmax(dim="MONTH")
-
-    phase_map = data_monthly_mean_max - obs_monthly_mean_max
-    
-    corrected_phase_map = ((phase_map + 6) % 12) - 6
-
-    corrected_phase_map = corrected_phase_map.where(mask_obs)
-
-    return corrected_phase_map
-
-def get_phase_map_seasonal_minimum(data_monthly_mean, obs_monthly_mean):
-    # Creating Mask
-    mask_data = data_monthly_mean.notnull().all(dim="MONTH")
-    mask_obs = obs_monthly_mean.notnull().all(dim="MONTH")
-
-    # Replacing NaNs with 0
-    data_monthly_mean = data_monthly_mean.fillna(999)
-    obs_monthly_mean = obs_monthly_mean.fillna(999)
-
-    data_monthly_mean_max = data_monthly_mean.argmin(dim="MONTH")
-    obs_monthly_mean_max = obs_monthly_mean.argmin(dim="MONTH")
-
-    phase_map = data_monthly_mean_max - obs_monthly_mean_max
-    
-    corrected_phase_map = ((phase_map + 6) % 12) - 6
-
-    corrected_phase_map = corrected_phase_map.where(mask_obs)
-
-    return corrected_phase_map
-
-def get_amplitude(data_monthly_mean, obs_monthly_mean):
-    # Creating Mask
-    mask_obs = obs_monthly_mean.notnull().all(dim="MONTH")
-
-    data_monthly_mean_max = data_monthly_mean.max(dim="MONTH")
-    data_monthly_mean_min = data_monthly_mean.min(dim="MONTH")
-
-    obs_monthly_mean_max = obs_monthly_mean.max(dim="MONTH")
-    obs_monthly_mean_min = obs_monthly_mean.min(dim="MONTH")
-
-    # Getting Amplitudes
-    amplitude_data = (data_monthly_mean_max - data_monthly_mean_min) / 2
-    amplitude_obs = (obs_monthly_mean_max - obs_monthly_mean_min) / 2
-
-    amplitude_map = np.log10(amplitude_data / amplitude_obs)
-
-    amplitude_map = amplitude_map.where(mask_obs)
-
-    return amplitude_map
-
-#--- 4. Plot Phase Map --------------------
-phase_map_maximum = get_phase_map_seasonal_maximum(imp_temp_monthly_average, observed_temperature_monthly_average)
-print(phase_map_maximum)
-phase_map_minimum = get_phase_map_seasonal_minimum(imp_temp_monthly_average, observed_temperature_monthly_average)
-print(phase_map_minimum)
-amplitudes = get_amplitude(imp_temp_monthly_average, observed_temperature_monthly_average)
-print(amplitudes)
 
 #%%
 
-# Plotting Seasonal Maximum
-fig, axes = plt.subplots(1, 1, figsize=(8,5))
-scheme_name = "Implicit"
-# Plotting
-# ax = plt.subplot(3, 2, i + 1)
-phase_map_maximum.plot(ax=axes, cmap='RdBu_r', cbar_kwargs={'label': 'Phase'}, vmin = -6, vmax = 6)
-axes.set_xlabel("Longitude")
-axes.set_ylabel("Lattitude")
-axes.set_title(f'{scheme_name} Scheme - Phase Map Seasonal Maximum')
-max_phase = phase_map_maximum.max().item()
-print(scheme_name, max_phase)
-plt.tight_layout()
-# fig.text(
-#     0.99, 0.01,
-#     f"Gamma = {gamma_0}\n"
-#     f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
-#     f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
-#     f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
-#     ha='right', va='bottom', fontsize=18
-# )
-plt.show()
+# Seasonal Analysis (Summer for the Northern Hemisphere)
+summer_months_north_index = []
+for i in range(13):
+    summer_months_north = (17.5 + i*12, 18.5 + i*12, 19.5 + i*12)
+    summer_months_north_index.extend(summer_months_north)
 
 
-# Plotting Seasonal Minimum
+
+obs_summer_north_ds = observed_temperature_anomaly.sel(TIME=summer_months_north_index, method="nearest")
+obs_summer_north_ds = obs_summer_north_ds.sel(LATITUDE=slice(0, 79.5))
+
+imp_summer_north_ds = implicit_model_anomaly_ds.sel(TIME=summer_months_north_index, method="nearest")
+imp_summer_north_ds = imp_summer_north_ds.sel(LATITUDE=slice(0, 79.5))
+
+# Summer months for the Southern Hemisphere 
+
+summer_months_south_index = []
+for i in range(13):
+    summer_months_south = (11.5 + i*12, 12.5 + i*12, 13.5 +i*12)
+    summer_months_south_index.extend(summer_months_south)
+
+
+obs_summer_south_ds = observed_temperature_anomaly.sel(TIME=summer_months_south_index, method="nearest")
+obs_summer_south_ds = obs_summer_south_ds.sel(LATITUDE=slice(-64.5,0))
+
+imp_summer_south_ds = implicit_model_anomaly_ds.sel(TIME=summer_months_south_index, method="nearest")
+imp_summer_south_ds = imp_summer_south_ds.sel(LATITUDE=slice(-64.5, 0))
+# Calculating RMSE for Summer season
+
+rmse_summer_north = calculate_RMSE(obs_summer_north_ds, imp_summer_north_ds, dim="TIME")
+rmse_summer_south = calculate_RMSE(obs_summer_south_ds, imp_summer_south_ds, dim="TIME")
+
+rmse_summer = xr.concat([rmse_summer_south, rmse_summer_north], dim="LATITUDE")
+
 fig, axes = plt.subplots(1, 1, figsize=(8,5))
-scheme_name = "Implicit"
-# Plotting
-# ax = plt.subplot(3, 2, i + 1)
-phase_map_minimum.plot(ax=axes, cmap='RdBu_r', cbar_kwargs={'label': 'Phase'}, vmin = -6, vmax = 6)
+rmse_summer.plot(ax=axes, cmap='nipy_spectral', cbar_kwargs={'label': 'RMSE (K)'}, vmin = 0, vmax = 3)
 axes.set_xlabel("Longitude")
 axes.set_ylabel("Lattitude")
-axes.set_title(f'{scheme_name} Scheme - Phase Map Seasonal Minimum')
-min_phase = phase_map_minimum.max().item()
-print(scheme_name, min_phase)
+axes.set_title(f'{scheme_name} Scheme - Summer RMSE')
+max_rmse = rmse_summer.max().item()
+print(scheme_name, max_rmse)
+max_rmse_location_summer = rmse_summer.where(rmse_summer == rmse_summer.max(), drop=True).squeeze()
+print(max_rmse_location_summer)
+min_rmse = rmse_summer.min().item()
+print(scheme_name, min_rmse)
+min_rmse_location_summer = rmse_summer.where(rmse_summer == rmse_summer.min(), drop=True).squeeze()
+print(min_rmse_location_summer)
 plt.tight_layout()
-# fig.text(
-#     0.99, 0.01,
-#     f"Gamma = {gamma_0}\n"
-#     f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
-#     f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
-#     f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
-#     ha='right', va='bottom', fontsize=18
-# )
+fig.text(
+    0.99, 0.01,
+    f"Gamma = {gamma_0}\n"
+    f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
+    f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
+    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
+    ha='right', va='bottom', fontsize=10
+)
 plt.show()
 
-# Plotting Amplitudes
+#%%
+
+# Winter Seasonal Analysis 
+
+winter_months_north_index = summer_months_south_index
+
+obs_winter_north_ds = observed_temperature_anomaly.sel(TIME=winter_months_north_index, method="nearest")
+obs_winter_north_ds = obs_winter_north_ds.sel(LATITUDE=slice(0,79.5))
+
+imp_winter_north_ds = implicit_model_anomaly_ds.sel(TIME=winter_months_north_index, method="nearest")
+imp_winter_north_ds = imp_winter_north_ds.sel(LATITUDE=slice(0,79.5))
+
+winter_months_south_index = summer_months_north_index
+
+obs_winter_south_ds = observed_temperature_anomaly.sel(TIME=winter_months_south_index, method="nearest")
+obs_winter_south_ds = obs_winter_south_ds.sel(LATITUDE=slice(-64.5, 0))
+
+imp_winter_south_ds = implicit_model_anomaly_ds.sel(TIME=winter_months_south_index, method="nearest")
+imp_winter_south_ds = imp_winter_south_ds.sel(LATITUDE=slice(-64.5, 0))
+
+rmse_winter_north = calculate_RMSE(obs_winter_north_ds, imp_winter_north_ds)
+rmse_winter_south = calculate_RMSE(obs_winter_south_ds, imp_winter_south_ds)
+
+rmse_winter = xr.concat([rmse_winter_south, rmse_winter_north], dim="LATITUDE")
+
 fig, axes = plt.subplots(1, 1, figsize=(8,5))
-scheme_name = "Implicit"
-# Plotting
-# ax = plt.subplot(3, 2, i + 1)
-amplitudes.plot(ax=axes, cmap='viridis', cbar_kwargs={'label': 'Amplitude'}, vmin = -7, vmax = -1)
+rmse_winter.plot(ax=axes, cmap='nipy_spectral', cbar_kwargs={'label': 'RMSE (K)'}, vmin = 0, vmax = 3)
 axes.set_xlabel("Longitude")
 axes.set_ylabel("Lattitude")
-axes.set_title(f'{scheme_name} Scheme - Amplitude Plot')
-max_amp = amplitudes.max().item()
-print(scheme_name, max_amp)
-min_amp = amplitudes.min().item()
-print(scheme_name, min_amp)
+axes.set_title(f'{scheme_name} Scheme - Winter RMSE')
+max_rmse = rmse_winter.max().item()
+print(scheme_name, max_rmse)
+max_rmse_location_winter = rmse_winter.where(rmse_winter == rmse_winter.max(), drop=True).squeeze()
+print(max_rmse_location_winter)
+min_rmse = rmse_winter.min().item()
+print(scheme_name, min_rmse)
+min_rmse_location_winter = rmse_winter.where(rmse_winter == rmse_winter.min(), drop=True).squeeze()
+print(min_rmse_location_winter)
 plt.tight_layout()
-# fig.text(
-#     0.99, 0.01,
-#     f"Gamma = {gamma_0}\n"
-#     f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
-#     f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
-#     f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
-#     ha='right', va='bottom', fontsize=18
-# )
+fig.text(
+    0.99, 0.01,
+    f"Gamma = {gamma_0}\n"
+    f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
+    f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
+    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
+    ha='right', va='bottom', fontsize=10
+)
 plt.show()
-# %%
+
+#%% Time Series
+
+# Win_min = dict(LATITUDE=45.0, LONGITUDE=-30.0)   # Northern Hemisphere
+# Win_max = dict(LATITUDE=-40.0, LONGITUDE=60.0)   # Southern Hemisphere
+
+Win_min = dict(LATITUDE=-52.5, LONGITUDE=-95.5)
+Win_max = dict(LATITUDE=41.5, LONGITUDE=-50.5)
+
+def extract_point_timeseries(ds, lat, lon):
+    return ds.sel(
+        LATITUDE=lat,
+        LONGITUDE=lon,
+        method="nearest"
+    )
+
+obs_NH = extract_point_timeseries(
+    observed_temperature_anomaly,
+    Win_min["LATITUDE"],
+    Win_min["LONGITUDE"]
+)
+
+mod_NH = extract_point_timeseries(
+    implicit_model_anomaly_ds,
+    Win_min["LATITUDE"],
+    Win_min["LONGITUDE"]
+)
+
+# Southern Hemisphere point
+obs_SH = extract_point_timeseries(
+    observed_temperature_anomaly,
+    Win_max["LATITUDE"],
+    Win_max["LONGITUDE"]
+)
+
+mod_SH = extract_point_timeseries(
+    implicit_model_anomaly_ds,
+    Win_max["LATITUDE"],
+    Win_max["LONGITUDE"]
+)
+
+rmse_ts_NH = np.sqrt((mod_NH - obs_NH) ** 2)
+rmse_ts_SH = np.sqrt((mod_SH - obs_SH) ** 2)
+
+fig, ax = plt.subplots(figsize=(10, 5))
+
+rmse_ts_NH.plot(
+    ax=ax,
+    label=f"P1 Win_min({Win_min['LATITUDE']}°, {Win_min['LONGITUDE']}°)",
+    linewidth=2
+)
+
+rmse_ts_SH.plot(
+    ax=ax,
+    label=f"P2 Win_max({Win_max['LATITUDE']}°, {Win_max['LONGITUDE']}°)",
+    linewidth=2
+)
+
+ax.set_title(f"{scheme_name} Scheme – Time Series RMSE at Selected Grid Points")
+ax.set_xlabel("Time (months since Jan 2004)")
+ax.set_ylabel("RMSE (K)")
+ax.legend()
+ax.grid(True)
+
+plt.tight_layout()
+plt.show()
