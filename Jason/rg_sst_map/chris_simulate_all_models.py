@@ -1,32 +1,14 @@
-#%%
-#--- 0. Imports ------------------------------------------------------------
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
-from chris_utils import make_movie, get_eof_with_nan_consideration
 from chris_utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
+from chris_utils import remove_empty_attributes, make_movie, get_eof_with_nan_consideration
+
 from matplotlib.animation import FuncAnimation
 import matplotlib
-from scipy.stats import kurtosis, skew
-
-# Configuration for visual style
-sns.set_theme(style="whitegrid")
-plt.rcParams['figure.figsize'] = [12, 8]
-
-#%%
-#--- 1. Configuration & Data Loading ---------------------------------------
-
 
 matplotlib.use('TkAgg')
 
-INCLUDE_SURFACE = True
-INCLUDE_EKMAN = True
-INCLUDE_ENTRAINMENT = True
-CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turned on
-
-observed_path = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature(T_m).nc"
 HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = r"C:\Users\jason\MSciProject\heat_flux_interpolated_all_contributions.nc"
 HEAT_FLUX_DATA_PATH = r"C:\Users\jason\MSciProject\heat_flux_interpolated.nc"
 EKMAN_ANOMALY_DATA_PATH = r"C:\Users\jason\MSciProject\Ekman_Current_Anomaly.nc"
@@ -55,7 +37,6 @@ c_0 = 4100.0
 gamma_0 = 30.0
 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
-observed_temp_ds = xr.open_dataset(observed_path, decode_times=False)
 
 heat_flux_ds = xr.open_dataset(HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH, decode_times=False)
 heat_flux_ds['NET_HEAT_FLUX'] = heat_flux_ds['avg_slhtf'] + heat_flux_ds['avg_snlwrf'] + heat_flux_ds['avg_snswrf'] + \
@@ -290,19 +271,59 @@ semi_implicit_model_anomaly_ds = semi_implicit_model_anomaly_ds.rename("SEMI_IMP
 # combine to a single ds
 all_anomalies_ds = xr.merge([chris_prev_cur_model_anomaly_ds, chris_mean_k_model_anomaly_ds, chris_prev_k_model_anomaly_ds, chris_capped_exponent_model_anomaly_ds, explicit_model_anomaly_ds, implicit_model_anomaly_ds, semi_implicit_model_anomaly_ds])
 
+# remove whatever seasonal cycle remains
+model_names = ["CHRIS_PREV_CUR", "CHRIS_MEAN_K", "CHRIS_PREV_K", "CHRIS_CAPPED_EXPONENT", "EXPLICIT", "IMPLICIT", "SEMI_IMPLICIT"]
+for variable_name in model_names:
+    monthly_mean = get_monthly_mean(all_anomalies_ds[variable_name])
+    all_anomalies_ds[variable_name] = get_anomaly(all_anomalies_ds, variable_name, monthly_mean)[variable_name + "_ANOMALY"]
+    all_anomalies_ds = all_anomalies_ds.drop_vars(variable_name + "_ANOMALY")
+
+# chris_prev_cur_monthly_mean = get_monthly_mean(all_anomalies_ds["CHRIS_PREV_CUR"])
+# all_anomalies_ds["CHRIS_PREV_CUR"] = get_anomaly(all_anomalies_ds, "CHRIS_PREV_CUR", chris_prev_cur_monthly_mean)["CHRIS_PREV_CUR_ANOMALY"]
+# all_anomalies_ds = all_anomalies_ds.drop_vars("CHRIS_PREV_CUR_ANOMALY")
+#
+# chris_mean_k_monthly_mean = get_monthly_mean(all_anomalies_ds["CHRIS_MEAN_K"])
+# all_anomalies_ds["CHRIS_MEAN_K"] = get_anomaly(all_anomalies_ds, "CHRIS_MEAN_K", chris_mean_k_monthly_mean)["CHRIS_MEAN_K_ANOMALY"]
+# all_anomalies_ds = all_anomalies_ds.drop_vars("CHRIS_MEAN_K_ANOMALY")
+#
+# chris_prev_k_monthly_mean = get_monthly_mean(all_anomalies_ds["CHRIS_PREV_K"])
+# all_anomalies_ds["CHRIS_PREV_K"] = get_anomaly(all_anomalies_ds, "CHRIS_PREV_K", chris_prev_k_monthly_mean)["CHRIS_PREV_K_ANOMALY"]
+# all_anomalies_ds = all_anomalies_ds.drop_vars("CHRIS_PREV_K_ANOMALY")
+#
+# chris_capped_exponent_monthly_mean = get_monthly_mean(all_anomalies_ds["CHRIS_CAPPED_EXPONENT"])
+# all_anomalies_ds["CHRIS_CAPPED_EXPONENT"] = get_anomaly(all_anomalies_ds, "CHRIS_CAPPED_EXPONENT", chris_capped_exponent_monthly_mean)["CHRIS_CAPPED_EXPONENT_ANOMALY"]
+# all_anomalies_ds = all_anomalies_ds.drop_vars("CHRIS_CAPPED_EXPONENT_ANOMALY")
+#
+# explicit_monthly_mean = get_monthly_mean(all_anomalies_ds["EXPLICIT"])
+# all_anomalies_ds["EXPLICIT"] = get_anomaly(all_anomalies_ds, "EXPLICIT", explicit_monthly_mean)["EXPLICIT_ANOMALY"]
+# all_anomalies_ds = all_anomalies_ds.drop_vars("EXPLICIT_ANOMALY")
+#
+#
+# implicit_monthly_mean = get_monthly_mean(test_all_anomalies_ds["IMPLICIT"])
+# all_anomalies_ds["IMPLICIT_TEST"] = get_anomaly(test_all_anomalies_ds, "IMPLICIT", implicit_monthly_mean)["IMPLICIT_ANOMALY"]
+# all_anomalies_ds = all_anomalies_ds.drop_vars("IMPLICIT_ANOMALY")
+#
+# semi_implicit_monthly_mean = get_monthly_mean(all_anomalies_ds["SEMI_IMPLICIT"])
+# all_anomalies_ds["SEMI_IMPLICIT_TEST"] = get_anomaly(all_anomalies_ds, "SEMI_IMPLICIT", semi_implicit_monthly_mean)["SEMI_IMPLICIT_ANOMALY"]
+# all_anomalies_ds = all_anomalies_ds.drop_vars("SEMI_IMPLICIT_ANOMALY")
+
 # clean up prev_cur model
 if CLEAN_CHRIS_PREV_CUR:
     all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"] = all_anomalies_ds["CHRIS_PREV_CUR"].where((all_anomalies_ds["CHRIS_PREV_CUR"] > -10) & (all_anomalies_ds["CHRIS_PREV_CUR"] < 10))
     n_modes = 20
     monthly_mean = get_monthly_mean(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"])
     map_mask = temperature_ds['BATHYMETRY_MASK'].sel(PRESSURE=2.5)
-    eof_ds, variance, PCs = get_eof_with_nan_consideration(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"], map_mask, modes=n_modes, monthly_mean_ds=None, tolerance=1e-4)
+    eof_ds, variance, PCs = get_eof_with_nan_consideration(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"], map_mask, modes=n_modes, monthly_mean_ds=None, tolerance=1e-2)
     all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"] = eof_ds.rename("CHRIS_PREV_CUR_CLEAN")
+    chris_prev_cur_clean_monthly_mean = get_monthly_mean(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"])
+    all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"] = get_anomaly(all_anomalies_ds, "CHRIS_PREV_CUR_CLEAN", chris_prev_cur_clean_monthly_mean)["CHRIS_PREV_CUR_CLEAN_ANOMALY"]
+    all_anomalies_ds = all_anomalies_ds.drop_vars("CHRIS_PREV_CUR_CLEAN_ANOMALY")
 
 # save
-# all_anomalies_ds.to_netcdf("../datasets/all_anomalies_10.nc")
+all_anomalies_ds = remove_empty_attributes(all_anomalies_ds) # when doing the seasonality removal, some units are None
+# all_anomalies_ds.to_netcdf(r"C:\Users\jason\MSciProject\all_anomalies_test.nc")
 
-# format entrainment flux datasets
+# format entrainment flux datasets and remove whatever seasonal cycle may remain
 if INCLUDE_ENTRAINMENT:
     entrainment_flux_prev_cur_ds = xr.concat(entrainment_fluxes_prev_cur, 'TIME')
     entrainment_flux_prev_cur_ds = entrainment_flux_prev_cur_ds.drop_vars(["MONTH", "PRESSURE"])
@@ -342,12 +363,15 @@ if INCLUDE_ENTRAINMENT:
 
 # merge the relevant fluxes into a single dataset
 flux_components_to_merge = []
+variable_names = []
 if INCLUDE_SURFACE:
     surface_flux_da = surface_flux_da.rename("SURFACE_FLUX_ANOMALY")
     flux_components_to_merge.append(surface_flux_da)
+    variable_names.append("SURFACE_FLUX_ANOMALY")
 if INCLUDE_EKMAN:
     ekman_anomaly_da = ekman_anomaly_da.rename("EKMAN_FLUX_ANOMALY")
     flux_components_to_merge.append(ekman_anomaly_da)
+    variable_names.append("EKMAN_FLUX_ANOMALY")
 if INCLUDE_ENTRAINMENT:
     flux_components_to_merge.append(entrainment_flux_prev_cur_ds)
     flux_components_to_merge.append(entrainment_flux_mean_k_ds)
@@ -356,199 +380,28 @@ if INCLUDE_ENTRAINMENT:
     flux_components_to_merge.append(entrainment_flux_explicit_ds)
     flux_components_to_merge.append(entrainment_flux_implicit_ds)
     flux_components_to_merge.append(entrainment_flux_semi_implicit_ds)
+    variable_names.append("ENTRAINMENT_FLUX_PREV_CUR_ANOMALY")
+    variable_names.append("ENTRAINMENT_FLUX_MEAN_K_ANOMALY")
+    variable_names.append("ENTRAINMENT_FLUX_PREV_K_ANOMALY")
+    variable_names.append("ENTRAINMENT_FLUX_CAPPED_EXPONENT_ANOMALY")
+    variable_names.append("ENTRAINMENT_FLUX_EXPLICIT_ANOMALY")
+    variable_names.append("ENTRAINMENT_FLUX_IMPLICIT_ANOMALY")
+    variable_names.append("ENTRAINMENT_FLUX_SEMI_IMPLICIT_ANOMALY")
 
 flux_components_ds = xr.merge(flux_components_to_merge)
 
+# remove whatever seasonal cycle may remain from the components
+for variable_name in variable_names:
+    monthly_mean = get_monthly_mean(flux_components_ds[variable_name])
+    flux_components_ds[variable_name] = get_anomaly(flux_components_ds, variable_name, monthly_mean)[variable_name + "_ANOMALY"]
+    flux_components_ds = flux_components_ds.drop_vars(variable_name + "_ANOMALY")
 
-#------------------------------------------------------------------------------------------------------------------------------------------------
+flux_components_ds = remove_empty_attributes(flux_components_ds)
+# print(flux_components_ds)
 
-# Extract Variables
-observed_temperature_monthly_average = get_monthly_mean(observed_temp_ds['__xarray_dataarray_variable__'])
-observed_temperature_anomaly = get_anomaly(observed_temp_ds, '__xarray_dataarray_variable__', observed_temperature_monthly_average)
-observed_temperature_anomaly = observed_temperature_anomaly['__xarray_dataarray_variable___ANOMALY']
-
-schemes = {
-    "Explicit": all_anomalies_ds["EXPLICIT"],
-    "Implicit": all_anomalies_ds["IMPLICIT"],
-    "Semi-Implicit": all_anomalies_ds["SEMI_IMPLICIT"],
-    "Chris Mean K": all_anomalies_ds["CHRIS_MEAN_K"],
-    "CHRIS_PREV_K": all_anomalies_ds["CHRIS_PREV_K"],
-    "CHRIS_PREV_CUR_CLEAN": all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"],
-    "CHRIS_CAPPED_EXPONENT": all_anomalies_ds["CHRIS_CAPPED_EXPONENT"]
-}
-
-#%%
-#--- 2. Helper Functions ---------------------------------------------------
-
-def get_clean_error_distribution(test_da, obs_da):
-    """
-    Calculates error (Test - Obs), slices time, and returns 
-    a flattened numpy array with NaNs removed.
-    """
-    # 1. Align and Slice (Time slice 1:end)
-    test_sliced = test_da.isel(TIME=slice(1, None))
-    obs_sliced = obs_da.isel(TIME=slice(1, None))
-    
-    # 2. Calculate Error (xarray handles alignment automatically)
-    error_da = test_sliced - obs_sliced
-    
-    # 3. Flatten and drop NaNs
-    flat_error = error_da.values.flatten()
-    return flat_error[~np.isnan(flat_error)]
-
-#%%
-#--- 3. Calculate Errors ---------------------------------------------------
-
-# Dictionary to store processed error arrays
-error_distributions = {}
-
-print("Calculating errors...")
-
-# summer_indices = [
-#     i for i in range(180)
-#     if (i % 12 in [5, 6, 7]) and (i != 0)
-# ]
-
-# print(f"Summer indices: {summer_indices}")
-
-for name, data in schemes.items():
-    print(f"Processing {name}...")
-    new_data = data.isel(LATITUDE=slice(0,-90))
-    observed_temperature_anomaly_selected = observed_temperature_anomaly.isel(LATITUDE=slice(0,-90))
-    error_distributions[name] = get_clean_error_distribution(new_data, observed_temperature_anomaly_selected)
-
-
-#%%
-#--- 4. Plotting: Histograms with Middle 50% Region (IQR) ------------------
-
-# Create a figure with enough subplots
-num_schemes = len(schemes)
-cols = 2
-rows = int(np.ceil(num_schemes / cols))
-
-fig, axes = plt.subplots(rows, cols, figsize=(15, 6 * rows), constrained_layout=True)
-axes_flat = axes.flatten()
-
-for i, (name, err_data) in enumerate(error_distributions.items()):
-    ax = axes_flat[i]
-    
-    # 1. Plot Histogram
-    sns.kdeplot(err_data, bw_adjust=1.0, label=name, ax=ax)
-    
-    # 2. Calculate Percentiles
-    # The middle 50% lies between the 25th and 75th percentiles
-    q25, q75 = np.percentile(err_data, [25, 75])
-    
-    # 3. Add Shaded Region for Middle 50%
-    # axvspan draws a vertical span (rectangle) across the plot
-    ax.axvspan(q25, q75, color='green', alpha=0.2, label='Middle 50% (IQR)')
-    ax.axvline(q25, color='green', linestyle=':', linewidth=1.5)
-    ax.axvline(q75, color='green', linestyle=':', linewidth=1.5)
-
-    ax.axvline(np.min(err_data), color='firebrick', linestyle='--', alpha=0.6, label=f'Min: {np.min(err_data):.2e}')
-    ax.axvline(np.max(err_data), color='darkorange', linestyle='--', alpha=0.6, label=f'Max: {np.max(err_data):.2e}')
-    
-    # 4. Add Reference Lines
-    ax.axvline(0, color='black', linewidth=1, alpha=0.5)
-
-    # 5. Formatting & Annotations
-    ax.set_title(f"{name} Scheme Error Distribution")
-    ax.set_xlabel("Error (K)")
-    ax.set_ylabel("Frequency")
-
-    # Add text annotation to show the width of this region
-    iqr_width = q75 - q25
-    # Place text near the top of the range
-    y_limits = ax.get_ylim()
-    ax.text(5, y_limits[1]*0.5, f"IQR Width:\n{iqr_width:.3f} K", 
-            horizontalalignment='center', color='darkgreen', fontweight='bold')
-    ax.legend(loc='upper right', fontsize = 'x-small')
-
-    #skewness and kurtosis
-    err_data_skew = skew(err_data, axis=0, bias=True)
-    err_data_kurt = kurtosis(err_data, axis=0, bias=True)
-    ax.text(0.9,0.01, f"Skewness = {err_data_skew:.3f} \n Kurtosis = {err_data_kurt:.3f}")
-
-
-# Turn off unused subplots
-if len(axes_flat) > num_schemes:
-    for j in range(num_schemes, len(axes_flat)):
-        axes_flat[j].axis('off')
-
-fig.text(
-    0.99, 0.01,
-    f"Gamma = {gamma_0}\n"
-    f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
-    f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
-    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
-    ha='right', va='bottom', fontsize=12
-)
-plt.show()
-
-#%%
-#--- 5. Plotting: Combined KDE (Log Scale) ---------------------------------
-
-plt.figure(figsize=(12, 7))
-
-for name, err_data in error_distributions.items():
-    # KDE plot
-    sns.kdeplot(err_data, bw_adjust=1.0, label=name)
-
-# Formatting
-plt.xlim(-10, 10)        
-plt.yscale("log")      
-plt.ylim(1e-4, 1e2)
-plt.title("Comparison of Temporal Error Distributions (Log-Scale)")
-plt.xlabel("Error (K)")
-plt.ylabel("Probability Density (Log Scale)")
-plt.legend()
-plt.grid(True, which="both", ls="--", alpha=0.3)
-plt.text(
-    0.99, 0.01,
-    f"Gamma = {gamma_0}\n"
-    f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
-    f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
-    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
-    ha='right', va='bottom', fontsize=18
-)
-plt.show()
-
-
-
-#%%
-#--- 6. Plotting: Cumulative Distribution Function (CDF) with 50% Box ------
-
-plt.figure(figsize=(12, 7))
-
-# Iterate through schemes and plot their CDF
-for name, err_data in error_distributions.items():
-    sns.ecdfplot(data=err_data, label=name, linewidth=2, alpha=0.5)
-
-# Add reference lines
-plt.axvline(0, color='black', linestyle='--', alpha=0.5, linewidth=1, label="Zero Error")
-plt.axhline(0.5, color='black', linestyle=':', alpha=0.5, label="50% Probability")
-
-# Add Guidelines for the 25% - 75% probability zone
-plt.axhline(0.25, color='gray', linestyle=':', alpha=0.5)
-plt.axhline(0.75, color='gray', linestyle=':', alpha=0.5)
-plt.text(plt.xlim()[0], 0.25, " 25%", verticalalignment='bottom', color='gray')
-plt.text(plt.xlim()[0], 0.75, " 75%", verticalalignment='bottom', color='gray')
-
-plt.axhspan(0.25, 0.75, color='grey' , alpha=0.2)
-
-# Formatting
-plt.title("Cumulative Distribution Function (CDF) of Errors")
-plt.xlabel("Error (K)")
-plt.ylabel("Proportion")
-plt.xlim(-5, 5) # Adjust this limit based on your data range
-plt.grid(True, alpha=0.3)
-plt.legend()
-plt.text(
-    0.99, 0.01,
-    f"Gamma = {gamma_0}\n"
-    f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
-    f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
-    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
-    ha='right', va='bottom', fontsize=18
-)
-plt.show()
+# flux_components_ds.to_netcdf("../datasets/flux_components.nc")
+#
+make_movie(all_anomalies_ds["EXPLICIT"], -5, 5)
+make_movie(all_anomalies_ds["IMPLICIT"], -5, 5)
+# make_movie(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"], -5, 5)
+# make_movie(all_anomalies_ds["CHRIS_MEAN_K"], -5, 5)

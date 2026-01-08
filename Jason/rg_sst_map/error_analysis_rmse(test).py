@@ -1,23 +1,13 @@
 #%%
-#--- 0. Imports ------------------------------------------------------------
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
+
 from chris_utils import make_movie, get_eof_with_nan_consideration
 from chris_utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
 import matplotlib
-from scipy.stats import kurtosis, skew
-
-# Configuration for visual style
-sns.set_theme(style="whitegrid")
-plt.rcParams['figure.figsize'] = [12, 8]
-
-#%%
-#--- 1. Configuration & Data Loading ---------------------------------------
-
+import matplotlib.pyplot as plt
 
 matplotlib.use('TkAgg')
 
@@ -28,31 +18,18 @@ CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turn
 
 observed_path = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature(T_m).nc"
 HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = r"C:\Users\jason\MSciProject\heat_flux_interpolated_all_contributions.nc"
-HEAT_FLUX_DATA_PATH = r"C:\Users\jason\MSciProject\heat_flux_interpolated.nc"
+# HEAT_FLUX_DATA_PATH = "../datasets/heat_flux_interpolated.nc"
 EKMAN_ANOMALY_DATA_PATH = r"C:\Users\jason\MSciProject\Ekman_Current_Anomaly.nc"
-EKMAN_ANOMALY_TEST_DATA_PATH = r"C:\Users\jason\MSciProject\Ekman_Current_Anomaly_Test.nc"
 TEMP_DATA_PATH = r"C:\Users\jason\MSciProject\RG_ArgoClim_Temperature_2019.nc"
 MLD_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure-(2004-2018).nc"
 ENTRAINMENT_VEL_DATA_PATH = r"C:\Users\jason\MSciProject\Entrainment_Velocity-(2004-2018).nc"
-ENTRAINMENT_VEL_DENOISED_DATA_PATH = r"C:\Users\jason\MSciProject\entrainment_vel_denoised.nc"
+# ENTRAINMENT_VEL_DENOISED_DATA_PATH = "../datasets/entrainment_vel_denoised.nc"
 H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
-T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\/t_sub.nc"
-T_SUB_DENOISED_DATA_PATH = r"C:\Users\jason\MSciProject\t_sub_denoised.nc"
-
-
-INCLUDE_SURFACE = True
-INCLUDE_EKMAN = True
-INCLUDE_ENTRAINMENT = True
-CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turned on
-
-INTEGRATE_EXPLICIT = False
-SEPARATE_REGIMES = False        # if True, then consider entrainment only when it is above entrainment_lower_threshold
-USE_DENOISED_VALUES = True
-
-USE_SMOOTHED_EKMAN = False
+H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
+T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\t_sub.nc"
 rho_0 = 1025.0
 c_0 = 4100.0
-gamma_0 = 30.0
+gamma_0 = 30
 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
 observed_temp_ds = xr.open_dataset(observed_path, decode_times=False)
@@ -64,19 +41,9 @@ heat_flux_monthly_mean = get_monthly_mean(heat_flux_ds['NET_HEAT_FLUX'])
 heat_flux_anomaly_ds = get_anomaly(heat_flux_ds, 'NET_HEAT_FLUX', heat_flux_monthly_mean)
 surface_flux_da = heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY']
 
-# ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
-# ekman_anomaly_da = ekman_anomaly_ds['Q_Ek_anom']
-# ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
-
-if USE_SMOOTHED_EKMAN ==True:
-    ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_TEST_DATA_PATH, decode_times=False)
-    ekman_anomaly_da = ekman_anomaly_ds['Ekman_Current_Anomaly_Test']
-    ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
-
-if USE_SMOOTHED_EKMAN == False:
-    ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
-    ekman_anomaly_da = ekman_anomaly_ds['Q_Ek_anom']
-    ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
+ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
+ekman_anomaly_da = ekman_anomaly_ds['Q_Ek_anom']
+ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
 
 hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
 hbar_da = hbar_ds["MONTHLY_MEAN_MLD_PRESSURE"]
@@ -358,11 +325,21 @@ if INCLUDE_ENTRAINMENT:
     flux_components_to_merge.append(entrainment_flux_semi_implicit_ds)
 
 flux_components_ds = xr.merge(flux_components_to_merge)
+print(flux_components_ds)
+#------------------------------------------------------------------------------------------------------------
+#%%
+def calculate_RMSE (obs, model, dim = 'TIME'):
+    """
+    Calculates Root Mean Square Error.
+    Formula: sqrt( mean( (obs - model)^2 ) )
+    """
+    error = model - obs
+    squared_error = error ** 2
+    mean_squared_error = squared_error.mean(dim=dim)
+    rmse = np.sqrt(mean_squared_error)
+    return rmse
 
 
-#------------------------------------------------------------------------------------------------------------------------------------------------
-
-# Extract Variables
 observed_temperature_monthly_average = get_monthly_mean(observed_temp_ds['__xarray_dataarray_variable__'])
 observed_temperature_anomaly = get_anomaly(observed_temp_ds, '__xarray_dataarray_variable__', observed_temperature_monthly_average)
 observed_temperature_anomaly = observed_temperature_anomaly['__xarray_dataarray_variable___ANOMALY']
@@ -377,178 +354,40 @@ schemes = {
     "CHRIS_CAPPED_EXPONENT": all_anomalies_ds["CHRIS_CAPPED_EXPONENT"]
 }
 
-#%%
-#--- 2. Helper Functions ---------------------------------------------------
+for key in schemes:
+    schemes[key] = schemes[key].isel(TIME=slice(1, None))
 
-def get_clean_error_distribution(test_da, obs_da):
-    """
-    Calculates error (Test - Obs), slices time, and returns 
-    a flattened numpy array with NaNs removed.
-    """
-    # 1. Align and Slice (Time slice 1:end)
-    test_sliced = test_da.isel(TIME=slice(1, None))
-    obs_sliced = obs_da.isel(TIME=slice(1, None))
+
+fig, axes = plt.subplots(3, 3, figsize=(12,7))
+
+
+for ax, (scheme_name, model_da) in zip(axes.flat, schemes.items()):
+    # Calculate RMSE over the 'TIME' dimension
+    # new_data = model_da.isel(LATITUDE=slice(0,-90) and )
+    # observed_temperature_anomaly_selected = observed_temperature_anomaly.isel(LATITUDE=slice(0,-90))
+    rmse_map = calculate_RMSE(observed_temperature_anomaly, model_da, dim='TIME')
     
-    # 2. Calculate Error (xarray handles alignment automatically)
-    error_da = test_sliced - obs_sliced
-    
-    # 3. Flatten and drop NaNs
-    flat_error = error_da.values.flatten()
-    return flat_error[~np.isnan(flat_error)]
-
-#%%
-#--- 3. Calculate Errors ---------------------------------------------------
-
-# Dictionary to store processed error arrays
-error_distributions = {}
-
-print("Calculating errors...")
-
-# summer_indices = [
-#     i for i in range(180)
-#     if (i % 12 in [5, 6, 7]) and (i != 0)
-# ]
-
-# print(f"Summer indices: {summer_indices}")
-
-for name, data in schemes.items():
-    print(f"Processing {name}...")
-    new_data = data.isel(LATITUDE=slice(0,-90))
-    observed_temperature_anomaly_selected = observed_temperature_anomaly.isel(LATITUDE=slice(0,-90))
-    error_distributions[name] = get_clean_error_distribution(new_data, observed_temperature_anomaly_selected)
-
-
-#%%
-#--- 4. Plotting: Histograms with Middle 50% Region (IQR) ------------------
-
-# Create a figure with enough subplots
-num_schemes = len(schemes)
-cols = 2
-rows = int(np.ceil(num_schemes / cols))
-
-fig, axes = plt.subplots(rows, cols, figsize=(15, 6 * rows), constrained_layout=True)
-axes_flat = axes.flatten()
-
-for i, (name, err_data) in enumerate(error_distributions.items()):
-    ax = axes_flat[i]
-    
-    # 1. Plot Histogram
-    sns.kdeplot(err_data, bw_adjust=1.0, label=name, ax=ax)
-    
-    # 2. Calculate Percentiles
-    # The middle 50% lies between the 25th and 75th percentiles
-    q25, q75 = np.percentile(err_data, [25, 75])
-    
-    # 3. Add Shaded Region for Middle 50%
-    # axvspan draws a vertical span (rectangle) across the plot
-    ax.axvspan(q25, q75, color='green', alpha=0.2, label='Middle 50% (IQR)')
-    ax.axvline(q25, color='green', linestyle=':', linewidth=1.5)
-    ax.axvline(q75, color='green', linestyle=':', linewidth=1.5)
-
-    ax.axvline(np.min(err_data), color='firebrick', linestyle='--', alpha=0.6, label=f'Min: {np.min(err_data):.2e}')
-    ax.axvline(np.max(err_data), color='darkorange', linestyle='--', alpha=0.6, label=f'Max: {np.max(err_data):.2e}')
-    
-    # 4. Add Reference Lines
-    ax.axvline(0, color='black', linewidth=1, alpha=0.5)
-
-    # 5. Formatting & Annotations
-    ax.set_title(f"{name} Scheme Error Distribution")
-    ax.set_xlabel("Error (K)")
-    ax.set_ylabel("Frequency")
-
-    # Add text annotation to show the width of this region
-    iqr_width = q75 - q25
-    # Place text near the top of the range
-    y_limits = ax.get_ylim()
-    ax.text(5, y_limits[1]*0.5, f"IQR Width:\n{iqr_width:.3f} K", 
-            horizontalalignment='center', color='darkgreen', fontweight='bold')
-    ax.legend(loc='upper right', fontsize = 'x-small')
-
-    #skewness and kurtosis
-    err_data_skew = skew(err_data, axis=0, bias=True)
-    err_data_kurt = kurtosis(err_data, axis=0, bias=True)
-    ax.text(0.9,0.01, f"Skewness = {err_data_skew:.3f} \n Kurtosis = {err_data_kurt:.3f}")
-
-
-# Turn off unused subplots
-if len(axes_flat) > num_schemes:
-    for j in range(num_schemes, len(axes_flat)):
-        axes_flat[j].axis('off')
-
+    # Plotting
+    # ax = plt.subplot(3, 2, i + 1)
+    rmse_map.plot(ax=ax, cmap='nipy_spectral', cbar_kwargs={'label': 'RMSE (K)'}, vmin = 0, vmax = 3)
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Lattitude")
+    ax.set_title(f'{scheme_name} Scheme - Overall RMSE')
+    max_rmse = rmse_map.max().item()
+    print(scheme_name, max_rmse)
+plt.tight_layout()
+fig.delaxes(axes[2, 1]) # Removes the 8th subplot (row 2, column 1)
+fig.delaxes(axes[2, 2])
 fig.text(
     0.99, 0.01,
     f"Gamma = {gamma_0}\n"
     f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
     f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
     f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
-    ha='right', va='bottom', fontsize=12
-)
-plt.show()
-
-#%%
-#--- 5. Plotting: Combined KDE (Log Scale) ---------------------------------
-
-plt.figure(figsize=(12, 7))
-
-for name, err_data in error_distributions.items():
-    # KDE plot
-    sns.kdeplot(err_data, bw_adjust=1.0, label=name)
-
-# Formatting
-plt.xlim(-10, 10)        
-plt.yscale("log")      
-plt.ylim(1e-4, 1e2)
-plt.title("Comparison of Temporal Error Distributions (Log-Scale)")
-plt.xlabel("Error (K)")
-plt.ylabel("Probability Density (Log Scale)")
-plt.legend()
-plt.grid(True, which="both", ls="--", alpha=0.3)
-plt.text(
-    0.99, 0.01,
-    f"Gamma = {gamma_0}\n"
-    f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
-    f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
-    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
     ha='right', va='bottom', fontsize=18
 )
 plt.show()
 
 
 
-#%%
-#--- 6. Plotting: Cumulative Distribution Function (CDF) with 50% Box ------
-
-plt.figure(figsize=(12, 7))
-
-# Iterate through schemes and plot their CDF
-for name, err_data in error_distributions.items():
-    sns.ecdfplot(data=err_data, label=name, linewidth=2, alpha=0.5)
-
-# Add reference lines
-plt.axvline(0, color='black', linestyle='--', alpha=0.5, linewidth=1, label="Zero Error")
-plt.axhline(0.5, color='black', linestyle=':', alpha=0.5, label="50% Probability")
-
-# Add Guidelines for the 25% - 75% probability zone
-plt.axhline(0.25, color='gray', linestyle=':', alpha=0.5)
-plt.axhline(0.75, color='gray', linestyle=':', alpha=0.5)
-plt.text(plt.xlim()[0], 0.25, " 25%", verticalalignment='bottom', color='gray')
-plt.text(plt.xlim()[0], 0.75, " 75%", verticalalignment='bottom', color='gray')
-
-plt.axhspan(0.25, 0.75, color='grey' , alpha=0.2)
-
-# Formatting
-plt.title("Cumulative Distribution Function (CDF) of Errors")
-plt.xlabel("Error (K)")
-plt.ylabel("Proportion")
-plt.xlim(-5, 5) # Adjust this limit based on your data range
-plt.grid(True, alpha=0.3)
-plt.legend()
-plt.text(
-    0.99, 0.01,
-    f"Gamma = {gamma_0}\n"
-    f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
-    f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
-    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
-    ha='right', va='bottom', fontsize=18
-)
-plt.show()
+# %%
