@@ -1,5 +1,5 @@
 """
-Prepare Mixed Layer Depth (h) and (hbar) datasets.
+Calculate Mixed Layer Depth (h) and (hbar) datasets.
 
 Chengyun Zhu
 2026-1-6
