@@ -7,18 +7,19 @@ from utils import get_monthly_mean, make_movie
 
 matplotlib.use('TkAgg')
 
-FLUX_CONTRIBUTIONS_DATA_PATH = "../datasets/flux_components.nc"
-T_SUB_DATA_PATH = "../datasets/t_sub.nc"
-ENTRAINMENT_VEL_DATA_PATH = "../datasets/Entrainment_Velocity-(2004-2018).nc"
+FLUX_CONTRIBUTIONS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/flux_components.nc"
+T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub.nc"
+ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Entrainment_Velocity-(2004-2018).nc"
 all_components = xr.open_dataset(FLUX_CONTRIBUTIONS_DATA_PATH, decode_times=False)
 t_sub = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
 entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
 entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
 
-all_components["TOTAL_FLUX_ANOMALY"] = abs(all_components["SURFACE_FLUX_ANOMALY"]) + abs(all_components["EKMAN_FLUX_ANOMALY"]) + abs(all_components["ENTRAINMENT_FLUX_ANOMALY"])
+all_components["TOTAL_FLUX_ANOMALY"] = abs(all_components["SURFACE_FLUX_ANOMALY"]) + abs(all_components["EKMAN_FLUX_ANOMALY"]) + abs(all_components["ENTRAINMENT_FLUX_IMPLICIT_ANOMALY"]) + abs(all_components["GEOSTROPHIC_FLUX_ANOMALY"])
 all_components["SURFACE_FLUX_PROPORTION"] = abs(all_components["SURFACE_FLUX_ANOMALY"]) / all_components["TOTAL_FLUX_ANOMALY"]
 all_components["EKMAN_FLUX_PROPORTION"] = abs(all_components["EKMAN_FLUX_ANOMALY"]) / all_components["TOTAL_FLUX_ANOMALY"]
-all_components["ENTRAINMENT_FLUX_PROPORTION"] = abs(all_components["ENTRAINMENT_FLUX_ANOMALY"]) / all_components["TOTAL_FLUX_ANOMALY"]
+all_components["ENTRAINMENT_FLUX_PROPORTION"] = abs(all_components["ENTRAINMENT_FLUX_IMPLICIT_ANOMALY"]) / all_components["TOTAL_FLUX_ANOMALY"]
+all_components["GEOSTROPHIC_FLUX_PROPORTION"] = abs(all_components["GEOSTROPHIC_FLUX_ANOMALY"]) / all_components["TOTAL_FLUX_ANOMALY"]
 
 print(all_components)
 
@@ -53,7 +54,9 @@ print(all_components)
 # make_movie(all_components["TOTAL_FLUX_ANOMALY"], -50, 50, "Total Heat Flux")
 # make_movie(all_components["SURFACE_FLUX_PROPORTION"], 0, 1, "Surface Flux Proportion of Total Flux")
 # make_movie(all_components["EKMAN_FLUX_PROPORTION"], 0, 1, "Ekman Flux Proportion of Total Flux")
-make_movie(all_components["ENTRAINMENT_FLUX_PROPORTION"], 0, 1, "Entrainment Flux Proportion of Total Flux")
+# make_movie(all_components["ENTRAINMENT_FLUX_PROPORTION"], 0, 1, "Entrainment Flux Proportion of Total Flux")
+make_movie(all_components["GEOSTROPHIC_FLUX_PROPORTION"], 0, 1, "Geostrophic Flux Proportion of Total Flux")
+
 
 # make_movie(t_sub['T_sub'], 0, 30, "T_sub Anomaly")
 # make_movie(t_sub['T_sub_ANOMALY'], 0, 3, "T_sub Anomaly")
