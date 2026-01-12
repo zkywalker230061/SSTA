@@ -1,15 +1,20 @@
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
-from dask.diagnostics import ProgressBar
-
 from SSTA.Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset, compute_gradient_lon, compute_gradient_lat
 import matplotlib
 
+DOWNLOADED_SSH = False
+
 TEMP_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/RG_ArgoClim_Temperature_2019.nc"
 MEAN_TEMP_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Temperature_Monthly_Mean.nc"
-SEA_SURFACE_HEIGHT_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_interpolated_grad.nc"
+if DOWNLOADED_SSH:
+    SEA_SURFACE_HEIGHT_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_interpolated_grad.nc"
+    var_name = "sla"
+else:
+    SEA_SURFACE_HEIGHT_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_calculated_grad.nc"
+    var_name = "ssh"
 H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
 rho_0 = 1025.0
 c_0 = 4100.0
@@ -30,37 +35,30 @@ ssh_anomaly = xr.open_dataset(SEA_SURFACE_HEIGHT_DATA_PATH, decode_times=False)
 hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
 hbar_da = hbar_ds["MONTHLY_MEAN_MLD_PRESSURE"]
 
-temp_grad_lat = compute_gradient_lat(mean_temp["MONTHLY_MEAN_TEMPERATURE"])
-temp_grad_long = compute_gradient_lon(mean_temp["MONTHLY_MEAN_TEMPERATURE"])
-ssh_grad_anomaly_lat = ssh_anomaly['sla_anomaly_grad_lat']
-ssh_grad_anomaly_long = ssh_anomaly['sla_anomaly_grad_long']
+temp_grad_lat = compute_gradient_lat(mean_temp["MONTHLY_MEAN_TEMPERATURE"]).sel(PRESSURE=2.5)
+temp_grad_long = compute_gradient_lon(mean_temp["MONTHLY_MEAN_TEMPERATURE"]).sel(PRESSURE=2.5)
+ssh_grad_anomaly_lat = ssh_anomaly[var_name + '_anomaly_grad_lat']
+ssh_grad_anomaly_long = ssh_anomaly[var_name + '_anomaly_grad_long']
 
-#lat = temp_grad_lat["LATITUDE"]
-f = coriolis_parameter(ssh_anomaly['LATITUDE']).broadcast_like(ssh_anomaly['sla']).broadcast_like(ssh_grad_anomaly_long)
-
-# chunk into Dask arrays for efficiency
-time_chunk = -1
-lat_chunk = 40
-long_chunk = 40
-hbar_da = hbar_da.chunk({"MONTH": -1, "LATITUDE": lat_chunk, "LONGITUDE": long_chunk})
-f = f.chunk({"TIME": -1, "LATITUDE": lat_chunk, "LONGITUDE": long_chunk})
-ssh_grad_anomaly_lat = ssh_grad_anomaly_lat.chunk({"TIME": -1, "LATITUDE": lat_chunk, "LONGITUDE": long_chunk})
-temp_grad_long = temp_grad_long.chunk({"MONTH": -1, "LATITUDE": lat_chunk, "LONGITUDE": long_chunk})
-ssh_grad_anomaly_long = ssh_grad_anomaly_long.chunk({"TIME": -1, "LATITUDE": lat_chunk, "LONGITUDE": long_chunk})
-temp_grad_lat = temp_grad_lat.chunk({"MONTH": -1, "LATITUDE": lat_chunk, "LONGITUDE": long_chunk})
+f = coriolis_parameter(ssh_anomaly['LATITUDE']).broadcast_like(ssh_anomaly[var_name]).broadcast_like(ssh_grad_anomaly_long)    # broadcasting based on Jason/Julia's usage
 
 
-def get_geostrophic_term(time, hbar, f, ssh_lat, temp_lon, ssh_lon, temp_lat):
+def get_geostrophic_term(time, hbar, f, ssh_lat, temp_long, ssh_long, temp_lat):
     month = int((time + 0.5) % 12)
     if month == 0:
         month = 12
-    return (rho_0 * c_0 * hbar * g / f.sel(TIME=time)) * (ssh_lat.sel(TIME=time) * temp_lon.sel(MONTH=month) - ssh_lon.sel(TIME=time) * temp_lat.sel(MONTH=month))
-# seems to return something with a month dimension as well, which isn't helpful
+    return (rho_0 * c_0 * hbar.sel(MONTH=month) * g / f.sel(TIME=time)) * (ssh_lat.sel(TIME=time) * temp_long.sel(MONTH=month) - ssh_long.sel(TIME=time) * temp_lat.sel(MONTH=month))
+
 geostropic_anomalies = []
 for time in ssh_grad_anomaly_lat.TIME.values:
-    geostropic_anomalies.append(get_geostrophic_term(time, hbar_da, f, ssh_grad_anomaly_lat, temp_grad_long, ssh_grad_anomaly_long, temp_grad_lat))
+    geostrophic_term = get_geostrophic_term(time, hbar_da, f, ssh_grad_anomaly_lat, temp_grad_long, ssh_grad_anomaly_long, temp_grad_lat)
+    geostrophic_term = geostrophic_term.reset_coords(("PRESSURE", "MONTH"), drop=True)
+    geostropic_anomalies.append(geostrophic_term)
 geostrophic_anomaly = xr.concat(geostropic_anomalies, "TIME")
+geostrophic_anomaly = geostrophic_anomaly.rename("GEOSTROPHIC_ANOMALY")
 
 print(geostrophic_anomaly)
-with ProgressBar():
-    geostrophic_anomaly.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly.nc")
+if DOWNLOADED_SSH:
+    geostrophic_anomaly.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly_downloaded.nc")
+else:
+    geostrophic_anomaly.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly_calculated.nc")

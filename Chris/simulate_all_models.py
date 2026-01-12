@@ -9,12 +9,13 @@ import matplotlib
 
 matplotlib.use('TkAgg')
 
-INCLUDE_SURFACE = False
-INCLUDE_EKMAN = False
+INCLUDE_SURFACE = True
+INCLUDE_EKMAN = True
 INCLUDE_ENTRAINMENT = True
 INCLUDE_GEOSTROPHIC = True
 # first method for geostrophic: https://egusphere.copernicus.org/preprints/2025/egusphere-2025-3039/egusphere-2025-3039.pdf
-CLEAN_CHRIS_PREV_CUR = False        # only really useful when entrainment is turned on
+CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turned on
+USE_DOWNLOADED_SSH = False
 
 HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/heat_flux_interpolated_all_contributions.nc"
 EKMAN_ANOMALY_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Ekman_Current_Anomaly.nc"
@@ -26,7 +27,8 @@ H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Dept
 T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub.nc"
 T_SUB_DENOISED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub_denoised.nc"
 SEA_SURFACE_GRAD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_interpolated_grad.nc"
-GEOSTROPHIC_ANOMALY_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly.nc"
+GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly_downloaded.nc"
+GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly_calculated.nc"
 rho_0 = 1025.0
 c_0 = 4100.0
 gamma_0 = 10.0
@@ -56,7 +58,11 @@ entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=Fal
 entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
 entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
 
-geostrophic_anomaly_da = xr.open_dataset(GEOSTROPHIC_ANOMALY_DATA_PATH, decode_times=False)
+if USE_DOWNLOADED_SSH:
+    geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH, decode_times=False)
+else:
+    geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH, decode_times=False)
+geostrophic_anomaly_da = geostrophic_anomaly_ds["GEOSTROPHIC_ANOMALY"]
 
 sea_surface_grad_ds = xr.open_dataset(SEA_SURFACE_GRAD_DATA_PATH, decode_times=False)
 
@@ -147,7 +153,7 @@ for month in heat_flux_anomaly_ds.TIME.values:
         cur_geo_anom = geostrophic_anomaly_da.sel(TIME=month)
         cur_hbar = hbar_da.sel(MONTH=month_in_year)
 
-        # generate the right dataset depending on whether surface flux and/or Ekman terms are desired
+        # generate the right dataset depending on whether surface flux and/or Ekman and/or geostrophic terms are desired
         if INCLUDE_SURFACE and INCLUDE_EKMAN:
             cur_surf_ek = cur_heat_flux_anom + cur_ekman_anom
             prev_surf_ek = prev_heat_flux_anom + prev_ekman_anom
@@ -352,6 +358,10 @@ if INCLUDE_EKMAN:
     ekman_anomaly_da = ekman_anomaly_da.rename("EKMAN_FLUX_ANOMALY")
     flux_components_to_merge.append(ekman_anomaly_da)
     variable_names.append("EKMAN_FLUX_ANOMALY")
+if INCLUDE_GEOSTROPHIC:
+    geostrophic_anomaly_da = geostrophic_anomaly_da.rename("GEOSTROPHIC_FLUX_ANOMALY")
+    flux_components_to_merge.append(geostrophic_anomaly_da)
+    variable_names.append("GEOSTROPHIC_FLUX_ANOMALY")
 if INCLUDE_ENTRAINMENT:
     flux_components_to_merge.append(entrainment_flux_prev_cur_ds)
     flux_components_to_merge.append(entrainment_flux_mean_k_ds)
@@ -379,7 +389,7 @@ for variable_name in variable_names:
 flux_components_ds = remove_empty_attributes(flux_components_ds)
 print(flux_components_ds)
 
-flux_components_ds.to_netcdf("../datasets/flux_components.nc")
+flux_components_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/flux_components.nc")
 #
 # make_movie(all_anomalies_ds["EXPLICIT"], -5, 5)
 make_movie(all_anomalies_ds["IMPLICIT"], -2, 2)
