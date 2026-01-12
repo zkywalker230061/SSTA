@@ -1,8 +1,11 @@
 import gsw
-#import netCDF4 as nc
+import netCDF4 as nc
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
+import dask
+from dask.diagnostics import ProgressBar
+
 from utils import load_and_prepare_dataset, make_movie
 
 ALREADY_COMBINED = True
@@ -33,29 +36,20 @@ else:
     ds.to_netcdf("../datasets/RG_ArgoClim_Actual.nc")
 
 
-def get_alpha(ds, time):
-    ds = ds.sel(TIME=time)
-    SA = gsw.SA_from_SP(ds.MEASURED_SALINITY, ds.PRESSURE, ds.LONGITUDE, ds.LATITUDE)
-    CT = gsw.CT_from_t(SA, ds.MEASURED_TEMPERATURE, ds.PRESSURE)
-    alpha = gsw.alpha(SA, CT, ds.PRESSURE)
-    return alpha
+def get_alpha(salinity, temperature, pressure, longitude, latitude):
+    SA = gsw.SA_from_SP(salinity, pressure, longitude, latitude)
+    CT = gsw.CT_from_t(SA, temperature, pressure)
+    return gsw.alpha(SA, CT, pressure)
 
-alpha_list = []
-for time in ds.TIME.values:
-    print(time)
-    alpha = get_alpha(ds, time)
-    alpha_list.append(alpha)
-ds = None
-alpha_ds = xr.concat(alpha_list, "TIME")
-print("concatenate done")
-#print(alpha_ds)
+ds = ds.chunk({"TIME": -1, "PRESSURE": -1, "LATITUDE": 60, "LONGITUDE": 90})    # use dask arrays for considerably improved efficiency. hopeless without it (out of RAM on my machine)
 
-alpha_integrate = alpha_ds.sel(PRESSURE=slice(0, ref_pressure)).integrate("PRESSURE")
-print("integrate done")
-#print(alpha_integrate)
+alpha = xr.apply_ufunc(get_alpha,ds.MEASURED_SALINITY, ds.MEASURED_TEMPERATURE, ds.PRESSURE, ds.LONGITUDE, ds.LATITUDE, input_core_dims=[["PRESSURE"], ["PRESSURE"], ["PRESSURE"], [], []], output_core_dims=[["PRESSURE"]], vectorize=True, dask="parallelized")
+alpha_integrate = alpha.sel(PRESSURE=slice(0, ref_pressure)).integrate("PRESSURE")
 
-ssh = ref_dym_pressure + alpha_integrate
+ssh = (ref_dym_pressure + alpha_integrate) / g
 print("ssh obtained")
-#print(ssh)
+print(ssh)
+ssh = ssh.rename("ssh")
 
-ssh.to_netcdf("../datasets/sea_surface_calculated.nc")
+with ProgressBar():     # lengthy. adjust chunk sizes as needed; bigger chunk gives shorter loading time.
+    ssh.to_netcdf("../datasets/sea_surface_calculated.nc")

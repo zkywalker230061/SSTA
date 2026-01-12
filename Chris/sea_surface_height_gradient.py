@@ -1,7 +1,5 @@
 import xarray as xr
 import pandas as pd
-import eofs
-import xeofs as xe
 import matplotlib.pyplot as plt
 from SSTA.Chris.utils import make_movie, load_and_prepare_dataset, compute_gradient_lat, compute_gradient_lon, \
     get_monthly_mean, get_anomaly

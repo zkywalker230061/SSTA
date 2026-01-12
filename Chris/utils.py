@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import matplotlib
 import numpy as np
-#from scipy.linalg import svd
+from scipy.linalg import svd
 #import wpca
 #from wpca import EMPCA
 #import wpca
