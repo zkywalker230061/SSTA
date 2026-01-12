@@ -9,23 +9,29 @@ import matplotlib
 
 matplotlib.use('TkAgg')
 
-INCLUDE_SURFACE = True
-INCLUDE_EKMAN = True
+INCLUDE_SURFACE = False
+INCLUDE_EKMAN = False
 INCLUDE_ENTRAINMENT = True
-CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turned on
+INCLUDE_GEOSTROPHIC = True
+# first method for geostrophic: https://egusphere.copernicus.org/preprints/2025/egusphere-2025-3039/egusphere-2025-3039.pdf
+CLEAN_CHRIS_PREV_CUR = False        # only really useful when entrainment is turned on
 
-HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "../datasets/heat_flux_interpolated_all_contributions.nc"
-EKMAN_ANOMALY_DATA_PATH = "../datasets/Ekman_Current_Anomaly.nc"
-TEMP_DATA_PATH = "../datasets/RG_ArgoClim_Temperature_2019.nc"
-MLD_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
-ENTRAINMENT_VEL_DATA_PATH = "../datasets/Entrainment_Velocity-(2004-2018).nc"
-#H_BAR_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
-H_BAR_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
-T_SUB_DATA_PATH = "../datasets/t_sub.nc"
-T_SUB_DENOISED_DATA_PATH = "../datasets/t_sub_denoised.nc"
+HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/heat_flux_interpolated_all_contributions.nc"
+EKMAN_ANOMALY_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Ekman_Current_Anomaly.nc"
+TEMP_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/RG_ArgoClim_Temperature_2019.nc"
+MLD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
+ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Entrainment_Velocity-(2004-2018).nc"
+#H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
+H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
+T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub.nc"
+T_SUB_DENOISED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub_denoised.nc"
+SEA_SURFACE_GRAD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_interpolated_grad.nc"
+GEOSTROPHIC_ANOMALY_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly.nc"
 rho_0 = 1025.0
 c_0 = 4100.0
 gamma_0 = 10.0
+g = 9.81
+f = 1       # coriolis parameter
 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
 
@@ -49,6 +55,10 @@ t_sub_da = t_sub_ds["T_sub_ANOMALY"]
 entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
 entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
 entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
+
+geostrophic_anomaly_da = xr.open_dataset(GEOSTROPHIC_ANOMALY_DATA_PATH, decode_times=False)
+
+sea_surface_grad_ds = xr.open_dataset(SEA_SURFACE_GRAD_DATA_PATH, decode_times=False)
 
 
 def month_to_second(month):
@@ -110,10 +120,23 @@ for month in heat_flux_anomaly_ds.TIME.values:
         prev_semi_implicit_k_tm_anom = semi_implicit_model_anomalies[-1].isel(TIME=-1)
 
         # get previous data
+
+        # OLD METHOD FOR GEOSTROPHIC
+        # if INCLUDE_GEOSTROPHIC:
+        #     prev_tsub_anom_at_cur_loc = t_sub_da.sel(TIME=prev_month)
+        #     alpha = g / f * sea_surface_grad_ds['sla_anomaly_grad_long']
+        #     beta = g / f * sea_surface_grad_ds['sla_anomaly_grad_lat']
+        #     back_x = prev_tsub_anom_at_cur_loc['LONGITUDE'] + alpha * month_to_second(1)
+        #     back_y = prev_tsub_anom_at_cur_loc['LATITUDE'] - beta * month_to_second(1)
+        #     prev_tsub_anom = prev_tsub_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y)
+        # else:
+        #     prev_tsub_anom = t_sub_da.sel(TIME=prev_month)
+
         prev_tsub_anom = t_sub_da.sel(TIME=prev_month)
         prev_heat_flux_anom = surface_flux_da.sel(TIME=prev_month)
         prev_ekman_anom = ekman_anomaly_da.sel(TIME=prev_month)
         prev_entrainment_vel = entrainment_vel_da.sel(MONTH=prev_month_in_year)
+        prev_geo_anom = geostrophic_anomaly_da.sel(TIME=prev_month)
         prev_hbar = hbar_da.sel(MONTH=prev_month_in_year)
 
         # get current data
@@ -121,6 +144,7 @@ for month in heat_flux_anomaly_ds.TIME.values:
         cur_heat_flux_anom = surface_flux_da.sel(TIME=month)
         cur_ekman_anom = ekman_anomaly_da.sel(TIME=month)
         cur_entrainment_vel = entrainment_vel_da.sel(MONTH=month_in_year)
+        cur_geo_anom = geostrophic_anomaly_da.sel(TIME=month)
         cur_hbar = hbar_da.sel(MONTH=month_in_year)
 
         # generate the right dataset depending on whether surface flux and/or Ekman terms are desired
@@ -139,6 +163,10 @@ for month in heat_flux_anomaly_ds.TIME.values:
         else:       # just a way to get a zero dataset
             cur_surf_ek = cur_ekman_anom - cur_ekman_anom
             prev_surf_ek = prev_ekman_anom - prev_ekman_anom
+
+        if INCLUDE_GEOSTROPHIC:
+            cur_surf_ek = cur_surf_ek + cur_geo_anom
+            prev_surf_ek = prev_surf_ek + prev_geo_anom
 
         if INCLUDE_ENTRAINMENT:
             cur_b = cur_surf_ek / (rho_0 * c_0 * cur_hbar) + cur_entrainment_vel / cur_hbar * cur_tsub_anom
@@ -265,7 +293,7 @@ if CLEAN_CHRIS_PREV_CUR:
     n_modes = 20
     monthly_mean = get_monthly_mean(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"])
     map_mask = temperature_ds['BATHYMETRY_MASK'].sel(PRESSURE=2.5)
-    eof_ds, variance, PCs = get_eof_with_nan_consideration(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"], map_mask, modes=n_modes, monthly_mean_ds=None, tolerance=1e-2)
+    eof_ds, variance, PCs, EOFs = get_eof_with_nan_consideration(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"], map_mask, modes=n_modes, monthly_mean_ds=None, tolerance=1e-2)
     all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"] = eof_ds.rename("CHRIS_PREV_CUR_CLEAN")
     chris_prev_cur_clean_monthly_mean = get_monthly_mean(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"])
     all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"] = get_anomaly(all_anomalies_ds, "CHRIS_PREV_CUR_CLEAN", chris_prev_cur_clean_monthly_mean)["CHRIS_PREV_CUR_CLEAN_ANOMALY"]
@@ -273,7 +301,7 @@ if CLEAN_CHRIS_PREV_CUR:
 
 # save
 all_anomalies_ds = remove_empty_attributes(all_anomalies_ds) # when doing the seasonality removal, some units are None
-all_anomalies_ds.to_netcdf("../datasets/all_anomalies.nc")
+#all_anomalies_ds.to_netcdf("../datasets/all_anomalies.nc")
 
 # format entrainment flux datasets
 if INCLUDE_ENTRAINMENT:
@@ -354,7 +382,7 @@ print(flux_components_ds)
 flux_components_ds.to_netcdf("../datasets/flux_components.nc")
 #
 # make_movie(all_anomalies_ds["EXPLICIT"], -5, 5)
-# make_movie(all_anomalies_ds["IMPLICIT"], -5, 5)
+make_movie(all_anomalies_ds["IMPLICIT"], -2, 2)
 # make_movie(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"], -5, 5)
 # make_movie(all_anomalies_ds["CHRIS_MEAN_K"], -5, 5)
 
