@@ -10,7 +10,7 @@ from utils import load_and_prepare_dataset, make_movie
 
 ALREADY_COMBINED = True
 g = 9.81
-ref_pressure = 1000     # dbar (==m more or less); choose to be where horizontal gradient is 0
+ref_pressure = 2000     # dbar (==m more or less); choose to be where horizontal gradient is 0
 ref_dym_pressure = g * ref_pressure
 
 if ALREADY_COMBINED:
@@ -43,7 +43,7 @@ def get_alpha(salinity, temperature, pressure, longitude, latitude):
 
 ds = ds.chunk({"TIME": -1, "PRESSURE": -1, "LATITUDE": 60, "LONGITUDE": 90})    # use dask arrays for considerably improved efficiency. hopeless without it (out of RAM on my machine)
 
-alpha = xr.apply_ufunc(get_alpha,ds.MEASURED_SALINITY, ds.MEASURED_TEMPERATURE, ds.PRESSURE, ds.LONGITUDE, ds.LATITUDE, input_core_dims=[["PRESSURE"], ["PRESSURE"], ["PRESSURE"], [], []], output_core_dims=[["PRESSURE"]], vectorize=True, dask="parallelized")
+alpha = xr.apply_ufunc(get_alpha, ds.MEASURED_SALINITY, ds.MEASURED_TEMPERATURE, ds.PRESSURE, ds.LONGITUDE, ds.LATITUDE, input_core_dims=[["PRESSURE"], ["PRESSURE"], ["PRESSURE"], [], []], output_core_dims=[["PRESSURE"]], vectorize=True, dask="parallelized")
 alpha_integrate = alpha.sel(PRESSURE=slice(0, ref_pressure)).integrate("PRESSURE")
 
 ssh = (ref_dym_pressure + alpha_integrate) / g

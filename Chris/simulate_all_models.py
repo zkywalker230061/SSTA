@@ -12,7 +12,7 @@ matplotlib.use('TkAgg')
 INCLUDE_SURFACE = False
 INCLUDE_EKMAN = False
 INCLUDE_ENTRAINMENT = True
-INCLUDE_GEOSTROPHIC = False
+INCLUDE_GEOSTROPHIC = True
 # first method for geostrophic: https://egusphere.copernicus.org/preprints/2025/egusphere-2025-3039/egusphere-2025-3039.pdf
 CLEAN_CHRIS_PREV_CUR = False        # only really useful when entrainment is turned on
 
@@ -26,6 +26,7 @@ H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Dept
 T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub.nc"
 T_SUB_DENOISED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub_denoised.nc"
 SEA_SURFACE_GRAD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_interpolated_grad.nc"
+GEOSTROPHIC_ANOMALY_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly.nc"
 rho_0 = 1025.0
 c_0 = 4100.0
 gamma_0 = 10.0
@@ -54,6 +55,8 @@ t_sub_da = t_sub_ds["T_sub_ANOMALY"]
 entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
 entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
 entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
+
+geostrophic_anomaly_da = xr.open_dataset(GEOSTROPHIC_ANOMALY_DATA_PATH, decode_times=False)
 
 sea_surface_grad_ds = xr.open_dataset(SEA_SURFACE_GRAD_DATA_PATH, decode_times=False)
 
@@ -117,19 +120,23 @@ for month in heat_flux_anomaly_ds.TIME.values:
         prev_semi_implicit_k_tm_anom = semi_implicit_model_anomalies[-1].isel(TIME=-1)
 
         # get previous data
-        if INCLUDE_GEOSTROPHIC:
-            prev_tsub_anom_at_cur_loc = t_sub_da.sel(TIME=prev_month)
-            alpha = g / f * sea_surface_grad_ds['sla_anomaly_grad_long']
-            beta = g / f * sea_surface_grad_ds['sla_anomaly_grad_lat']
-            back_x = prev_tsub_anom_at_cur_loc['LONGITUDE'] + alpha * month_to_second(1)
-            back_y = prev_tsub_anom_at_cur_loc['LATITUDE'] - beta * month_to_second(1)
-            prev_tsub_anom = prev_tsub_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y)
-        else:
-            prev_tsub_anom = t_sub_da.sel(TIME=prev_month)
 
+        # OLD METHOD FOR GEOSTROPHIC
+        # if INCLUDE_GEOSTROPHIC:
+        #     prev_tsub_anom_at_cur_loc = t_sub_da.sel(TIME=prev_month)
+        #     alpha = g / f * sea_surface_grad_ds['sla_anomaly_grad_long']
+        #     beta = g / f * sea_surface_grad_ds['sla_anomaly_grad_lat']
+        #     back_x = prev_tsub_anom_at_cur_loc['LONGITUDE'] + alpha * month_to_second(1)
+        #     back_y = prev_tsub_anom_at_cur_loc['LATITUDE'] - beta * month_to_second(1)
+        #     prev_tsub_anom = prev_tsub_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y)
+        # else:
+        #     prev_tsub_anom = t_sub_da.sel(TIME=prev_month)
+
+        prev_tsub_anom = t_sub_da.sel(TIME=prev_month)
         prev_heat_flux_anom = surface_flux_da.sel(TIME=prev_month)
         prev_ekman_anom = ekman_anomaly_da.sel(TIME=prev_month)
         prev_entrainment_vel = entrainment_vel_da.sel(MONTH=prev_month_in_year)
+        prev_geo_anom = geostrophic_anomaly_da.sel(TIME=prev_month)
         prev_hbar = hbar_da.sel(MONTH=prev_month_in_year)
 
         # get current data
@@ -137,6 +144,7 @@ for month in heat_flux_anomaly_ds.TIME.values:
         cur_heat_flux_anom = surface_flux_da.sel(TIME=month)
         cur_ekman_anom = ekman_anomaly_da.sel(TIME=month)
         cur_entrainment_vel = entrainment_vel_da.sel(MONTH=month_in_year)
+        cur_geo_anom = geostrophic_anomaly_da.sel(TIME=month)
         cur_hbar = hbar_da.sel(MONTH=month_in_year)
 
         # generate the right dataset depending on whether surface flux and/or Ekman terms are desired
@@ -155,6 +163,10 @@ for month in heat_flux_anomaly_ds.TIME.values:
         else:       # just a way to get a zero dataset
             cur_surf_ek = cur_ekman_anom - cur_ekman_anom
             prev_surf_ek = prev_ekman_anom - prev_ekman_anom
+
+        if INCLUDE_GEOSTROPHIC:
+            cur_surf_ek = cur_surf_ek + cur_geo_anom
+            prev_surf_ek = prev_surf_ek + prev_geo_anom
 
         if INCLUDE_ENTRAINMENT:
             cur_b = cur_surf_ek / (rho_0 * c_0 * cur_hbar) + cur_entrainment_vel / cur_hbar * cur_tsub_anom
