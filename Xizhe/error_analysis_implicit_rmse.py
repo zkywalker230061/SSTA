@@ -11,11 +11,11 @@ import matplotlib.pyplot as plt
 
 matplotlib.use('TkAgg')
 
-INCLUDE_SURFACE = False
+INCLUDE_SURFACE = True
     ## INCLUDE_RADIATIVE = True
     ## INCLUDE_TURBULENT = True
-INCLUDE_EKMAN = False
-INCLUDE_ENTRAINMENT = False
+INCLUDE_EKMAN = True
+INCLUDE_ENTRAINMENT = True
 CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turned on
 
 observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature(T_m).nc"
@@ -29,9 +29,14 @@ ENTRAINMENT_VEL_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelli
 H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
 H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
 T_SUB_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/t_sub.nc"
+
+implicit_path = "/Users/julia/Desktop/SSTA/datasets/implicit_1111_10eofs.nc"
+implicit = xr.open_dataset(implicit_path, decode_times=False)
+implicit_ds = implicit["__xarray_dataarray_variable__"]
+
 rho_0 = 1025.0
 c_0 = 4100.0
-gamma_0 = 0
+gamma_0 = 10
 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
 observed_temp_ds = xr.open_dataset(observed_path, decode_times=False)
@@ -223,7 +228,7 @@ fig, axes = plt.subplots(1, 1, figsize=(8,5))
 
 
 scheme_name = "Implicit"
-rmse_map = calculate_RMSE(observed_temperature_anomaly, implicit_model_anomaly_ds, dim='TIME')
+rmse_map = calculate_RMSE(observed_temperature_anomaly, implicit_ds, dim='TIME')
 
 # Plotting
 # ax = plt.subplot(3, 2, i + 1)
