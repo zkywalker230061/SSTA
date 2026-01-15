@@ -26,3 +26,15 @@ datasets/Mixed_Layer_Temperature-(2004-2018).nc
 1768440312.7207837
 datasets/Mixed_Layer_Salinity-(2004-2018).nc
 1768440403.9186742
+datasets/Mixed_Layer_Temperature-Seasonal_Cycle_Mean.nc
+1768477132.1937618
+datasets/Mixed_Layer_Salinity-Seasonal_Cycle_Mean.nc
+1768477132.434581
+datasets/Mixed_Layer_Temperature_Anomaly-(2004-2018).nc
+1768477133.6741645
+datasets/Mixed_Layer_Salinity_Anomaly-(2004-2018).nc
+1768477135.111427
+datasets/Mixed_Layer_Temperature_Anomaly-Seasonal_Cycle_Mean.nc
+1768478193.5158617
+datasets/Mixed_Layer_Salinity_Anomaly-Seasonal_Cycle_Mean.nc
+1768478193.794684
