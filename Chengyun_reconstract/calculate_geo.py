@@ -11,10 +11,10 @@ import gsw
 
 from utilities import load_and_prepare_dataset
 # from utilities import get_monthly_mean, get_anomaly
-from utilities import save_file
+# from utilities import save_file
 
 g = 9.81
-ref_pressure = 1000     # dbar (==m more or less); choose to be where horizontal gradient is 0
+ref_pressure = 2000     # dbar (==m more or less); choose to be where horizontal gradient is 0
 ref_dym_pressure = g * ref_pressure
 
 
@@ -42,4 +42,4 @@ print("ssh obtained")
 print(ssh)
 ssh = ssh.rename("ssh")
 
-# ssh.to_netcdf("../datasets/sea_surface_calculated.nc")
+# ssh.to_netcdf("datasets/sea_surface_calculated.nc")
