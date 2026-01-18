@@ -109,7 +109,7 @@ def save_temperature_anomalies():
     """Save temperature anomaly dataset."""
 
     with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Temperature_Anomaly-(2004-2018).nc" in logs_datasets.read():
+        if "datasets/Temperature_Anomalies-(2004-2018).nc" in logs_datasets.read():
             return
 
     t = load_and_prepare_dataset(
@@ -122,14 +122,14 @@ def save_temperature_anomalies():
         t,
         t_monthly_mean
     )
-    save_file(t_a, "datasets/Temperature_Anomaly-(2004-2018).nc")
+    save_file(t_a, "datasets/Temperature_Anomalies-(2004-2018).nc")
 
 
 def save_salinity_anomalies():
     """Save salinity anomaly dataset."""
 
     with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Salinity_Anomaly-(2004-2018).nc" in logs_datasets.read():
+        if "datasets/Salinity_Anomalies-(2004-2018).nc" in logs_datasets.read():
             return
 
     s = load_and_prepare_dataset(
@@ -142,7 +142,7 @@ def save_salinity_anomalies():
         s,
         s_monthly_mean
     )
-    save_file(s_a, "datasets/Salinity_Anomaly-(2004-2018).nc")
+    save_file(s_a, "datasets/Salinity_Anomalies-(2004-2018).nc")
 
 
 def _trapezoid_mean(quantity, depth, h_single):
@@ -314,7 +314,7 @@ def save_mixed_layer_temperature_anomalies():
     """Save mixed layer temperature anomaly dataset."""
 
     with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Mixed_Layer_Temperature_Anomaly-(2004-2018).nc" in logs_datasets.read():
+        if "datasets/Mixed_Layer_Temperature_Anomalies-(2004-2018).nc" in logs_datasets.read():
             return
 
     t_m = load_and_prepare_dataset(
@@ -329,7 +329,7 @@ def save_mixed_layer_temperature_anomalies():
     )
     save_file(
         t_m_a,
-        "datasets/Mixed_Layer_Temperature_Anomaly-(2004-2018).nc"
+        "datasets/Mixed_Layer_Temperature_Anomalies-(2004-2018).nc"
     )
 
 
@@ -337,7 +337,7 @@ def save_mixed_layer_salinity_anomalies():
     """Save mixed layer salinity anomaly dataset."""
 
     with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Mixed_Layer_Salinity_Anomaly-(2004-2018).nc" in logs_datasets.read():
+        if "datasets/Mixed_Layer_Salinity_Anomalies-(2004-2018).nc" in logs_datasets.read():
             return
 
     s_m = load_and_prepare_dataset(
@@ -352,7 +352,7 @@ def save_mixed_layer_salinity_anomalies():
     )
     save_file(
         s_m_a,
-        "datasets/Mixed_Layer_Salinity_Anomaly-(2004-2018).nc"
+        "datasets/Mixed_Layer_Salinity_Anomalies-(2004-2018).nc"
     )
 
 

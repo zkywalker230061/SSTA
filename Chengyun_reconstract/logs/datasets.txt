@@ -6,13 +6,13 @@ datasets/Temperature-Seasonal_Mean.nc
 1767707802.9015105
 datasets/Salinity-Seasonal_Mean.nc
 1767707806.818691
-datasets/Salinity_Anomaly-(2004-2018).nc
+datasets/Salinity_Anomalies-(2004-2018).nc
 1767707822.0973604
 datasets/Mixed_Layer_Depth-(2004-2018).nc
 1768324266.6303885
 datasets/Mixed_Layer_Depth-Seasonal_Mean.nc
 1768324268.0461767
-datasets/Temperature_Anomaly-(2004-2018).nc
+datasets/Temperature_Anomalies-(2004-2018).nc
 1768325073.7547972
 datasets/Sub_Layer_Temperature-(2004-2018).nc
 1768339501.1969721
@@ -26,9 +26,9 @@ datasets/Mixed_Layer_Temperature-Seasonal_Mean.nc
 1768477132.1937618
 datasets/Mixed_Layer_Salinity-Seasonal_Mean.nc
 1768477132.434581
-datasets/Mixed_Layer_Temperature_Anomaly-(2004-2018).nc
+datasets/Mixed_Layer_Temperature_Anomalies-(2004-2018).nc
 1768477133.6741645
-datasets/Mixed_Layer_Salinity_Anomaly-(2004-2018).nc
+datasets/Mixed_Layer_Salinity_Anomalies-(2004-2018).nc
 1768477135.111427
 datasets/Mixed_Layer_Entrainment_Velocity-(2004-2018).nc
 1768689397.7668908
@@ -36,9 +36,9 @@ datasets/Sub_Layer_Temperature-Seasonal_Mean.nc
 1768690598.7112842
 datasets/Sub_Layer_Salinity-Seasonal_Mean.nc
 1768690598.8421202
-datasets/Sub_Layer_Temperature_Anomaly-(2004-2018).nc
+datasets/Sub_Layer_Temperature_Anomalies-(2004-2018).nc
 1768690599.1386003
-datasets/Sub_Layer_Salinity_Anomaly-(2004-2018).nc
+datasets/Sub_Layer_Salinity_Anomalies-(2004-2018).nc
 1768690599.4419122
 datasets/Mixed_Layer_Entrainment_Velocity-Seasonal_Mean.nc
 1768694649.5071354
@@ -78,3 +78,7 @@ datasets/Simulation-Ekman_Heat_Flux-(2004-2018).nc
 1768751399.0205896
 datasets/Simulation-Ekman_Water_Rate-(2004-2018).nc
 1768751795.781298
+datasets/Simulation-Geostrophic_Heat_Flux-(2004-2018).nc
+1768755842.5354352
+datasets/Simulation-Geostrophic_Water_Rate-(2004-2018).nc
+1768755880.9333217

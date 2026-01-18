@@ -222,7 +222,7 @@ def save_sub_temperature_anomalies():
     """Save the sub-layer temperature anomalies dataset."""
 
     with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Sub_Layer_Temperature_Anomaly-(2004-2018).nc" in logs_datasets.read():
+        if "datasets/Sub_Layer_Temperature_Anomalies-(2004-2018).nc" in logs_datasets.read():
             return
 
     t_sub = load_and_prepare_dataset(
@@ -233,11 +233,11 @@ def save_sub_temperature_anomalies():
         'datasets/Sub_Layer_Temperature-Seasonal_Mean.nc'
     )['MONTHLY_MEAN_SUB_TEMPERATURE']
 
-    t_sub_anomaly = get_anomaly(t_sub, t_sub_monthly_mean)
+    t_sub_a = get_anomaly(t_sub, t_sub_monthly_mean)
 
     save_file(
-        t_sub_anomaly,
-        'datasets/Sub_Layer_Temperature_Anomaly-(2004-2018).nc'
+        t_sub_a,
+        'datasets/Sub_Layer_Temperature_Anomalies-(2004-2018).nc'
     )
 
 
@@ -245,7 +245,7 @@ def save_sub_salinity_anomalies():
     """Save the sub-layer salinity anomalies dataset."""
 
     with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Sub_Layer_Salinity_Anomaly-(2004-2018).nc" in logs_datasets.read():
+        if "datasets/Sub_Layer_Salinity_Anomalies-(2004-2018).nc" in logs_datasets.read():
             return
 
     s_sub = load_and_prepare_dataset(
@@ -256,11 +256,11 @@ def save_sub_salinity_anomalies():
         'datasets/Sub_Layer_Salinity-Seasonal_Mean.nc'
     )['MONTHLY_MEAN_SUB_SALINITY']
 
-    s_sub_anomaly = get_anomaly(s_sub, s_sub_monthly_mean)
+    s_sub_a = get_anomaly(s_sub, s_sub_monthly_mean)
 
     save_file(
-        s_sub_anomaly,
-        'datasets/Sub_Layer_Salinity_Anomaly-(2004-2018).nc'
+        s_sub_a,
+        'datasets/Sub_Layer_Salinity_Anomalies-(2004-2018).nc'
     )
 
 
@@ -331,10 +331,10 @@ def save_entrainment_anomaly_temperature():
             return
 
     t_sub_a = load_and_prepare_dataset(
-        "datasets/Sub_Layer_Temperature_Anomaly-(2004-2018).nc"
+        "datasets/Sub_Layer_Temperature_Anomalies-(2004-2018).nc"
     )['ANOMALY_SUB_TEMPERATURE']
     t_m_a = load_and_prepare_dataset(
-        "datasets/Mixed_Layer_Temperature_Anomaly-(2004-2018).nc"
+        "datasets/Mixed_Layer_Temperature_Anomalies-(2004-2018).nc"
     )['ANOMALY_ML_TEMPERATURE']
     w_e_monthly_mean = load_and_prepare_dataset(
         "datasets/Mixed_Layer_Entrainment_Velocity-Seasonal_Mean.nc"
@@ -368,10 +368,10 @@ def save_entrainment_anomaly_salinity():
             return
 
     s_sub_a = load_and_prepare_dataset(
-        "datasets/Sub_Layer_Salinity_Anomaly-(2004-2018).nc"
+        "datasets/Sub_Layer_Salinity_Anomalies-(2004-2018).nc"
     )['ANOMALY_SUB_SALINITY']
     s_m_a = load_and_prepare_dataset(
-        "datasets/Mixed_Layer_Salinity_Anomaly-(2004-2018).nc"
+        "datasets/Mixed_Layer_Salinity_Anomalies-(2004-2018).nc"
     )['ANOMALY_ML_SALINITY']
     w_e_monthly_mean = load_and_prepare_dataset(
         "datasets/Mixed_Layer_Entrainment_Velocity-Seasonal_Mean.nc"
