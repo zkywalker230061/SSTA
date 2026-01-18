@@ -3,7 +3,10 @@ import cdsapi
 dataset = "reanalysis-era5-single-levels-monthly-means"
 request = {
     "product_type": ["monthly_averaged_reanalysis"],
-    "variable": ["mean_evaporation_rate"],
+    "variable": [
+        "mean_evaporation_rate",
+        "mean_total_precipitation_rate"
+    ],
     "year": [
         "2004", "2005", "2006",
         "2007", "2008", "2009",

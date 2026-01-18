@@ -3,7 +3,12 @@ import cdsapi
 dataset = "reanalysis-era5-single-levels-monthly-means"
 request = {
     "product_type": ["monthly_averaged_reanalysis"],
-    "variable": ["mean_total_precipitation_rate"],
+    "variable": [
+        "mean_surface_latent_heat_flux",
+        "mean_surface_net_long_wave_radiation_flux",
+        "mean_surface_net_short_wave_radiation_flux",
+        "mean_surface_sensible_heat_flux"
+    ],
     "year": [
         "2004", "2005", "2006",
         "2007", "2008", "2009",
@@ -24,3 +29,4 @@ request = {
 
 client = cdsapi.Client()
 client.retrieve(dataset, request).download()
+

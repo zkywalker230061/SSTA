@@ -54,7 +54,7 @@ def _find_half_quantity(depth, quantity, mld):
     return mld_quantity
 
 
-def get_monthly_sub_temperature(t, h, month):
+def _get_monthly_sub_temperature(t, h, month):
     """
     Get sub-layer temperature for a given month.
 
@@ -98,7 +98,7 @@ def save_sub_temperature():
     monthly_datasets = []
     for month in t.TIME.values:
         monthly_datasets.append(
-            get_monthly_sub_temperature(t, h, month)
+            _get_monthly_sub_temperature(t, h, month)
         )
     t_sub = xr.concat(monthly_datasets, dim="TIME",
                       coords="different", compat='equals')
@@ -117,7 +117,7 @@ def save_sub_temperature():
     )
 
 
-def get_monthly_sub_salinity(s, h, month):
+def _get_monthly_sub_salinity(s, h, month):
     """
     Get sub-layer salinity for a given month.
 
@@ -161,7 +161,7 @@ def save_sub_salinity():
     monthly_datasets = []
     for month in s.TIME.values:
         monthly_datasets.append(
-            get_monthly_sub_salinity(s, h, month)
+            _get_monthly_sub_salinity(s, h, month)
         )
     s_sub = xr.concat(monthly_datasets, dim="TIME",
                       coords="different", compat='equals')
@@ -344,18 +344,18 @@ def save_entrainment_anomaly_temperature():
     w_e_monthly_mean = w_e_monthly_mean.rename({'MONTH': 'TIME'})
     w_e_monthly_mean['TIME'] = t_m_a.TIME
 
-    q_entrainment_prime = RHO_O * C_O * w_e_monthly_mean * (t_sub_a - t_m_a)
+    q_entrainment_a = RHO_O * C_O * w_e_monthly_mean * (t_sub_a - t_m_a)
 
-    q_entrainment_prime = q_entrainment_prime.drop_vars('MONTH')
+    q_entrainment_a = q_entrainment_a.drop_vars('MONTH')
 
-    q_entrainment_prime.attrs['units'] = 'W/m^2'
-    q_entrainment_prime.attrs['long_name'] = (
+    q_entrainment_a.attrs['units'] = 'W/m^2'
+    q_entrainment_a.attrs['long_name'] = (
         'Monthly Q_Entrainment Anomaly Jan 2004 - Dec 2018 (15.0 year)'
     )
-    q_entrainment_prime.name = 'ANOMALY_ENTRAINMENT_HEAT_FLUX'
+    q_entrainment_a.name = 'ANOMALY_ENTRAINMENT_HEAT_FLUX'
 
     save_file(
-        q_entrainment_prime,
+        q_entrainment_a,
         "datasets/Simulation-Entrainment_Heat_Flux-(2004-2018).nc"
     )
 
@@ -364,7 +364,7 @@ def save_entrainment_anomaly_salinity():
     """Save the Q_Entrainment dataset for salinity."""
 
     with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Simulation-Entrainment_Water_Flux-(2004-2018).nc" in logs_datasets.read():
+        if "datasets/Simulation-Entrainment_Water_Rate-(2004-2018).nc" in logs_datasets.read():
             return
 
     s_sub_a = load_and_prepare_dataset(
@@ -381,19 +381,19 @@ def save_entrainment_anomaly_salinity():
     w_e_monthly_mean = w_e_monthly_mean.rename({'MONTH': 'TIME'})
     w_e_monthly_mean['TIME'] = s_m_a.TIME
 
-    q_entrainment_salt_prime = RHO_O * w_e_monthly_mean * (s_sub_a - s_m_a)
+    q_entrainment_salt_a = RHO_O * w_e_monthly_mean * (s_sub_a - s_m_a)
 
-    q_entrainment_salt_prime = q_entrainment_salt_prime.drop_vars('MONTH')
+    q_entrainment_salt_a = q_entrainment_salt_a.drop_vars('MONTH')
 
-    q_entrainment_salt_prime.attrs['units'] = 'kg/m^2/s'
-    q_entrainment_salt_prime.attrs['long_name'] = (
-        'Monthly Q_Entrainment Water Flux Anomaly Jan 2004 - Dec 2018 (15.0 year)'
+    q_entrainment_salt_a.attrs['units'] = 'kg/m^2/s'
+    q_entrainment_salt_a.attrs['long_name'] = (
+        'Monthly Q_Entrainment Water Rate Anomaly Jan 2004 - Dec 2018 (15.0 year)'
     )
-    q_entrainment_salt_prime.name = 'ANOMALY_ENTRAINMENT_WATER_FLUX'
+    q_entrainment_salt_a.name = 'ANOMALY_ENTRAINMENT_WATER_RATE'
 
     save_file(
-        q_entrainment_salt_prime,
-        "datasets/Simulation-Entrainment_Water_Flux-(2004-2018).nc"
+        q_entrainment_salt_a,
+        "datasets/Simulation-Entrainment_Water_Rate-(2004-2018).nc"
     )
 
 
