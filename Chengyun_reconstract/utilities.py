@@ -180,11 +180,6 @@ def save_file(
             logs_datasets.write(str(time.time()) + "\n")
 
 
-def main():
-    """Main function for testing utilities."""
+if __name__ == "__main__":
 
     pass
-
-
-if __name__ == "__main__":
-    main()

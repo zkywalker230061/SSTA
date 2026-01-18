@@ -89,7 +89,6 @@ def _find_half_depth(density_anomaly_profile, pressure, density_anomaly_surface_
 def _find_surface_density_anomaly_mean(ds: xr.Dataset) -> None:
     """
     Find the mean density anomaly near the surface (top 10 dbar).
-    TODO: TEMPORARY FUNCTION.
 
     Parameters
     ----------
@@ -102,48 +101,48 @@ def _find_surface_density_anomaly_mean(ds: xr.Dataset) -> None:
     ds['SURFACE_DENSITY_ANOMALY_MEAN'] = sigma0_surface_mean
 
 
-def _find_depth_iteration(density_anomaly_profile, pressure):
-    """
-    Find the mixed layer depth (hbar) from a density anomaly profile using iterative method.
+# def _find_depth_iteration(density_anomaly_profile, pressure):
+#     """
+#     Find the mixed layer depth (hbar) from a density anomaly profile using iterative method.
 
-    Parameters
-    ----------
-    density_anomaly_profile : np.ndarray
-        1D array of density anomaly values at different pressures.
-    pressure : np.ndarray
-        1D array of pressure values corresponding to the density profile.
+#     Parameters
+#     ----------
+#     density_anomaly_profile : np.ndarray
+#         1D array of density anomaly values at different pressures.
+#     pressure : np.ndarray
+#         1D array of pressure values corresponding to the density profile.
 
-    Returns
-    -------
-    float
-        The pressure at the mixed layer depth (hbar).
-        Returns MAX_DEPTH if not found, or -inf for land.
-    """
+#     Returns
+#     -------
+#     float
+#         The pressure at the mixed layer depth (hbar).
+#         Returns MAX_DEPTH if not found, or -inf for land.
+#     """
 
-    # sort pressure and temperature to be in order of increasing pressure
-    indices_increasing_pressure = np.argsort(pressure)
-    pressure = pressure[indices_increasing_pressure]
-    density_anomaly_profile = density_anomaly_profile[indices_increasing_pressure]
+#     # sort pressure and temperature to be in order of increasing pressure
+#     indices_increasing_pressure = np.argsort(pressure)
+#     pressure = pressure[indices_increasing_pressure]
+#     density_anomaly_profile = density_anomaly_profile[indices_increasing_pressure]
 
-    sigma0_surface_mean = density_anomaly_profile[:1].mean()
+#     sigma0_surface_mean = density_anomaly_profile[:1].mean()
 
-    # land
-    if np.isnan(sigma0_surface_mean):
-        return -np.inf
+#     # land
+#     if np.isnan(sigma0_surface_mean):
+#         return -np.inf
 
-    i = 1
-    while (
-        abs(density_anomaly_profile[i+1] - sigma0_surface_mean) < HBAR_DDIFF
-        and i <= len(pressure)-1
-    ):
-        sigma0_surface_mean = (
-            density_anomaly_profile[:i+1].mean()
-        )
-        i += 1
-    mld = pressure[i]
-    if mld <= MAX_DEPTH:
-        return mld
-    return MAX_DEPTH
+#     i = 1
+#     while (
+#         abs(density_anomaly_profile[i+1] - sigma0_surface_mean) < HBAR_DDIFF
+#         and i <= len(pressure)-1
+#     ):
+#         sigma0_surface_mean = (
+#             density_anomaly_profile[:i+1].mean()
+#         )
+#         i += 1
+#     mld = pressure[i]
+#     if mld <= MAX_DEPTH:
+#         return mld
+#     return MAX_DEPTH
 
 
 def get_monthly_mld(
@@ -239,7 +238,7 @@ def save_monthly_mean_mld():
     """Save the monthly mean of the mixed layer depth dataset."""
 
     with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Mixed_Layer_Depth-Seasonal_Cycle_Mean.nc" in logs_datasets.read():
+        if "datasets/Mixed_Layer_Depth-Seasonal_Mean.nc" in logs_datasets.read():
             return
 
     h = load_and_prepare_dataset(
@@ -249,7 +248,7 @@ def save_monthly_mean_mld():
 
     save_file(
         h_monthly_mean,
-        "datasets/Mixed_Layer_Depth-Seasonal_Cycle_Mean.nc"
+        "datasets/Mixed_Layer_Depth-Seasonal_Mean.nc"
     )
 
 

@@ -75,7 +75,7 @@ def save_monthly_mean_temperature():
     """Save the monthly mean temperature dataset."""
 
     with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Temperature-Seasonal_Cycle_Mean.nc" in logs_datasets.read():
+        if "datasets/Temperature-Seasonal_Mean.nc" in logs_datasets.read():
             return
 
     t = load_and_prepare_dataset(
@@ -84,7 +84,7 @@ def save_monthly_mean_temperature():
     t_monthly_mean = get_monthly_mean(t)
     save_file(
         t_monthly_mean,
-        "datasets/Temperature-Seasonal_Cycle_Mean.nc"
+        "datasets/Temperature-Seasonal_Mean.nc"
     )
 
 
@@ -92,7 +92,7 @@ def save_monthly_mean_salinity():
     """Save the monthly mean salinity dataset."""
 
     with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Salinity-Seasonal_Cycle_Mean.nc" in logs_datasets.read():
+        if "datasets/Salinity-Seasonal_Mean.nc" in logs_datasets.read():
             return
 
     s = load_and_prepare_dataset(
@@ -101,7 +101,7 @@ def save_monthly_mean_salinity():
     s_monthly_mean = get_monthly_mean(s)
     save_file(
         s_monthly_mean,
-        "datasets/Salinity-Seasonal_Cycle_Mean.nc"
+        "datasets/Salinity-Seasonal_Mean.nc"
     )
 
 
@@ -116,7 +116,7 @@ def save_temperature_anomalies():
         "datasets/Temperature-(2004-2018).nc",
     )['TEMPERATURE']
     t_monthly_mean = load_and_prepare_dataset(
-        "datasets/Temperature-Seasonal_Cycle_Mean.nc",
+        "datasets/Temperature-Seasonal_Mean.nc",
     )['MONTHLY_MEAN_TEMPERATURE']
     t_a = get_anomaly(
         t,
@@ -136,7 +136,7 @@ def save_salinity_anomalies():
         "datasets/Salinity-(2004-2018).nc",
     )['SALINITY']
     s_monthly_mean = load_and_prepare_dataset(
-        "datasets/Salinity-Seasonal_Cycle_Mean.nc",
+        "datasets/Salinity-Seasonal_Mean.nc",
     )['MONTHLY_MEAN_SALINITY']
     s_a = get_anomaly(
         s,
@@ -280,7 +280,7 @@ def save_monthly_mean_mixed_layer_temperature():
     """Save the monthly mean mixed layer temperature dataset."""
 
     with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Mixed_Layer_Temperature-Seasonal_Cycle_Mean.nc" in logs_datasets.read():
+        if "datasets/Mixed_Layer_Temperature-Seasonal_Mean.nc" in logs_datasets.read():
             return
 
     t_m = load_and_prepare_dataset(
@@ -289,7 +289,7 @@ def save_monthly_mean_mixed_layer_temperature():
     t_m_monthly_mean = get_monthly_mean(t_m)
     save_file(
         t_m_monthly_mean,
-        "datasets/Mixed_Layer_Temperature-Seasonal_Cycle_Mean.nc"
+        "datasets/Mixed_Layer_Temperature-Seasonal_Mean.nc"
     )
 
 
@@ -297,7 +297,7 @@ def save_monthly_mean_mixed_layer_salinity():
     """Save the monthly mean mixed layer salinity dataset."""
 
     with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Mixed_Layer_Salinity-Seasonal_Cycle_Mean.nc" in logs_datasets.read():
+        if "datasets/Mixed_Layer_Salinity-Seasonal_Mean.nc" in logs_datasets.read():
             return
 
     s_m = load_and_prepare_dataset(
@@ -306,7 +306,7 @@ def save_monthly_mean_mixed_layer_salinity():
     s_m_monthly_mean = get_monthly_mean(s_m)
     save_file(
         s_m_monthly_mean,
-        "datasets/Mixed_Layer_Salinity-Seasonal_Cycle_Mean.nc"
+        "datasets/Mixed_Layer_Salinity-Seasonal_Mean.nc"
     )
 
 
@@ -321,7 +321,7 @@ def save_mixed_layer_temperature_anomalies():
         "datasets/Mixed_Layer_Temperature-(2004-2018).nc",
     )['ML_TEMPERATURE']
     t_m_monthly_mean = load_and_prepare_dataset(
-        "datasets/Mixed_Layer_Temperature-Seasonal_Cycle_Mean.nc",
+        "datasets/Mixed_Layer_Temperature-Seasonal_Mean.nc",
     )['MONTHLY_MEAN_ML_TEMPERATURE']
     t_m_a = get_anomaly(
         t_m,
@@ -344,7 +344,7 @@ def save_mixed_layer_salinity_anomalies():
         "datasets/Mixed_Layer_Salinity-(2004-2018).nc",
     )['ML_SALINITY']
     s_m_monthly_mean = load_and_prepare_dataset(
-        "datasets/Mixed_Layer_Salinity-Seasonal_Cycle_Mean.nc",
+        "datasets/Mixed_Layer_Salinity-Seasonal_Mean.nc",
     )['MONTHLY_MEAN_ML_SALINITY']
     s_m_a = get_anomaly(
         s_m,
