@@ -44,8 +44,6 @@ datasets/Mixed_Layer_Entrainment_Velocity-Seasonal_Mean.nc
 1768694649.5071354
 datasets/Simulation-Entrainment_Heat_Flux-(2004-2018).nc
 1768698693.055833
-datasets/Simulation-Entrainment_Water_Rate-(2004-2018).nc
-1768698693.2623038
 datasets/Sea_Surface_Height-(2004-2018).nc
 1768700459.3216279
 datasets/Sea_Surface_Height-Seasonal_Mean.nc
@@ -74,11 +72,13 @@ datasets/Turbulent_Surface_Stress-Seasonal_Mean.nc
 1768704618.6223648
 datasets/Turbulent_Surface_Stress_Anomalies-(2004-2018).nc
 1768704619.1161697
+datasets/Simulation-Entrainment_Water_Rate-(2004-2018).nc
+1768761242.6086676
 datasets/Simulation-Ekman_Heat_Flux-(2004-2018).nc
-1768751399.0205896
+1768761812.6738124
 datasets/Simulation-Ekman_Water_Rate-(2004-2018).nc
-1768751795.781298
+1768761813.0338652
 datasets/Simulation-Geostrophic_Heat_Flux-(2004-2018).nc
-1768755842.5354352
+1768761987.5428154
 datasets/Simulation-Geostrophic_Water_Rate-(2004-2018).nc
-1768755880.9333217
+1768761988.5837429

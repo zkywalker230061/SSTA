@@ -263,27 +263,24 @@ def save_geostrophic_anomaly_temperature():
         np.deg2rad(t_m_monthly_mean['LATITUDE'])
     )
     f = f.expand_dims(LONGITUDE=t_m_monthly_mean['LONGITUDE'])
-    f = f.where(
-        (t_m_monthly_mean['LATITUDE'] > 5) | (t_m_monthly_mean['LATITUDE'] < -5)
-    )
 
-    q_geo_a = RHO_O * C_O * G / f * h_monthly_mean * (
+    q_geostrophic_a = RHO_O * C_O * G / f * h_monthly_mean * (
         (dssh_a_dy_da * dt_m_monthly_mean_dx_da)
         - (dssh_a_dx_da * dt_m_monthly_mean_dy_da)
         + (dssh_monthly_mean_dy_da * dt_m_a_dx_da)
         - (dssh_monthly_mean_dx_da * dt_m_a_dy_da)
     )
 
-    q_geo_a = q_geo_a.drop_vars('MONTH')
+    q_geostrophic_a = q_geostrophic_a.drop_vars('MONTH')
 
-    q_geo_a.attrs['units'] = 'W/m^2'
-    q_geo_a.attrs['long_name'] = (
+    q_geostrophic_a.attrs['units'] = 'W/m^2'
+    q_geostrophic_a.attrs['long_name'] = (
         'Monthly Q_Geostrophic Anomaly Jan 2004 - Dec 2018 (15.0 year)'
     )
-    q_geo_a.name = 'ANOMALY_GEOSTROPHIC_HEAT_FLUX'
+    q_geostrophic_a.name = 'ANOMALY_GEOSTROPHIC_HEAT_FLUX'
 
     save_file(
-        q_geo_a,
+        q_geostrophic_a,
         "datasets/Simulation-Geostrophic_Heat_Flux-(2004-2018).nc"
     )
 
@@ -429,27 +426,24 @@ def save_geostrophic_anomaly_salinity():
         np.deg2rad(s_m_monthly_mean['LATITUDE'])
     )
     f = f.expand_dims(LONGITUDE=s_m_monthly_mean['LONGITUDE'])
-    f = f.where(
-        (s_m_monthly_mean['LATITUDE'] > 5) | (s_m_monthly_mean['LATITUDE'] < -5)
-    )
 
-    q_geo_a = RHO_O * G / f * h_monthly_mean * (
+    q_geostrophic_a = RHO_O * G / f * h_monthly_mean * (
         (dssh_a_dy_da * ds_m_monthly_mean_dx_da)
         - (dssh_a_dx_da * ds_m_monthly_mean_dy_da)
         + (dssh_monthly_mean_dy_da * ds_m_a_dx_da)
         - (dssh_monthly_mean_dx_da * ds_m_a_dy_da)
     )
 
-    q_geo_a = q_geo_a.drop_vars('MONTH')
+    q_geostrophic_a = q_geostrophic_a.drop_vars('MONTH')
 
-    q_geo_a.attrs['units'] = 'kg/m^2/s'
-    q_geo_a.attrs['long_name'] = (
+    q_geostrophic_a.attrs['units'] = 'kg/m^2/s'
+    q_geostrophic_a.attrs['long_name'] = (
         'Monthly Q_Geostrophic Anomaly Jan 2004 - Dec 2018 (15.0 year)'
     )
-    q_geo_a.name = 'ANOMALY_GEOSTROPHIC_WATER_RATE'
+    q_geostrophic_a.name = 'ANOMALY_GEOSTROPHIC_WATER_RATE'
 
     save_file(
-        q_geo_a,
+        q_geostrophic_a,
         "datasets/Simulation-Geostrophic_Water_Rate-(2004-2018).nc"
     )
 

@@ -119,9 +119,6 @@ def save_ekman_anomaly_temperature():
         np.deg2rad(t_m_monthly_mean['LATITUDE'])
     )
     f = f.expand_dims(LONGITUDE=t_m_monthly_mean['LONGITUDE'])
-    f = f.where(
-        (t_m_monthly_mean['LATITUDE'] > 5) | (t_m_monthly_mean['LATITUDE'] < -5)
-    )
 
     q_ekman_a = C_O / f * (
         tao_a_ds['ANOMALY_avg_iews'] * dt_m_monthly_mean_dy_da -
@@ -189,9 +186,6 @@ def save_ekman_anomaly_salinity():
         np.deg2rad(s_m_monthly_mean['LATITUDE'])
     )
     f = f.expand_dims(LONGITUDE=s_m_monthly_mean['LONGITUDE'])
-    f = f.where(
-        (s_m_monthly_mean['LATITUDE'] > 5) | (s_m_monthly_mean['LATITUDE'] < -5)
-    )
 
     q_ekman_a = 1 / f * (
         tao_a_ds['ANOMALY_avg_iews'] * dt_m_monthly_mean_dy_da -
