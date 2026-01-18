@@ -82,19 +82,15 @@ def save_surface_heat_flux_anomalies():
         "datasets/Surface_Heat_Flux-Seasonal_Mean.nc"
     )
 
-    lh_anomalies = get_anomaly(q_surface['avg_slhtf'],
-                               q_surface_monthly_mean['MONTHLY_MEAN_avg_slhtf'])
-    sh_anomalies = get_anomaly(q_surface['avg_ishf'],
-                               q_surface_monthly_mean['MONTHLY_MEAN_avg_ishf'])
-    sw_anomalies = get_anomaly(q_surface['avg_snswrf'],
-                               q_surface_monthly_mean['MONTHLY_MEAN_avg_snswrf'])
-    lw_anomalies = get_anomaly(q_surface['avg_snlwrf'],
-                               q_surface_monthly_mean['MONTHLY_MEAN_avg_snlwrf'])
+    lh_a = get_anomaly(q_surface['avg_slhtf'], q_surface_monthly_mean['MONTHLY_MEAN_avg_slhtf'])
+    sh_a = get_anomaly(q_surface['avg_ishf'], q_surface_monthly_mean['MONTHLY_MEAN_avg_ishf'])
+    sw_a = get_anomaly(q_surface['avg_snswrf'], q_surface_monthly_mean['MONTHLY_MEAN_avg_snswrf'])
+    lw_a = get_anomaly(q_surface['avg_snlwrf'], q_surface_monthly_mean['MONTHLY_MEAN_avg_snlwrf'])
 
-    q_surface_anomalies = lh_anomalies.to_dataset(name='ANOMALY_avg_slhtf')
-    q_surface_anomalies['ANOMALY_avg_ishf'] = sh_anomalies
-    q_surface_anomalies['ANOMALY_avg_snswrf'] = sw_anomalies
-    q_surface_anomalies['ANOMALY_avg_snlwrf'] = lw_anomalies
+    q_surface_anomalies = lh_a.to_dataset(name='ANOMALY_avg_slhtf')
+    q_surface_anomalies['ANOMALY_avg_ishf'] = sh_a
+    q_surface_anomalies['ANOMALY_avg_snswrf'] = sw_a
+    q_surface_anomalies['ANOMALY_avg_snlwrf'] = lw_a
 
     save_file(
         q_surface_anomalies,
@@ -116,13 +112,11 @@ def save_surface_water_rate_anomalies():
         "datasets/Surface_Water_Rate-Seasonal_Mean.nc"
     )
 
-    eva_anomalies = get_anomaly(q_surface['avg_ie'],
-                                q_surface_monthly_mean['MONTHLY_MEAN_avg_ie'])
-    pre_anomalies = get_anomaly(q_surface['avg_tprate'],
-                                q_surface_monthly_mean['MONTHLY_MEAN_avg_tprate'])
+    eva_a = get_anomaly(q_surface['avg_ie'], q_surface_monthly_mean['MONTHLY_MEAN_avg_ie'])
+    pre_a = get_anomaly(q_surface['avg_tprate'], q_surface_monthly_mean['MONTHLY_MEAN_avg_tprate'])
 
-    q_surface_anomalies = eva_anomalies.to_dataset(name='ANOMALY_avg_ie')
-    q_surface_anomalies['ANOMALY_avg_tprate'] = pre_anomalies
+    q_surface_anomalies = eva_a.to_dataset(name='ANOMALY_avg_ie')
+    q_surface_anomalies['ANOMALY_avg_tprate'] = pre_a
 
     save_file(
         q_surface_anomalies,

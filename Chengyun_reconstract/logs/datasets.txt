@@ -70,3 +70,7 @@ datasets/Simulation-Surface_Heat_Flux-(2004-2018).nc
 1768704081.5706854
 datasets/Simulation-Surface_Water_Rate-(2004-2018).nc
 1768704081.6448245
+datasets/Turbulent_Surface_Stress-Seasonal_Mean.nc
+1768704618.6223648
+datasets/Turbulent_Surface_Stress_Anomalies-(2004-2018).nc
+1768704619.1161697
