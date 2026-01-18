@@ -118,11 +118,11 @@ def save_temperature_anomalies():
     t_monthly_mean = load_and_prepare_dataset(
         "datasets/Temperature-Seasonal_Cycle_Mean.nc",
     )['MONTHLY_MEAN_TEMPERATURE']
-    ta = get_anomaly(
+    t_a = get_anomaly(
         t,
         t_monthly_mean
     )
-    save_file(ta, "datasets/Temperature_Anomaly-(2004-2018).nc")
+    save_file(t_a, "datasets/Temperature_Anomaly-(2004-2018).nc")
 
 
 def save_salinity_anomalies():
@@ -138,45 +138,11 @@ def save_salinity_anomalies():
     s_monthly_mean = load_and_prepare_dataset(
         "datasets/Salinity-Seasonal_Cycle_Mean.nc",
     )['MONTHLY_MEAN_SALINITY']
-    sa = get_anomaly(
+    s_a = get_anomaly(
         s,
         s_monthly_mean
     )
-    save_file(sa, "datasets/Salinity_Anomaly-(2004-2018).nc")
-
-
-def save_monthly_mean_temperature_anomalies():
-    """Save monthly mean temperature anomaly dataset."""
-
-    with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Temperature_Anomaly-Seasonal_Cycle_Mean.nc" in logs_datasets.read():
-            return
-
-    ta = load_and_prepare_dataset(
-        "datasets/Temperature_Anomaly-(2004-2018).nc",
-    )['ANOMALY_TEMPERATURE']
-    ta_monthly_mean = get_monthly_mean(ta)
-    save_file(
-        ta_monthly_mean,
-        "datasets/Temperature_Anomaly-Seasonal_Cycle_Mean.nc"
-    )
-
-
-def save_monthly_mean_salinity_anomalies():
-    """Save monthly mean salinity anomaly dataset."""
-
-    with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Salinity_Anomaly-Seasonal_Cycle_Mean.nc" in logs_datasets.read():
-            return
-
-    sa = load_and_prepare_dataset(
-        "datasets/Salinity_Anomaly-(2004-2018).nc",
-    )['ANOMALY_SALINITY']
-    sa_monthly_mean = get_monthly_mean(sa)
-    save_file(
-        sa_monthly_mean,
-        "datasets/Salinity_Anomaly-Seasonal_Cycle_Mean.nc"
-    )
+    save_file(s_a, "datasets/Salinity_Anomaly-(2004-2018).nc")
 
 
 def _trapezoid_mean(quantity, depth, h_single):
@@ -357,12 +323,12 @@ def save_mixed_layer_temperature_anomalies():
     t_m_monthly_mean = load_and_prepare_dataset(
         "datasets/Mixed_Layer_Temperature-Seasonal_Cycle_Mean.nc",
     )['MONTHLY_MEAN_ML_TEMPERATURE']
-    t_ma = get_anomaly(
+    t_m_a = get_anomaly(
         t_m,
         t_m_monthly_mean
     )
     save_file(
-        t_ma,
+        t_m_a,
         "datasets/Mixed_Layer_Temperature_Anomaly-(2004-2018).nc"
     )
 
@@ -380,47 +346,13 @@ def save_mixed_layer_salinity_anomalies():
     s_m_monthly_mean = load_and_prepare_dataset(
         "datasets/Mixed_Layer_Salinity-Seasonal_Cycle_Mean.nc",
     )['MONTHLY_MEAN_ML_SALINITY']
-    s_ma = get_anomaly(
+    s_m_a = get_anomaly(
         s_m,
         s_m_monthly_mean
     )
     save_file(
-        s_ma,
+        s_m_a,
         "datasets/Mixed_Layer_Salinity_Anomaly-(2004-2018).nc"
-    )
-
-
-def save_monthly_mean_mixed_layer_temperature_anomalies():
-    """Save monthly mean mixed layer temperature anomaly dataset."""
-
-    with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Mixed_Layer_Temperature_Anomaly-Seasonal_Cycle_Mean.nc" in logs_datasets.read():
-            return
-
-    t_ma = load_and_prepare_dataset(
-        "datasets/Mixed_Layer_Temperature_Anomaly-(2004-2018).nc",
-    )['ANOMALY_ML_TEMPERATURE']
-    t_ma_monthly_mean = get_monthly_mean(t_ma)
-    save_file(
-        t_ma_monthly_mean,
-        "datasets/Mixed_Layer_Temperature_Anomaly-Seasonal_Cycle_Mean.nc"
-    )
-
-
-def save_monthly_mean_mixed_layer_salinity_anomalies():
-    """Save monthly mean mixed layer salinity anomaly dataset."""
-
-    with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Mixed_Layer_Salinity_Anomaly-Seasonal_Cycle_Mean.nc" in logs_datasets.read():
-            return
-
-    s_ma = load_and_prepare_dataset(
-        "datasets/Mixed_Layer_Salinity_Anomaly-(2004-2018).nc",
-    )['ANOMALY_ML_SALINITY']
-    s_ma_monthly_mean = get_monthly_mean(s_ma)
-    save_file(
-        s_ma_monthly_mean,
-        "datasets/Mixed_Layer_Salinity_Anomaly-Seasonal_Cycle_Mean.nc"
     )
 
 
@@ -433,8 +365,6 @@ def main():
     save_monthly_mean_salinity()
     save_temperature_anomalies()
     save_salinity_anomalies()
-    save_monthly_mean_temperature_anomalies()
-    save_monthly_mean_salinity_anomalies()
 
     save_mixed_layer_temperature()
     save_mixed_layer_salinity()
@@ -442,8 +372,6 @@ def main():
     save_monthly_mean_mixed_layer_salinity()
     save_mixed_layer_temperature_anomalies()
     save_mixed_layer_salinity_anomalies()
-    save_monthly_mean_mixed_layer_temperature_anomalies()
-    save_monthly_mean_mixed_layer_salinity_anomalies()
 
 
 if __name__ == "__main__":
