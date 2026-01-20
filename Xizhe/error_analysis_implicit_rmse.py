@@ -16,6 +16,7 @@ INCLUDE_SURFACE = True
     ## INCLUDE_TURBULENT = True
 INCLUDE_EKMAN = True
 INCLUDE_ENTRAINMENT = True
+INCLUDE_GEOSTROPHIC = False
 CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turned on
 
 observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature(T_m).nc"
@@ -29,14 +30,18 @@ ENTRAINMENT_VEL_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelli
 H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
 H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
 T_SUB_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/t_sub.nc"
+GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = '/Users/julia/Desktop/SSTA/datasets/data_for_modelling/geostrophic_anomaly_downloaded.nc'
 
-implicit_path = "/Users/julia/Desktop/SSTA/datasets/implicit_1111_10eofs.nc"
+
+implicit_path = "/Users/julia/Desktop/SSTA/datasets/implicit_1111_gamma30_10eofs.nc"
 implicit = xr.open_dataset(implicit_path, decode_times=False)
 implicit_ds = implicit["__xarray_dataarray_variable__"]
 
 rho_0 = 1025.0
 c_0 = 4100.0
-gamma_0 = 10
+gamma_0 = 30.0
+g = 9.81
+f = 1 
 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
 observed_temp_ds = xr.open_dataset(observed_path, decode_times=False)
@@ -61,6 +66,9 @@ t_sub_da = t_sub_ds["T_sub_ANOMALY"]
 entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
 entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
 entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
+
+geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH, decode_times=False)
+geostrophic_anomaly_da = geostrophic_anomaly_ds["GEOSTROPHIC_ANOMALY"]
 
 
 def month_to_second(month):
@@ -103,6 +111,8 @@ for month in heat_flux_anomaly_ds.TIME.values:
         prev_ekman_anom = ekman_anomaly_da.sel(TIME=prev_month)
         prev_entrainment_vel = entrainment_vel_da.sel(MONTH=prev_month_in_year)
         prev_hbar = hbar_da.sel(MONTH=prev_month_in_year)
+        prev_geo_anom = geostrophic_anomaly_da.sel(TIME=prev_month)
+
 
         # get current data
         cur_tsub_anom = t_sub_da.sel(TIME=month)
@@ -110,6 +120,8 @@ for month in heat_flux_anomaly_ds.TIME.values:
         cur_ekman_anom = ekman_anomaly_da.sel(TIME=month)
         cur_entrainment_vel = entrainment_vel_da.sel(MONTH=month_in_year)
         cur_hbar = hbar_da.sel(MONTH=month_in_year)
+        cur_geo_anom = geostrophic_anomaly_da.sel(TIME=month)
+
 
         # generate the right dataset depending on whether surface flux and/or Ekman terms are desired
         if INCLUDE_SURFACE and INCLUDE_EKMAN:
@@ -127,6 +139,10 @@ for month in heat_flux_anomaly_ds.TIME.values:
         else:       # just a way to get a zero dataset
             cur_surf_ek = cur_ekman_anom - cur_ekman_anom
             prev_surf_ek = prev_ekman_anom - prev_ekman_anom
+
+        if INCLUDE_GEOSTROPHIC:
+            cur_surf_ek = cur_surf_ek + cur_geo_anom
+            prev_surf_ek = prev_surf_ek + prev_geo_anom
 
         if INCLUDE_ENTRAINMENT:
             cur_b = cur_surf_ek / (rho_0 * c_0 * cur_hbar) + cur_entrainment_vel / cur_hbar * cur_tsub_anom
@@ -228,7 +244,9 @@ fig, axes = plt.subplots(1, 1, figsize=(8,5))
 
 
 scheme_name = "Implicit"
-rmse_map = calculate_RMSE(observed_temperature_anomaly, implicit_ds, dim='TIME')
+rmse_map = calculate_RMSE(observed_temperature_anomaly, implicit_model_anomaly_ds, dim='TIME')
+# rmse_map = calculate_RMSE(observed_temperature_anomaly, implicit_ds, dim='TIME')
+
 
 # Plotting
 # ax = plt.subplot(3, 2, i + 1)
@@ -244,7 +262,8 @@ fig.text(
     f"Gamma = {gamma_0}\n"
     f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
     f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
-    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
+    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
+    f"INCLUDE_GEOSTROPHIC = {INCLUDE_GEOSTROPHIC}",
     ha='right', va='bottom', fontsize=18
 )
 plt.show()

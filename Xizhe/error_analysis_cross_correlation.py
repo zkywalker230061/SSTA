@@ -13,10 +13,10 @@ from scipy.stats import kurtosis, skew, pearsonr
 
 matplotlib.use('TkAgg')
 
-INCLUDE_SURFACE = True
-INCLUDE_EKMAN = True
+INCLUDE_SURFACE = False
+INCLUDE_EKMAN = False
 INCLUDE_ENTRAINMENT = True
-INCLUDE_GEOSTROPHIC = True
+INCLUDE_GEOSTROPHIC = False
 CLEAN_CHRIS_PREV_CUR = False        # only really useful when entrainment is turned on
 
 observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature(T_m).nc"
@@ -34,7 +34,7 @@ GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = '/Users/julia/Desktop/SSTA/datasets/d
 
 rho_0 = 1025.0
 c_0 = 4100.0
-gamma_0 = 10.0
+gamma_0 = 100
 g = 9.81
 f = 1 
 
@@ -179,16 +179,7 @@ implicit_model_anomaly_ds = xr.concat(implicit_model_anomalies, 'TIME')
 # rename all models
 implicit_model_anomaly_ds = implicit_model_anomaly_ds.rename("IMPLICIT")
 
-# # clean up prev_cur model
-# if CLEAN_CHRIS_PREV_CUR:
-#     all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"] = all_anomalies_ds["CHRIS_PREV_CUR"].where((all_anomalies_ds["CHRIS_PREV_CUR"] > -10) & (all_anomalies_ds["CHRIS_PREV_CUR"] < 10))
-#     n_modes = 20
-#     monthly_mean = get_monthly_mean(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"])
-#     map_mask = temperature_ds['BATHYMETRY_MASK'].sel(PRESSURE=2.5)
-#     eof_ds, variance, PCs = get_eof_with_nan_consideration(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"], map_mask, modes=n_modes, monthly_mean_ds=None, tolerance=1e-4)
-#     all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"] = eof_ds.rename("CHRIS_PREV_CUR_CLEAN")
-
-# save
+# save files
 # all_anomalies_ds.to_netcdf("../datasets/all_anomalies_10.nc")
 
 # format entrainment flux datasets
@@ -225,15 +216,25 @@ observed_temperature_anomaly = observed_temperature_anomaly['__xarray_dataarray_
 
 lat = observed_temperature_anomaly['LATITUDE'].values
 lon = observed_temperature_anomaly['LONGITUDE'].values
-print(lat, lon)
-correlation = xr.corr(observed_temperature_anomaly, implicit_model_anomaly_ds, dim='TIME')
-correlation_da = xr.DataArray(
-    correlation,
-    dims=("LATITUDE", "LONGITUDE"),
-    coords={"LATITUDE": lat, "LONGITUDE": lon},
-    name="correlation"
-)
 
+def get_cross_correlation(obs, model, month_lagged=0):
+    
+    model_lag = model.shift(TIME=month_lagged)                         #the model dataset is lagged by k months
+
+    correlation = xr.corr(obs, model_lag, dim='TIME')
+    correlation_da = xr.DataArray(
+        correlation,
+        dims=("LATITUDE", "LONGITUDE"),
+        coords={"LATITUDE": lat, "LONGITUDE": lon},
+        name="correlation"
+    )
+    return correlation_da
+
+correlation = get_cross_correlation(observed_temperature_anomaly, implicit_model_anomaly_ds, month_lagged=1)
+
+
+# print(observed_temperature_anomaly.mean)
+# print(implicit_model_anomaly_ds.mean)
 
 #%%
 
@@ -258,4 +259,7 @@ fig.text(
     ha='right', va='bottom', fontsize=8
 )
 plt.show()
+# %%
+
+# print(np.abs(implicit_model_anomaly_ds).mean())
 # %%
