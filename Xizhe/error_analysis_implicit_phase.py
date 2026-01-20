@@ -18,17 +18,17 @@ INCLUDE_EKMAN = True
 INCLUDE_ENTRAINMENT = False
 CLEAN_CHRIS_PREV_CUR = False        # only really useful when entrainment is turned on
 
-observed_path = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature(T_m).nc"
-HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = r"C:\Users\jason\MSciProject\heat_flux_interpolated_all_contributions.nc"
+observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature(T_m).nc"
+HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/heat_flux_interpolated_all_contributions.nc"
 # HEAT_FLUX_DATA_PATH = "../datasets/heat_flux_interpolated.nc"
-EKMAN_ANOMALY_DATA_PATH = r"C:\Users\jason\MSciProject\Ekman_Current_Anomaly.nc"
-TEMP_DATA_PATH = r"C:\Users\jason\MSciProject\RG_ArgoClim_Temperature_2019.nc"
-MLD_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure-(2004-2018).nc"
-ENTRAINMENT_VEL_DATA_PATH = r"C:\Users\jason\MSciProject\Entrainment_Velocity-(2004-2018).nc"
+EKMAN_ANOMALY_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Ekman_Current_Anomaly.nc"
+TEMP_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
+MLD_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
+ENTRAINMENT_VEL_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Entrainment_Velocity-(2004-2018).nc"
 # ENTRAINMENT_VEL_DENOISED_DATA_PATH = "../datasets/entrainment_vel_denoised.nc"
-H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
-H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
-T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\t_sub.nc"
+H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
+H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
+T_SUB_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/t_sub.nc"
 rho_0 = 1025.0
 c_0 = 4100.0
 gamma_0 = 10
@@ -348,7 +348,7 @@ fig, axes = plt.subplots(1, 1, figsize=(8,5))
 scheme_name = "Implicit"
 # Plotting
 # ax = plt.subplot(3, 2, i + 1)
-amplitudes.plot(ax=axes, cmap='viridis', cbar_kwargs={'label': 'Amplitude'}, vmin = -7, vmax = -1)
+amplitudes.plot(ax=axes, cmap='nipy_spectral', cbar_kwargs={'label': 'Amplitude'}, vmin = -7, vmax = -1)
 axes.set_xlabel("Longitude")
 axes.set_ylabel("Lattitude")
 axes.set_title(f'{scheme_name} Scheme - Amplitude Plot')

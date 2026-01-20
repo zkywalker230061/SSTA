@@ -9,29 +9,34 @@ from chris_utils import make_movie, get_eof_with_nan_consideration
 from chris_utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
 import matplotlib
-from scipy.stats import kurtosis, skew
+from scipy.stats import kurtosis, skew, pearsonr
 
 matplotlib.use('TkAgg')
 
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN = True
-INCLUDE_ENTRAINMENT = False
+INCLUDE_ENTRAINMENT = True
+INCLUDE_GEOSTROPHIC = True
 CLEAN_CHRIS_PREV_CUR = False        # only really useful when entrainment is turned on
 
-observed_path = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature(T_m).nc"
-HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = r"C:\Users\jason\MSciProject\heat_flux_interpolated_all_contributions.nc"
+observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature(T_m).nc"
+HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/heat_flux_interpolated_all_contributions.nc"
 # HEAT_FLUX_DATA_PATH = "../datasets/heat_flux_interpolated.nc"
-EKMAN_ANOMALY_DATA_PATH = r"C:\Users\jason\MSciProject\Ekman_Current_Anomaly.nc"
-TEMP_DATA_PATH = r"C:\Users\jason\MSciProject\RG_ArgoClim_Temperature_2019.nc"
-MLD_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure-(2004-2018).nc"
-ENTRAINMENT_VEL_DATA_PATH = r"C:\Users\jason\MSciProject\Entrainment_Velocity-(2004-2018).nc"
+EKMAN_ANOMALY_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Ekman_Current_Anomaly.nc"
+TEMP_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
+MLD_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
+ENTRAINMENT_VEL_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Entrainment_Velocity-(2004-2018).nc"
 # ENTRAINMENT_VEL_DENOISED_DATA_PATH = "../datasets/entrainment_vel_denoised.nc"
-H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
-H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
-T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\t_sub.nc"
+H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
+H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
+T_SUB_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/t_sub.nc"
+GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = '/Users/julia/Desktop/SSTA/datasets/data_for_modelling/geostrophic_anomaly_downloaded.nc'
+
 rho_0 = 1025.0
 c_0 = 4100.0
-gamma_0 = 10
+gamma_0 = 10.0
+g = 9.81
+f = 1 
 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
 observed_temp_ds = xr.open_dataset(observed_path, decode_times=False)
@@ -56,6 +61,12 @@ t_sub_da = t_sub_ds["T_sub_ANOMALY"]
 entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
 entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
 entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
+
+geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH, decode_times=False)
+geostrophic_anomaly_da = geostrophic_anomaly_ds["GEOSTROPHIC_ANOMALY"]
+
+
+
 
 
 def month_to_second(month):
@@ -98,6 +109,8 @@ for month in heat_flux_anomaly_ds.TIME.values:
         prev_ekman_anom = ekman_anomaly_da.sel(TIME=prev_month)
         prev_entrainment_vel = entrainment_vel_da.sel(MONTH=prev_month_in_year)
         prev_hbar = hbar_da.sel(MONTH=prev_month_in_year)
+        prev_geo_anom = geostrophic_anomaly_da.sel(TIME=prev_month)
+
 
         # get current data
         cur_tsub_anom = t_sub_da.sel(TIME=month)
@@ -105,6 +118,7 @@ for month in heat_flux_anomaly_ds.TIME.values:
         cur_ekman_anom = ekman_anomaly_da.sel(TIME=month)
         cur_entrainment_vel = entrainment_vel_da.sel(MONTH=month_in_year)
         cur_hbar = hbar_da.sel(MONTH=month_in_year)
+        cur_geo_anom = geostrophic_anomaly_da.sel(TIME=month)
 
         # generate the right dataset depending on whether surface flux and/or Ekman terms are desired
         if INCLUDE_SURFACE and INCLUDE_EKMAN:
@@ -123,6 +137,10 @@ for month in heat_flux_anomaly_ds.TIME.values:
             cur_surf_ek = cur_ekman_anom - cur_ekman_anom
             prev_surf_ek = prev_ekman_anom - prev_ekman_anom
 
+        if INCLUDE_GEOSTROPHIC:
+            cur_surf_ek = cur_surf_ek + cur_geo_anom
+            prev_surf_ek = prev_surf_ek + prev_geo_anom
+
         if INCLUDE_ENTRAINMENT:
             cur_b = cur_surf_ek / (rho_0 * c_0 * cur_hbar) + cur_entrainment_vel / cur_hbar * cur_tsub_anom
             cur_a = cur_entrainment_vel / cur_hbar + gamma_0 / (rho_0 * c_0 * cur_hbar)
@@ -139,7 +157,6 @@ for month in heat_flux_anomaly_ds.TIME.values:
             prev_b = prev_surf_ek / (rho_0 * c_0 * prev_hbar)
             prev_a = gamma_0 / (rho_0 * c_0 * prev_hbar)
             prev_k = prev_a
-
         
 
         # update anomalies
@@ -203,98 +220,20 @@ observed_temperature_monthly_average = get_monthly_mean(observed_temp_ds['__xarr
 observed_temperature_anomaly = get_anomaly(observed_temp_ds, '__xarray_dataarray_variable__', observed_temperature_monthly_average)
 observed_temperature_anomaly = observed_temperature_anomaly['__xarray_dataarray_variable___ANOMALY']
 
-# Prepare Implicit Scheme Monthly Average At Each Grid Point
-imp_temp_monthly_average = get_monthly_mean(implicit_model_anomaly_ds)
 #%%
-#--- 3. Helper Functions --------------------
+#--- 3. Cross Correlation --------------------
 
-def get_phase_map_seasonal_maximum(data_monthly_mean, obs_monthly_mean):
-    # Creating Mask
-    mask_data = data_monthly_mean.notnull().all(dim="MONTH")
-    mask_obs = obs_monthly_mean.notnull().all(dim="MONTH")
+lat = observed_temperature_anomaly['LATITUDE'].values
+lon = observed_temperature_anomaly['LONGITUDE'].values
+print(lat, lon)
+correlation = xr.corr(observed_temperature_anomaly, implicit_model_anomaly_ds, dim='TIME')
+correlation_da = xr.DataArray(
+    correlation,
+    dims=("LATITUDE", "LONGITUDE"),
+    coords={"LATITUDE": lat, "LONGITUDE": lon},
+    name="correlation"
+)
 
-    # Replacing NaNs with 0
-    data_monthly_mean = data_monthly_mean.fillna(-999)
-    obs_monthly_mean = obs_monthly_mean.fillna(-999)
-
-    data_monthly_mean_max = data_monthly_mean.argmax(dim="MONTH")
-    obs_monthly_mean_max = obs_monthly_mean.argmax(dim="MONTH")
-
-    phase_map = data_monthly_mean_max - obs_monthly_mean_max
-    
-    corrected_phase_map = ((phase_map + 6) % 12) - 6
-
-    corrected_phase_map = corrected_phase_map.where(mask_obs)
-
-    return corrected_phase_map
-
-def get_phase_map_seasonal_maximum(data_monthly_mean, obs_monthly_mean):
-    # Creating Mask
-    mask_data = data_monthly_mean.notnull().all(dim="MONTH")
-    mask_obs = obs_monthly_mean.notnull().all(dim="MONTH")
-
-    # Replacing NaNs with 0
-    data_monthly_mean = data_monthly_mean.fillna(-999)
-    obs_monthly_mean = obs_monthly_mean.fillna(-999)
-
-    data_monthly_mean_max = data_monthly_mean.argmax(dim="MONTH")
-    obs_monthly_mean_max = obs_monthly_mean.argmax(dim="MONTH")
-
-    phase_map = data_monthly_mean_max - obs_monthly_mean_max
-    
-    corrected_phase_map = ((phase_map + 6) % 12) - 6
-
-    corrected_phase_map = corrected_phase_map.where(mask_obs)
-
-    return corrected_phase_map
-
-def get_phase_map_seasonal_minimum(data_monthly_mean, obs_monthly_mean):
-    # Creating Mask
-    mask_data = data_monthly_mean.notnull().all(dim="MONTH")
-    mask_obs = obs_monthly_mean.notnull().all(dim="MONTH")
-
-    # Replacing NaNs with 0
-    data_monthly_mean = data_monthly_mean.fillna(999)
-    obs_monthly_mean = obs_monthly_mean.fillna(999)
-
-    data_monthly_mean_max = data_monthly_mean.argmin(dim="MONTH")
-    obs_monthly_mean_max = obs_monthly_mean.argmin(dim="MONTH")
-
-    phase_map = data_monthly_mean_max - obs_monthly_mean_max
-    
-    corrected_phase_map = ((phase_map + 6) % 12) - 6
-
-    corrected_phase_map = corrected_phase_map.where(mask_obs)
-
-    return corrected_phase_map
-
-def get_amplitude(data_monthly_mean, obs_monthly_mean):
-    # Creating Mask
-    mask_obs = obs_monthly_mean.notnull().all(dim="MONTH")
-
-    data_monthly_mean_max = data_monthly_mean.max(dim="MONTH")
-    data_monthly_mean_min = data_monthly_mean.min(dim="MONTH")
-
-    obs_monthly_mean_max = obs_monthly_mean.max(dim="MONTH")
-    obs_monthly_mean_min = obs_monthly_mean.min(dim="MONTH")
-
-    # Getting Amplitudes
-    amplitude_data = (data_monthly_mean_max - data_monthly_mean_min) / 2
-    amplitude_obs = (obs_monthly_mean_max - obs_monthly_mean_min) / 2
-
-    amplitude_map = np.log10(amplitude_data / amplitude_obs)
-
-    amplitude_map = amplitude_map.where(mask_obs)
-
-    return amplitude_map
-
-#--- 4. Plot Phase Map --------------------
-phase_map_maximum = get_phase_map_seasonal_maximum(imp_temp_monthly_average, observed_temperature_monthly_average)
-print(phase_map_maximum)
-phase_map_minimum = get_phase_map_seasonal_minimum(imp_temp_monthly_average, observed_temperature_monthly_average)
-print(phase_map_minimum)
-amplitudes = get_amplitude(imp_temp_monthly_average, observed_temperature_monthly_average)
-print(amplitudes)
 
 #%%
 
@@ -303,67 +242,20 @@ fig, axes = plt.subplots(1, 1, figsize=(8,5))
 scheme_name = "Implicit"
 # Plotting
 # ax = plt.subplot(3, 2, i + 1)
-phase_map_maximum.plot(ax=axes, cmap='RdBu_r', cbar_kwargs={'label': 'Phase'}, vmin = -6, vmax = 6)
+correlation.plot(ax=axes, cmap='nipy_spectral', cbar_kwargs={'label': 'Phase'}, vmin = -1, vmax = 1)
 axes.set_xlabel("Longitude")
 axes.set_ylabel("Lattitude")
-axes.set_title(f'{scheme_name} Scheme - Phase Map Seasonal Maximum')
-max_phase = phase_map_maximum.max().item()
-print(scheme_name, max_phase)
+axes.set_title(f'{scheme_name} Scheme - Cross Correlation Map')
+# print(scheme_name, )
 plt.tight_layout()
-# fig.text(
-#     0.99, 0.01,
-#     f"Gamma = {gamma_0}\n"
-#     f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
-#     f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
-#     f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
-#     ha='right', va='bottom', fontsize=18
-# )
-plt.show()
-
-
-# Plotting Seasonal Minimum
-fig, axes = plt.subplots(1, 1, figsize=(8,5))
-scheme_name = "Implicit"
-# Plotting
-# ax = plt.subplot(3, 2, i + 1)
-phase_map_minimum.plot(ax=axes, cmap='RdBu_r', cbar_kwargs={'label': 'Phase'}, vmin = -6, vmax = 6)
-axes.set_xlabel("Longitude")
-axes.set_ylabel("Lattitude")
-axes.set_title(f'{scheme_name} Scheme - Phase Map Seasonal Minimum')
-min_phase = phase_map_minimum.max().item()
-print(scheme_name, min_phase)
-plt.tight_layout()
-# fig.text(
-#     0.99, 0.01,
-#     f"Gamma = {gamma_0}\n"
-#     f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
-#     f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
-#     f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
-#     ha='right', va='bottom', fontsize=18
-# )
-plt.show()
-
-# Plotting Amplitudes
-fig, axes = plt.subplots(1, 1, figsize=(8,5))
-scheme_name = "Implicit"
-# Plotting
-# ax = plt.subplot(3, 2, i + 1)
-amplitudes.plot(ax=axes, cmap='viridis', cbar_kwargs={'label': 'Amplitude'}, vmin = -7, vmax = -1)
-axes.set_xlabel("Longitude")
-axes.set_ylabel("Lattitude")
-axes.set_title(f'{scheme_name} Scheme - Amplitude Plot')
-max_amp = amplitudes.max().item()
-print(scheme_name, max_amp)
-min_amp = amplitudes.min().item()
-print(scheme_name, min_amp)
-plt.tight_layout()
-# fig.text(
-#     0.99, 0.01,
-#     f"Gamma = {gamma_0}\n"
-#     f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
-#     f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
-#     f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
-#     ha='right', va='bottom', fontsize=18
-# )
+fig.text(
+    0.99, 0.01,
+    f"Gamma = {gamma_0}\n"
+    f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
+    f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
+    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
+    f"INCLUDE_GEOSTROPHIC = {INCLUDE_GEOSTROPHIC}",
+    ha='right', va='bottom', fontsize=8
+)
 plt.show()
 # %%
