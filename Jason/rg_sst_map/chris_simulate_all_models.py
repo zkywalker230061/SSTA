@@ -401,7 +401,7 @@ flux_components_ds = remove_empty_attributes(flux_components_ds)
 
 # flux_components_ds.to_netcdf("../datasets/flux_components.nc")
 #
-make_movie(all_anomalies_ds["EXPLICIT"], -5, 5)
-make_movie(all_anomalies_ds["IMPLICIT"], -5, 5)
+# make_movie(all_anomalies_ds["EXPLICIT"], -5, 5)
+make_movie(all_anomalies_ds["IMPLICIT"], -2, 2)
 # make_movie(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"], -5, 5)
 # make_movie(all_anomalies_ds["CHRIS_MEAN_K"], -5, 5)
