@@ -164,7 +164,7 @@ def save_geostrophic_anomaly_temperature():
         coords=t_m_monthly_mean.coords,
         dims=t_m_monthly_mean.dims,
     )
-    dtheta_dx = 1 / (R * np.sin(np.deg2rad(t_m_monthly_mean['LATITUDE']))) / (np.pi/180)
+    dtheta_dx = 1 / (R * np.cos(np.deg2rad(t_m_monthly_mean['LATITUDE']))) / (np.pi/180)
     dtheta_dx = dtheta_dx.expand_dims(LONGITUDE=t_m_monthly_mean['LONGITUDE'])
     dt_m_monthly_mean_dx_da = dt_m_monthly_mean_dtheta_da * dtheta_dx
     dt_m_monthly_mean_dx_da.name = 'dt_m_monthly_mean_dx'
@@ -190,7 +190,7 @@ def save_geostrophic_anomaly_temperature():
         coords=t_m_a.coords,
         dims=t_m_a.dims,
     )
-    dtheta_dx = 1 / (R * np.sin(np.deg2rad(t_m_a['LATITUDE']))) / (np.pi/180)
+    dtheta_dx = 1 / (R * np.cos(np.deg2rad(t_m_a['LATITUDE']))) / (np.pi/180)
     dtheta_dx = dtheta_dx.expand_dims(LONGITUDE=t_m_a['LONGITUDE'])
     dt_m_a_dx_da = dt_m_a_dtheta_da * dtheta_dx
     dt_m_a_dx_da.name = 'dt_m_a_dx'
@@ -216,7 +216,7 @@ def save_geostrophic_anomaly_temperature():
         coords=ssh_monthly_mean.coords,
         dims=ssh_monthly_mean.dims,
     )
-    dtheta_dx = 1 / (R * np.sin(np.deg2rad(ssh_monthly_mean['LATITUDE']))) / (np.pi/180)
+    dtheta_dx = 1 / (R * np.cos(np.deg2rad(ssh_monthly_mean['LATITUDE']))) / (np.pi/180)
     dtheta_dx = dtheta_dx.expand_dims(LONGITUDE=ssh_monthly_mean['LONGITUDE'])
     dssh_monthly_mean_dx_da = dssh_monthly_mean_dtheta_da * dtheta_dx
     dssh_monthly_mean_dx_da.name = 'dssh_monthly_mean_dx'
@@ -242,7 +242,7 @@ def save_geostrophic_anomaly_temperature():
         coords=ssh_a.coords,
         dims=ssh_a.dims,
     )
-    dtheta_dx = 1 / (R * np.sin(np.deg2rad(ssh_a['LATITUDE']))) / (np.pi/180)
+    dtheta_dx = 1 / (R * np.cos(np.deg2rad(ssh_a['LATITUDE']))) / (np.pi/180)
     dtheta_dx = dtheta_dx.expand_dims(LONGITUDE=ssh_a['LONGITUDE'])
     dssh_a_dx_da = dssh_a_dtheta_da * dtheta_dx
     dssh_a_dx_da.name = 'dssh_a_dx'
@@ -327,7 +327,7 @@ def save_geostrophic_anomaly_salinity():
         coords=s_m_monthly_mean.coords,
         dims=s_m_monthly_mean.dims,
     )
-    dtheta_dx = 1 / (R * np.sin(np.deg2rad(s_m_monthly_mean['LATITUDE']))) / (np.pi/180)
+    dtheta_dx = 1 / (R * np.cos(np.deg2rad(s_m_monthly_mean['LATITUDE']))) / (np.pi/180)
     dtheta_dx = dtheta_dx.expand_dims(LONGITUDE=s_m_monthly_mean['LONGITUDE'])
     ds_m_monthly_mean_dx_da = ds_m_monthly_mean_dtheta_da * dtheta_dx
     ds_m_monthly_mean_dx_da.name = 'ds_m_monthly_mean_dx'
@@ -353,7 +353,7 @@ def save_geostrophic_anomaly_salinity():
         coords=s_m_a.coords,
         dims=s_m_a.dims,
     )
-    dtheta_dx = 1 / (R * np.sin(np.deg2rad(s_m_a['LATITUDE']))) / (np.pi/180)
+    dtheta_dx = 1 / (R * np.cos(np.deg2rad(s_m_a['LATITUDE']))) / (np.pi/180)
     dtheta_dx = dtheta_dx.expand_dims(LONGITUDE=s_m_a['LONGITUDE'])
     ds_m_a_dx_da = ds_m_a_dtheta_da * dtheta_dx
     ds_m_a_dx_da.name = 'ds_m_a_dx'
@@ -379,7 +379,7 @@ def save_geostrophic_anomaly_salinity():
         coords=ssh_monthly_mean.coords,
         dims=ssh_monthly_mean.dims,
     )
-    dtheta_dx = 1 / (R * np.sin(np.deg2rad(ssh_monthly_mean['LATITUDE']))) / (np.pi/180)
+    dtheta_dx = 1 / (R * np.cos(np.deg2rad(ssh_monthly_mean['LATITUDE']))) / (np.pi/180)
     dtheta_dx = dtheta_dx.expand_dims(LONGITUDE=ssh_monthly_mean['LONGITUDE'])
     dssh_monthly_mean_dx_da = dssh_monthly_mean_dtheta_da * dtheta_dx
     dssh_monthly_mean_dx_da.name = 'dssh_monthly_mean_dx'
@@ -405,7 +405,7 @@ def save_geostrophic_anomaly_salinity():
         coords=ssh_a.coords,
         dims=ssh_a.dims,
     )
-    dtheta_dx = 1 / (R * np.sin(np.deg2rad(ssh_a['LATITUDE']))) / (np.pi/180)
+    dtheta_dx = 1 / (R * np.cos(np.deg2rad(ssh_a['LATITUDE']))) / (np.pi/180)
     dtheta_dx = dtheta_dx.expand_dims(LONGITUDE=ssh_a['LONGITUDE'])
     dssh_a_dx_da = dssh_a_dtheta_da * dtheta_dx
     dssh_a_dx_da.name = 'dssh_a_dx'

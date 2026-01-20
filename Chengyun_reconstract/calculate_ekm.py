@@ -98,7 +98,7 @@ def save_ekman_anomaly_temperature():
         coords=t_m_monthly_mean.coords,
         dims=t_m_monthly_mean.dims,
     )
-    dtheta_dx = 1 / (R * np.sin(np.deg2rad(t_m_monthly_mean['LATITUDE']))) / (np.pi/180)
+    dtheta_dx = 1 / (R * np.cos(np.deg2rad(t_m_monthly_mean['LATITUDE']))) / (np.pi/180)
     dtheta_dx = dtheta_dx.expand_dims(LONGITUDE=t_m_monthly_mean['LONGITUDE'])
     dt_m_monthly_mean_dx_da = dt_m_monthly_mean_dtheta_da * dtheta_dx
     dt_m_monthly_mean_dx_da.name = 'dt_m_monthly_mean_dx'
@@ -165,7 +165,7 @@ def save_ekman_anomaly_salinity():
         coords=s_m_monthly_mean.coords,
         dims=s_m_monthly_mean.dims,
     )
-    dtheta_dx = 1 / (R * np.sin(np.deg2rad(s_m_monthly_mean['LATITUDE']))) / (np.pi/180)
+    dtheta_dx = 1 / (R * np.cos(np.deg2rad(s_m_monthly_mean['LATITUDE']))) / (np.pi/180)
     dtheta_dx = dtheta_dx.expand_dims(LONGITUDE=s_m_monthly_mean['LONGITUDE'])
     dt_m_monthly_mean_dx_da = dt_m_monthly_mean_dtheta_da * dtheta_dx
     dt_m_monthly_mean_dx_da.name = 'dt_m_monthly_mean_dx'

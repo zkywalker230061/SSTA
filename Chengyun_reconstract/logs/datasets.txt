@@ -74,11 +74,11 @@ datasets/Turbulent_Surface_Stress_Anomalies-(2004-2018).nc
 1768704619.1161697
 datasets/Simulation-Entrainment_Water_Rate-(2004-2018).nc
 1768761242.6086676
-datasets/Simulation-Ekman_Heat_Flux-(2004-2018).nc
-1768761812.6738124
-datasets/Simulation-Ekman_Water_Rate-(2004-2018).nc
-1768761813.0338652
 datasets/Simulation-Geostrophic_Heat_Flux-(2004-2018).nc
-1768761987.5428154
+1768951953.766279
 datasets/Simulation-Geostrophic_Water_Rate-(2004-2018).nc
-1768761988.5837429
+1768951954.9837234
+datasets/Simulation-Ekman_Heat_Flux-(2004-2018).nc
+1768951958.5079422
+datasets/Simulation-Ekman_Water_Rate-(2004-2018).nc
+1768951958.8837965
