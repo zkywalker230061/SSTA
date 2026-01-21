@@ -12,7 +12,7 @@ INCLUDE_SURFACE = True
 INCLUDE_EKMAN = True
 INCLUDE_ENTRAINMENT = True
 INCLUDE_GEOSTROPHIC = True
-INCLUDE_GEOSTROPHIC_DISPLACEMENT = False
+INCLUDE_GEOSTROPHIC_DISPLACEMENT = True
 USE_DOWNLOADED_SSH = False
 gamma_0 = 30.0
 
@@ -21,7 +21,7 @@ MASK_TROPICS_LATITUDE = 10
 
 CONSIDER_OBSERVATIONS = True
 MAKE_MOVIE = False
-PLOT_MODE_CONTRIBUTIONS = True
+PLOT_MODE_CONTRIBUTIONS = False
 PLOT_EOFS = False
 PLOT_ENSO = False
 MAKE_REGRESSION_MAPS = False
@@ -59,16 +59,13 @@ enso_indices_ds = enso_indices_ds.assign_coords(time=np.arange(len(enso_indices_
 enso_indices_ds = enso_indices_ds.sel(time=slice(672, 852)) # between 2004 and 2019
 enso_indices_ds = enso_indices_ds.assign_coords(time=np.arange(len(enso_indices_ds.time)))
 
-print(all_schemes_ds["IMPLICIT"].mean().item())
-print(abs(all_schemes_ds["IMPLICIT"]).mean().item())
-
 """Plot results"""
 # make_movie(all_schemes_ds["CHRIS_PREV_CUR"], -10, 10, colorbar_label="Chris Prev-Cur Scheme", ENSO_ds=enso_indices_ds)
 # make_movie(all_schemes_ds["CHRIS_MEAN_K"], -10, 10, colorbar_label="Chris Mean-k Scheme", ENSO_ds=enso_indices_ds)
 # make_movie(all_schemes_ds["CHRIS_PREV_K"], -10, 10, colorbar_label="Chris Prev-k Scheme", ENSO_ds=enso_indices_ds)
 # make_movie(all_schemes_ds["CHRIS_CAPPED_EXPONENT"], -10, 10, colorbar_label="Chris Capped Exponent Scheme", ENSO_ds=enso_indices_ds)
 # make_movie(all_schemes_ds["EXPLICIT"], -10, 10, colorbar_label="Explicit Scheme", ENSO_ds=enso_indices_ds)
-make_movie(all_schemes_ds["IMPLICIT"], -3, 3, colorbar_label="Implicit Scheme", ENSO_ds=enso_indices_ds, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/all_anomalies/videos/implicit" + save_name + ".mp4")
+# make_movie(all_schemes_ds["IMPLICIT"], -3, 3, colorbar_label="Implicit Scheme", ENSO_ds=enso_indices_ds, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/all_anomalies/videos/implicit" + save_name + ".mp4")
 # make_movie(all_schemes_ds["SEMI_IMPLICIT"], -10, 10, colorbar_label="Semi-Implicit Scheme", ENSO_ds=enso_indices_ds)
 #make_movie(all_schemes_ds["CHRIS_PREV_CUR_CLEAN"], -3, 3, colorbar_label="Chris Prev-Cur Scheme Denoised", ENSO_ds=enso_indices_ds, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/all_anomalies/videos/chris_clean" + save_name + ".mp4")
 #make_movie(observed_anomaly, -3, 3, colorbar_label="Argo Anomaly", ENSO_ds=enso_indices_ds, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/all_anomalies/videos/observations.mp4")
@@ -264,10 +261,10 @@ if TRACK_WARMING_EFFECTS:
         abs_mean_anomalies = []
         abs_mean_obs_anomalies = []
         for time in to_plot.TIME.values:
-            mean_anomalies.append(to_plot.sel(TIME=time).mean().item())
-            abs_mean_anomalies.append(abs(to_plot.sel(TIME=time)).mean().item())
-            mean_obs_anomalies.append(observed_anomaly.sel(TIME=time).mean().item())
-            abs_mean_obs_anomalies.append(abs(observed_anomaly.sel(TIME=time)).mean().item())
+            mean_anomalies.append(to_plot.sel(TIME=time).mean(skipna=True).item())
+            abs_mean_anomalies.append(abs(to_plot.sel(TIME=time)).mean(skipna=True).item())
+            mean_obs_anomalies.append(observed_anomaly.sel(TIME=time).mean(skipna=True).item())
+            abs_mean_obs_anomalies.append(abs(observed_anomaly.sel(TIME=time)).mean(skipna=True).item())
             times.append((time - 0.5) / 12 + 2004)
         plt.grid()
         plt.scatter(times, mean_anomalies, marker='x', label="Modelled mean anomaly")

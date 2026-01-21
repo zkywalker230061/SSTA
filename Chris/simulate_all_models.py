@@ -21,8 +21,8 @@ e.g.
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN = True
 INCLUDE_ENTRAINMENT = True
-INCLUDE_GEOSTROPHIC = True
-INCLUDE_GEOSTROPHIC_DISPLACEMENT = True
+INCLUDE_GEOSTROPHIC = False
+INCLUDE_GEOSTROPHIC_DISPLACEMENT = False
 # geostrophic displacement integral: https://egusphere.copernicus.org/preprints/2025/egusphere-2025-3039/egusphere-2025-3039.pdf
 CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turned on
 USE_DOWNLOADED_SSH = False
