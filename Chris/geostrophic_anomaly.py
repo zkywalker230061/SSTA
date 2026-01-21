@@ -1,7 +1,7 @@
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
-from SSTA.Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes
+from SSTA.Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, coriolis_parameter
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset, compute_gradient_lon, compute_gradient_lat
 import matplotlib
 
@@ -19,15 +19,6 @@ H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Dept
 rho_0 = 1025.0
 c_0 = 4100.0
 g = 9.81
-omega = 2 * np.pi / (24 * 3600)
-
-
-def coriolis_parameter(lat):
-    phi_rad = np.deg2rad(lat)
-    f = 2 * omega * np.sin(phi_rad)
-    f = xr.DataArray(f, coords={'LATITUDE': lat}, dims=['LATITUDE'])
-    f.attrs['units'] = 's^-1'
-    return f
 
 mean_temp = xr.open_dataset(MEAN_TEMP_DATA_PATH, decode_times=False)
 ssh_anomaly = xr.open_dataset(SEA_SURFACE_HEIGHT_DATA_PATH, decode_times=False)
@@ -58,6 +49,7 @@ geostrophic_anomaly = xr.concat(geostropic_anomalies, "TIME")
 geostrophic_anomaly = geostrophic_anomaly.rename("GEOSTROPHIC_ANOMALY")
 
 print(geostrophic_anomaly)
+geostrophic_anomaly = geostrophic_anomaly.where((geostrophic_anomaly['LATITUDE'] > 5) | (geostrophic_anomaly['LATITUDE'] < -5), 0)
 if DOWNLOADED_SSH:
     geostrophic_anomaly.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly_downloaded.nc")
 else:

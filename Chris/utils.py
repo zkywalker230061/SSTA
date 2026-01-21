@@ -3,7 +3,7 @@ import pandas as pd
 #import eofs
 #import xeofs as xe
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
+from matplotlib.animation import FuncAnimation, FFMpegWriter
 import matplotlib
 import numpy as np
 from scipy.linalg import svd
@@ -387,7 +387,7 @@ def get_eof(dataset, modes, mask=None, clean_nan=False):
     return components, explained_variance, scores
 
 
-def make_movie(dataset, vmin, vmax, colorbar_label=None, ENSO_ds=None):
+def make_movie(dataset, vmin, vmax, colorbar_label=None, ENSO_ds=None, savepath=None):
     times = dataset.TIME.values
 
     fig, ax = plt.subplots()
@@ -418,6 +418,8 @@ def make_movie(dataset, vmin, vmax, colorbar_label=None, ENSO_ds=None):
         return [pcolormesh, title]
 
     animation = FuncAnimation(fig, update, frames=len(times), interval=300, blit=False)
+    if savepath is not None:
+        animation.save(savepath, fps=2, dpi=200)
     plt.show()
 
 
@@ -551,3 +553,39 @@ def compute_gradient_lon(
 
     # Single points left as NaN
     return grad
+
+
+def get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH=False, gamma0=10, INCLUDE_GEOSTROPHIC_DISPLACEMENT=False):
+    save_name = ""
+    if INCLUDE_SURFACE:
+        save_name = save_name + "1"
+    else:
+        save_name = save_name + "0"
+    if INCLUDE_EKMAN:
+        save_name = save_name + "1"
+    else:
+        save_name = save_name + "0"
+    if INCLUDE_ENTRAINMENT:
+        save_name = save_name + "1"
+    else:
+        save_name = save_name + "0"
+    if INCLUDE_GEOSTROPHIC:
+        save_name = save_name + "1"
+        if INCLUDE_GEOSTROPHIC_DISPLACEMENT:
+            save_name = save_name + "_geostrophiccurrent"
+        if USE_DOWNLOADED_SSH:
+            save_name = save_name + "_downloadedSSH"
+    else:
+        save_name = save_name + "0"
+    if gamma0 != 10.0:
+        save_name += "_gamma" + str(gamma0)
+    return save_name
+
+
+def coriolis_parameter(lat):
+    omega = 2 * np.pi / (24 * 3600)
+    phi_rad = np.deg2rad(lat)
+    f = 2 * omega * np.sin(phi_rad)
+    f = xr.DataArray(f, coords={'LATITUDE': lat}, dims=['LATITUDE'])
+    f.attrs['units'] = 's^-1'
+    return f

@@ -2,20 +2,36 @@ import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 
-from SSTA.Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes
+from SSTA.Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, get_save_name, \
+    coriolis_parameter
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
 import matplotlib
 
 matplotlib.use('TkAgg')
 
+"""
+Naming scheme:
+Surface, Ekman, Entrainment, Geostrophic in that order. 0 if off, 1 if on
+e.g.
+1001
+=> surface and geostrophic on, Ekman and entrainment off
+"""
+
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN = True
 INCLUDE_ENTRAINMENT = True
 INCLUDE_GEOSTROPHIC = True
-# first method for geostrophic: https://egusphere.copernicus.org/preprints/2025/egusphere-2025-3039/egusphere-2025-3039.pdf
+INCLUDE_GEOSTROPHIC_DISPLACEMENT = True
+# geostrophic displacement integral: https://egusphere.copernicus.org/preprints/2025/egusphere-2025-3039/egusphere-2025-3039.pdf
 CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turned on
 USE_DOWNLOADED_SSH = False
+rho_0 = 1025.0
+c_0 = 4100.0
+gamma_0 = 30.0
+g = 9.81
+
+save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH, gamma0=gamma_0, INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_DISPLACEMENT)
 
 HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/heat_flux_interpolated_all_contributions.nc"
 EKMAN_ANOMALY_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Ekman_Current_Anomaly.nc"
@@ -26,14 +42,15 @@ ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Entrai
 H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
 T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub.nc"
 T_SUB_DENOISED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub_denoised.nc"
-SEA_SURFACE_GRAD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_interpolated_grad.nc"
+#SEA_SURFACE_GRAD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_interpolated_grad.nc"
 GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly_downloaded.nc"
 GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly_calculated.nc"
-rho_0 = 1025.0
-c_0 = 4100.0
-gamma_0 = 10.0
-g = 9.81
-f = 1       # coriolis parameter
+# if USE_DOWNLOADED_SSH:
+#     SEA_SURFACE_GRAD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_interpolated_grad.nc"
+#     ssh_var_name = "sla"
+# else:
+#     SEA_SURFACE_GRAD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_calculated_grad.nc"
+#     ssh_var_name = "ssh"
 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
 
@@ -60,8 +77,12 @@ entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
 
 if USE_DOWNLOADED_SSH:
     geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH, decode_times=False)
+    SEA_SURFACE_GRAD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_interpolated_grad.nc"
+    ssh_var_name = "sla"
 else:
     geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH, decode_times=False)
+    SEA_SURFACE_GRAD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_calculated_grad.nc"
+    ssh_var_name = "ssh"
 geostrophic_anomaly_da = geostrophic_anomaly_ds["GEOSTROPHIC_ANOMALY"]
 
 sea_surface_grad_ds = xr.open_dataset(SEA_SURFACE_GRAD_DATA_PATH, decode_times=False)
@@ -92,6 +113,7 @@ entrainment_fluxes_implicit = []
 entrainment_fluxes_semi_implicit = []
 
 added_baseline = False
+testparam = False
 for month in heat_flux_anomaly_ds.TIME.values:
     # find the previous and current month from 1 to 12 to access the monthly-averaged data (hbar, entrainment vel.)
     prev_month = month - 1
@@ -117,27 +139,40 @@ for month in heat_flux_anomaly_ds.TIME.values:
 
     else:
         # store previous readings Tm(n-1)
-        prev_chris_prev_cur_tm_anom = chris_prev_cur_model_anomalies[-1].isel(TIME=-1)
-        prev_chris_mean_k_tm_anom = chris_mean_k_model_anomalies[-1].isel(TIME=-1)
-        prev_chris_prev_k_tm_anom = chris_prev_k_model_anomalies[-1].isel(TIME=-1)
-        prev_chris_capped_exponent_k_tm_anom = chris_capped_exponent_model_anomalies[-1].isel(TIME=-1)
-        prev_explicit_k_tm_anom = explicit_model_anomalies[-1].isel(TIME=-1)
-        prev_implicit_k_tm_anom = implicit_model_anomalies[-1].isel(TIME=-1)
-        prev_semi_implicit_k_tm_anom = semi_implicit_model_anomalies[-1].isel(TIME=-1)
+        if INCLUDE_GEOSTROPHIC_DISPLACEMENT:    # then need to take the previous reading "back-propagated" based on current
+            prev_chris_prev_cur_tm_anom_at_cur_loc = chris_prev_cur_model_anomalies[-1].isel(TIME=-1)
+            prev_chris_mean_k_tm_anom_at_cur_loc = chris_mean_k_model_anomalies[-1].isel(TIME=-1)
+            prev_chris_prev_k_tm_anom_at_cur_loc = chris_prev_k_model_anomalies[-1].isel(TIME=-1)
+            prev_chris_capped_exponent_k_tm_anom_at_cur_loc = chris_capped_exponent_model_anomalies[-1].isel(TIME=-1)
+            prev_explicit_k_tm_anom_at_cur_loc = explicit_model_anomalies[-1].isel(TIME=-1)
+            prev_implicit_k_tm_anom_at_cur_loc = implicit_model_anomalies[-1].isel(TIME=-1)
+            prev_semi_implicit_k_tm_anom_at_cur_loc = semi_implicit_model_anomalies[-1].isel(TIME=-1)
+
+            f = coriolis_parameter(sea_surface_grad_ds['LATITUDE']).broadcast_like(sea_surface_grad_ds[ssh_var_name]).broadcast_like(sea_surface_grad_ds[ssh_var_name + '_anomaly_grad_long'])  # broadcasting based on Jason/Julia's usage
+            alpha = g / f.sel(TIME=month) * sea_surface_grad_ds[ssh_var_name + '_anomaly_grad_long'].sel(TIME=month)
+            beta = g / f.sel(TIME=month) * sea_surface_grad_ds[ssh_var_name + '_anomaly_grad_lat'].sel(TIME=month)
+            back_x = sea_surface_grad_ds['LONGITUDE'] + alpha * month_to_second(1)      # just need a list of long/lat
+            back_y = sea_surface_grad_ds['LATITUDE'] - beta * month_to_second(1)        # ss_grad is a useful dummy for that
+
+            # interpolate to the "back-propagated" x and y position, but if that turns out nan (due to coastline), then
+            # just use the temperature at current position. BC == "coast buffer"
+            prev_chris_prev_cur_tm_anom = prev_chris_prev_cur_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_chris_prev_cur_tm_anom_at_cur_loc)
+            prev_chris_mean_k_tm_anom = prev_chris_mean_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_chris_mean_k_tm_anom_at_cur_loc)
+            prev_chris_prev_k_tm_anom = prev_chris_prev_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_chris_prev_k_tm_anom_at_cur_loc)
+            prev_chris_capped_exponent_k_tm_anom = prev_chris_capped_exponent_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_chris_capped_exponent_k_tm_anom_at_cur_loc)
+            prev_explicit_k_tm_anom = prev_explicit_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_explicit_k_tm_anom_at_cur_loc)
+            prev_implicit_k_tm_anom = prev_implicit_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_implicit_k_tm_anom_at_cur_loc)
+            prev_semi_implicit_k_tm_anom = prev_semi_implicit_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_semi_implicit_k_tm_anom_at_cur_loc)
+        else:
+            prev_chris_prev_cur_tm_anom = chris_prev_cur_model_anomalies[-1].isel(TIME=-1)
+            prev_chris_mean_k_tm_anom = chris_mean_k_model_anomalies[-1].isel(TIME=-1)
+            prev_chris_prev_k_tm_anom = chris_prev_k_model_anomalies[-1].isel(TIME=-1)
+            prev_chris_capped_exponent_k_tm_anom = chris_capped_exponent_model_anomalies[-1].isel(TIME=-1)
+            prev_explicit_k_tm_anom = explicit_model_anomalies[-1].isel(TIME=-1)
+            prev_implicit_k_tm_anom = implicit_model_anomalies[-1].isel(TIME=-1)
+            prev_semi_implicit_k_tm_anom = semi_implicit_model_anomalies[-1].isel(TIME=-1)
 
         # get previous data
-
-        # OLD METHOD FOR GEOSTROPHIC
-        # if INCLUDE_GEOSTROPHIC:
-        #     prev_tsub_anom_at_cur_loc = t_sub_da.sel(TIME=prev_month)
-        #     alpha = g / f * sea_surface_grad_ds['sla_anomaly_grad_long']
-        #     beta = g / f * sea_surface_grad_ds['sla_anomaly_grad_lat']
-        #     back_x = prev_tsub_anom_at_cur_loc['LONGITUDE'] + alpha * month_to_second(1)
-        #     back_y = prev_tsub_anom_at_cur_loc['LATITUDE'] - beta * month_to_second(1)
-        #     prev_tsub_anom = prev_tsub_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y)
-        # else:
-        #     prev_tsub_anom = t_sub_da.sel(TIME=prev_month)
-
         prev_tsub_anom = t_sub_da.sel(TIME=prev_month)
         prev_heat_flux_anom = surface_flux_da.sel(TIME=prev_month)
         prev_ekman_anom = ekman_anomaly_da.sel(TIME=prev_month)
@@ -307,7 +342,7 @@ if CLEAN_CHRIS_PREV_CUR:
 
 # save
 all_anomalies_ds = remove_empty_attributes(all_anomalies_ds) # when doing the seasonality removal, some units are None
-#all_anomalies_ds.to_netcdf("../datasets/all_anomalies.nc")
+all_anomalies_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/all_anomalies/" + save_name + ".nc")
 
 # format entrainment flux datasets
 if INCLUDE_ENTRAINMENT:
@@ -387,12 +422,12 @@ for variable_name in variable_names:
     flux_components_ds = flux_components_ds.drop_vars(variable_name + "_ANOMALY")
 
 flux_components_ds = remove_empty_attributes(flux_components_ds)
-print(flux_components_ds)
+# print(flux_components_ds)
 
-flux_components_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/flux_components.nc")
-#
+flux_components_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/all_anomalies/" + save_name + "_flux_components.nc")
+
 # make_movie(all_anomalies_ds["EXPLICIT"], -5, 5)
-make_movie(all_anomalies_ds["IMPLICIT"], -2, 2)
+# make_movie(all_anomalies_ds["IMPLICIT"], -2, 2)
 # make_movie(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"], -5, 5)
 # make_movie(all_anomalies_ds["CHRIS_MEAN_K"], -5, 5)
 
