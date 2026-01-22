@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 from chris_utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, get_save_name, coriolis_parameter
-from utils_read_nc import get_monthly_mean, get_anomaly, load_and_prepare_dataset
+from chris_utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
 import matplotlib
 from scipy.stats import kurtosis, skew, pearsonr
@@ -16,7 +16,7 @@ matplotlib.use('TkAgg')
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN = True
 INCLUDE_ENTRAINMENT = True
-INCLUDE_GEOSTROPHIC = False
+INCLUDE_GEOSTROPHIC = True
 INCLUDE_GEOSTROPHIC_DISPLACEMENT = True
 CLEAN_CHRIS_PREV_CUR = False        # only really useful when entrainment is turned on
 
@@ -31,8 +31,10 @@ ENTRAINMENT_VEL_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelli
 H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
 H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
 T_SUB_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/t_sub.nc"
-GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = '/Users/julia/Desktop/SSTA/datasets/data_for_modelling/geostrophic_anomaly_downloaded.nc'
-SEA_SURFACE_GRAD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_interpolated_grad.nc"
+GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/geostrophic_anomaly_downloaded.nc"
+GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/geostrophic_anomaly_calculated.nc"
+SEA_SURFACE_GRAD_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/sea_surface_interpolated_grad.nc"
+USE_DOWNLOADED_SSH = False
 
 rho_0 = 1025.0
 c_0 = 4100.0
@@ -64,8 +66,18 @@ entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=Fal
 entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
 entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
 
-geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH, decode_times=False)
+if USE_DOWNLOADED_SSH:
+    geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH, decode_times=False)
+    SEA_SURFACE_GRAD_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/sea_surface_interpolated_grad.nc"
+    ssh_var_name = "sla"
+else:
+    geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH, decode_times=False)
+    SEA_SURFACE_GRAD_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/sea_surface_calculated_grad.nc"
+    ssh_var_name = "ssh"
 geostrophic_anomaly_da = geostrophic_anomaly_ds["GEOSTROPHIC_ANOMALY"]
+
+sea_surface_grad_ds = xr.open_dataset(SEA_SURFACE_GRAD_DATA_PATH, decode_times=False)
+
 
 def month_to_second(month):
     return month * 30.4375 * 24 * 60 * 60
@@ -345,102 +357,146 @@ observed_temperature_anomaly = get_anomaly(observed_temp_ds, '__xarray_dataarray
 observed_temperature_anomaly = observed_temperature_anomaly['__xarray_dataarray_variable___ANOMALY']
 
 #%%
-#--- 3. Cross Correlation ----------------------------------------
+#--- 3. Cross Correlation ----------------------------------------------------------------------------
 
 lat = observed_temperature_anomaly['LATITUDE'].values
 lon = observed_temperature_anomaly['LONGITUDE'].values
 
 def get_cross_correlation(obs, model, month_lagged=0):
-    model_lag = model.shift(TIME=month_lagged)  # shift along TIME
+    """
+    Calculates correlation with a specific lag.
+    Positive lag = Model is shifted forward (Model Lags Obs).
+    """
+    # Shift model along TIME
+    model_lag = model.shift(TIME=month_lagged)
 
-    # make sure TIME is aligned (important if coords differ)
-    obs_a, model_a = xr.align(obs, model_lag, join="inner")
-
-    # correlate over TIME
-    corr_map = xr.corr(obs_a, model_a, dim="TIME")
-    return corr_map
+    # xr.corr handles alignment automatically, but we must ensure 
+    # we are correlating along the TIME dimension.
+    return xr.corr(obs, model_lag, dim="TIME")
 
 
-#%%
-#-----------------------------------------------------------------------
-
-correlation_0_lag = get_cross_correlation(observed_temperature_anomaly, implicit_model_anomaly_ds, month_lagged=0)
-
+# --- 3.1  Calculate Single Lag (for the static map)------------------------------------------------
+target_lag = 0
+correlation_0_lag = get_cross_correlation(
+    observed_temperature_anomaly, 
+    implicit_model_anomaly_ds, 
+    month_lagged=target_lag
+)
+# --- 3.2 Calculate All Lags (for the movie and time series) ----------------------------------------
 lags = np.arange(-12, 13)
 run_by_lag = xr.concat(
     [get_cross_correlation(observed_temperature_anomaly, implicit_model_anomaly_ds, k) for k in lags],
     dim=xr.DataArray(lags, dims="lag", name="lag")
 )
 
-# make_movie(run_by_lag, -1, 1, "Cross Correlation")
-print(run_by_lag)
+# --- 4. Plotting: Static Map ------------------------------------------------------------------------
 
-# print(observed_temperature_anomaly.mean)
-# print(implicit_model_anomaly_ds.mean)
-
-#%%
-#----Fig: Cross Correlation of 0 lag ---------------------------------------------------
 fig, axes = plt.subplots(1, 1, figsize=(8,5))
 scheme_name = "Implicit"
-# Plotting
-# ax = plt.subplot(3, 2, i + 1)
-correlation_0_lag.plot(ax=axes, cmap='nipy_spectral', cbar_kwargs={'label': 'Phase'}, vmin = -1, vmax = 1)
+
+correlation_0_lag.plot(
+    ax=axes, 
+    cmap='nipy_spectral', 
+    cbar_kwargs={'label': 'Correlation'}, 
+    vmin=-1, vmax=1
+)
+
 axes.set_xlabel("Longitude")
-axes.set_ylabel("Lattitude")
-axes.set_title(f'{scheme_name} Scheme - Cross Correlation Map')
-# print(scheme_name, )
-plt.tight_layout()
+axes.set_ylabel("Latitude")
+axes.set_title(f'{scheme_name} Scheme - Cross Correlation Map (lag {target_lag})')
+
 fig.text(
     0.99, 0.01,
     f"Gamma = {gamma_0}\n"
     f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
     f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
     f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
-    f"INCLUDE_GEOSTROPHIC = {INCLUDE_GEOSTROPHIC}",
+    f"INCLUDE_GEOSTROPHIC = {INCLUDE_GEOSTROPHIC}\n"
+    f"INCLUDE_GEOSTROPHIC_DISPLACEMENT = {INCLUDE_GEOSTROPHIC_DISPLACEMENT}",
     ha='right', va='bottom', fontsize=8
 )
+plt.tight_layout()
 plt.show()
 
-# %%
+# --- 5. Plotting: Time Series ------------------------------------------------------------------------
 
-#----Fig: Cross Correlation of time series------------------------------
 locations = [
-    {'name': 'Southern Ocean', 'lat': -52.5, 'lon': -95.5, 'color': 'blue'},
-    {'name': 'North Atlantic', 'lat': 41.5, 'lon': -50.5, 'color': 'red'},
-    # Add more locations here easily
-    # {'name': 'Equator', 'lat': 0, 'lon': -120, 'color': 'green'}, 
+    {'name': 'Southern Ocean', 'lat': -52.5, 'lon': -95.5, 'color': 'red'},
+    {'name': 'North Atlantic', 'lat': 41.5, 'lon': -50.5, 'color': 'green'},
+    {'name': 'North Atlantic 2', 'lat': 50, 'lon': -25, 'color': 'pink'},
+    {'name': 'Indian', 'lat': -20, 'lon': 75, 'color': 'blue'},
+    {'name': 'North Pacific', 'lat': 30, 'lon': -150, 'color': 'yellow'},
 ]
 
 plt.figure(figsize=(10, 6))
 
 for loc in locations:
-    # Select nearest point
     point_data = run_by_lag.sel(
         LATITUDE=loc['lat'], 
         LONGITUDE=loc['lon'], 
         method='nearest'
     )
     
-    # Plot
     plt.plot(
         point_data['lag'], 
         point_data, 
-        label=f"{loc['name']} (lat: {loc['lat']}, lon: {loc['lon']})",
+        label=f"{loc['name']} (lat:{loc['lat']}, lon:{loc['lon']})",
         color=loc['color'],
         marker='o', markersize=4
     )
 
-# Formatting
 plt.axvline(0, color='k', linestyle='--', alpha=0.5, label='Zero Lag')
 plt.axhline(0, color='k', linewidth=0.8)
 plt.ylim(-1, 1)
-plt.xlabel("Lag (months)\n(Positive: Model is behind Obs | Negative: Model is ahead of Obs)")
+plt.xlabel("Lag (months)\n(Positive: Model lags Obs | Negative: Model leads Obs)")
 plt.ylabel("Cross-correlation")
-plt.title(f"Lagged Cross-Correlation at Selected Sites ({scheme_name})")
+plt.title(f"{scheme_name} Scheme: Lagged Cross-Correlation")
 plt.legend()
 plt.grid(True, alpha=0.3)
-plt.tight_layout()
 plt.show()
 
-# %%
-# print(np.abs(implicit_model_anomaly_ds).mean())
+# --- 6. Run the Movie ----------------------------------------------------------------------------------------
+
+def make_lag_movie(data_array, vmin=-1, vmax=1, savepath=None):
+    # Extract lag values
+    lags = data_array.lag.values
+    
+    fig, ax = plt.subplots(figsize=(8, 5))
+    
+    # Initial Plot (using the first lag)
+    # We use .isel(lag=0) to get the first frame
+    mesh = data_array.isel(lag=0).plot(
+        ax=ax, 
+        cmap='RdBu_r', 
+        vmin=vmin, vmax=vmax,
+        add_colorbar=True,
+        cbar_kwargs={'label': 'Correlation Coefficient'}
+    )
+    
+    # Store title object to update later
+    title = ax.set_title(f'Lag: {lags[0]} months')
+    ax.set_xlabel('Longitude')
+    ax.set_ylabel('Latitude')
+
+    def update(frame):
+        # Update the data in the mesh
+        # .ravel() flattens the 2D array to match what pcolormesh expects
+        data_slice = data_array.isel(lag=frame).values
+        mesh.set_array(data_slice.ravel())
+        
+        # Update Title
+        current_lag = lags[frame]
+        title.set_text(f'Lag: {current_lag} months')
+        
+        return [mesh, title]
+
+    anim = FuncAnimation(fig, update, frames=len(lags), interval=600, blit=False)
+    
+    if savepath:
+        anim.save(savepath, fps=5, dpi=150)
+    
+    plt.show()
+
+# Now we call the SPECIALIZED movie function
+# Note: You can uncomment savepath to save the file
+make_lag_movie(run_by_lag, vmin=-1, vmax=1, savepath=None) # savepath='lag_movie.mp4'
