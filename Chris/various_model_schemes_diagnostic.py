@@ -23,6 +23,7 @@ CONSIDER_OBSERVATIONS = True
 MAKE_MOVIE = False
 PLOT_MODE_CONTRIBUTIONS = False
 PLOT_EOFS = False
+PLOT_PCs_OVER_TIME = False
 PLOT_ENSO = False
 MAKE_REGRESSION_MAPS = False
 TRACK_WARMING_EFFECTS = True
@@ -173,7 +174,7 @@ if PLOT_EOFS:       # plot EOFs (spatial patterns) for the first k modes
         plt.show()
 
 # plot PCs over time
-if CONSIDER_OBSERVATIONS:
+if CONSIDER_OBSERVATIONS and PLOT_PCs_OVER_TIME:
     k_range = 3
     fig, axs = plt.subplots(k_range, 1)
     fig.suptitle("PCs of " + to_plot_name + " scheme")

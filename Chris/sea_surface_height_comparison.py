@@ -23,19 +23,29 @@ ssh_grad_long_da = sea_surface_grad_ds['ssh_anomaly_grad_long']
 ssh_grad_lat_da = sea_surface_grad_ds['ssh_anomaly_grad_lat']
 
 
-print(abs(ssh_download_da).mean().item())
-print(abs(ssh_da).mean().item())
+print(abs(ssh_grad_lat_download_da).mean().item())
+print(abs(ssh_grad_lat_da).mean().item())
 
-# make_movie(ssh_download_da, -0.1, 0.1)
-# make_movie(ssh_da, -0.1, 0.1)
+make_movie(ssh_download_da, -0.1, 0.1, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/ssh_videos/ssh_download.mp4")
+make_movie(ssh_da, -0.1, 0.1, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/ssh_videos/ssh_calculated.mp4")
+
+make_movie(ssh_grad_long_download_da, -1e-6, 1e-6, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/ssh_videos/ssh_grad_long_download.mp4")
+make_movie(ssh_grad_long_da, -1e-9, 1e-9, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/ssh_videos/ssh_grad_long_calculated.mp4")
+
+make_movie(ssh_grad_lat_download_da, -1e-6, 1e-6, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/ssh_videos/ssh_grad_lat_download.mp4")
+make_movie(ssh_grad_lat_da, -1e-9, 1e-9, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/ssh_videos/ssh_grad_lat_calculated.mp4")
+
 
 xr.corr(ssh_download_da, ssh_da, dim='TIME').plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
+plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/ssh_videos/ssh_correlation.jpg")
 plt.show()
 
 xr.corr(ssh_grad_long_download_da, ssh_grad_long_da, dim='TIME').plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
+plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/ssh_videos/ssh_grad_long_correlation.jpg")
 plt.show()
 
 xr.corr(ssh_grad_lat_download_da, ssh_grad_lat_da, dim='TIME').plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
+plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/ssh_videos/ssh_grad_lat_correlation.jpg")
 plt.show()
 
 
