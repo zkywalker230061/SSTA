@@ -467,7 +467,7 @@ def make_lag_movie(data_array, vmin=-1, vmax=1, savepath=None):
     # We use .isel(lag=0) to get the first frame
     mesh = data_array.isel(lag=0).plot(
         ax=ax, 
-        cmap='RdBu_r', 
+        cmap='nipy_spectral', 
         vmin=vmin, vmax=vmax,
         add_colorbar=True,
         cbar_kwargs={'label': 'Correlation Coefficient'}
@@ -497,6 +497,8 @@ def make_lag_movie(data_array, vmin=-1, vmax=1, savepath=None):
     
     plt.show()
 
-# Now we call the SPECIALIZED movie function
+
 # Note: You can uncomment savepath to save the file
 make_lag_movie(run_by_lag, vmin=-1, vmax=1, savepath=None) # savepath='lag_movie.mp4'
+
+# --- 7. Map of Lagged ----------------------------------------------------------------------------------------

@@ -14,9 +14,9 @@ matplotlib.use('TkAgg')
 
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN = True
-INCLUDE_ENTRAINMENT = True
-INCLUDE_GEOSTROPHIC = True
-INCLUDE_GEOSTROPHIC_DISPLACEMENT = True
+INCLUDE_ENTRAINMENT = False
+INCLUDE_GEOSTROPHIC = False
+INCLUDE_GEOSTROPHIC_DISPLACEMENT = False
 CLEAN_CHRIS_PREV_CUR = False        # only really useful when entrainment is turned on
 
 observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature(T_m).nc"
@@ -37,7 +37,7 @@ USE_DOWNLOADED_SSH = False
 
 rho_0 = 1025.0
 c_0 = 4100.0
-gamma_0 = 30
+gamma_0 = 100
 g = 9.81
 f = 1 
 
@@ -400,7 +400,7 @@ axes.set_xlabel("Longitude")
 axes.set_ylabel("Lattitude")
 axes.set_title(f'{scheme_name} Scheme - Overall RMSE')
 max_rmse = rmse_map.max().item()
-print(scheme_name, max_rmse)
+print(scheme_name, 'Overall RMSE max', max_rmse)
 plt.tight_layout()
 fig.text(
     0.99, 0.01,
@@ -422,7 +422,7 @@ axes.set_xlabel("Longitude")
 axes.set_ylabel("Lattitude")
 axes.set_title(f'{scheme_name} Scheme - Normalized RMSE')
 max_rmse = rmse_map_norm.max().item()
-print(scheme_name, max_rmse)
+print(scheme_name, 'Normalized RMSE max', max_rmse)
 plt.tight_layout()
 fig.text(
     0.99, 0.01,
@@ -478,20 +478,22 @@ axes.set_xlabel("Longitude")
 axes.set_ylabel("Lattitude")
 axes.set_title(f'{scheme_name} Scheme - Summer RMSE')
 max_rmse = rmse_summer.max().item()
-print(scheme_name, max_rmse)
+print(scheme_name, 'Summer RMSE max:', max_rmse)
 max_rmse_location_summer = rmse_summer.where(rmse_summer == rmse_summer.max(), drop=True).squeeze()
-print(max_rmse_location_summer)
+print('max_rmse_location_summer: \n', max_rmse_location_summer)
 min_rmse = rmse_summer.min().item()
-print(scheme_name, min_rmse)
+print(scheme_name, 'Summer RMSE min:', min_rmse)
 min_rmse_location_summer = rmse_summer.where(rmse_summer == rmse_summer.min(), drop=True).squeeze()
-print(min_rmse_location_summer)
+print('min_rmse_location_summer: \n', min_rmse_location_summer)
 plt.tight_layout()
 fig.text(
     0.99, 0.01,
     f"Gamma = {gamma_0}\n"
     f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
     f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
-    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
+    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
+    f"INCLUDE_GEOSTROPHIC = {INCLUDE_GEOSTROPHIC}\n"
+    f"INCLUDE_GEOSTROPHIC_DISPLACEMENT = {INCLUDE_GEOSTROPHIC_DISPLACEMENT}",
     ha='right', va='bottom', fontsize=10
 )
 plt.show()
@@ -527,20 +529,22 @@ axes.set_xlabel("Longitude")
 axes.set_ylabel("Lattitude")
 axes.set_title(f'{scheme_name} Scheme - Winter RMSE')
 max_rmse = rmse_winter.max().item()
-print(scheme_name, max_rmse)
+print(scheme_name, 'Winter RMSE max' , max_rmse)
 max_rmse_location_winter = rmse_winter.where(rmse_winter == rmse_winter.max(), drop=True).squeeze()
-print(max_rmse_location_winter)
+print('max_rmse_location_winter', max_rmse_location_winter)
 min_rmse = rmse_winter.min().item()
-print(scheme_name, min_rmse)
+print(scheme_name, 'Winter RMSE min', min_rmse)
 min_rmse_location_winter = rmse_winter.where(rmse_winter == rmse_winter.min(), drop=True).squeeze()
-print(min_rmse_location_winter)
+print('min_rmse_location_winter', min_rmse_location_winter)
 plt.tight_layout()
 fig.text(
     0.99, 0.01,
     f"Gamma = {gamma_0}\n"
     f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
     f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
-    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
+    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
+    f"INCLUDE_GEOSTROPHIC = {INCLUDE_GEOSTROPHIC}\n"
+    f"INCLUDE_GEOSTROPHIC_DISPLACEMENT = {INCLUDE_GEOSTROPHIC_DISPLACEMENT}",
     ha='right', va='bottom', fontsize=10
 )
 plt.show()
