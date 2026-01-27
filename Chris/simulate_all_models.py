@@ -18,8 +18,8 @@ e.g.
 => surface and geostrophic on, Ekman and entrainment off
 """
 
-INCLUDE_SURFACE = True
-INCLUDE_EKMAN = True
+INCLUDE_SURFACE = False
+INCLUDE_EKMAN = False
 INCLUDE_ENTRAINMENT = True
 INCLUDE_GEOSTROPHIC = False
 INCLUDE_GEOSTROPHIC_DISPLACEMENT = False
@@ -28,7 +28,7 @@ CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turn
 USE_DOWNLOADED_SSH = False
 rho_0 = 1025.0
 c_0 = 4100.0
-gamma_0 = 30.0
+gamma_0 = 0.0
 g = 9.81
 
 save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH, gamma0=gamma_0, INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_DISPLACEMENT)
