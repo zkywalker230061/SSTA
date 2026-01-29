@@ -2,7 +2,8 @@ import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 
-from SSTA.Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, get_save_name, coriolis_parameter
+from SSTA.Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, get_save_name, \
+    coriolis_parameter, get_month_from_time
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
 import matplotlib
@@ -14,7 +15,7 @@ INCLUDE_ENTRAINMENT = True
 INCLUDE_GEOSTROPHIC = False
 INCLUDE_GEOSTROPHIC_DISPLACEMENT = False
 USE_DOWNLOADED_SSH = False
-gamma_0 = 30.0
+gamma_0 = 0.0
 entrainment_threshold = 5e-8        # entrainment velocities below this value are not considered as entraining
 
 save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH=USE_DOWNLOADED_SSH, gamma0=gamma_0, INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_DISPLACEMENT)
@@ -143,9 +144,7 @@ def entrain_detrain_split():
     def take_from_same_month(month, da):
         da_at_month = []
         for time in da.TIME.values:
-            month_of_this_time = (time + 0.5) % 12
-            if month_of_this_time == 0:
-                month_of_this_time = 12.0
+            month_of_this_time = get_month_from_time(time)
             if month_of_this_time == month:
                 da_at_month.append(da.sel(TIME=time))
         da_at_month = xr.concat(da_at_month, 'TIME')
@@ -205,15 +204,16 @@ def track_temperature_over_time():
             correlation[i] = cov / np.sqrt(x_var * y_var)
         return correlation
 
-    unexpected_location_weighted_correlation = pearson_weighted_correlation(unexpected_location_model, unexpected_location_obs, 2.5)
-    expected_location_weighted_correlation = pearson_weighted_correlation(expected_location_model, expected_location_obs, 2.5)
+    unexpected_location_weighted_correlation = pearson_weighted_correlation(unexpected_location_model, unexpected_location_obs, 3)
+    expected_location_weighted_correlation = pearson_weighted_correlation(expected_location_model, expected_location_obs, 3)
 
 
     plt.figure()
     plt.grid()
     plt.plot(time, unexpected_location_model, label="Entrainment-only model")
     plt.plot(time, unexpected_location_obs, label="Observations")
-    plt.plot(time, unexpected_location_correlation, label="Correlation")
+    #plt.plot(time, unexpected_location_correlation, label="Correlation")
+    plt.plot(time, unexpected_location_weighted_correlation, label="Correlation")
     plt.fill_between(time, 0, 1, where=(unexpected_location_entrainment > entrainment_threshold), transform=plt.gca().get_xaxis_transform(), color='grey', alpha=0.5)
     plt.xlabel("Time (year)")
     plt.ylabel("Temperature Anomaly (K)")
@@ -225,7 +225,8 @@ def track_temperature_over_time():
     plt.grid()
     plt.plot(time, expected_location_model, label="Entrainment-only model")
     plt.plot(time, expected_location_obs, label="Observations")
-    plt.plot(time, expected_location_correlation, label="Correlation")
+    #plt.plot(time, expected_location_correlation, label="Correlation")
+    plt.plot(time, expected_location_weighted_correlation, label="Correlation")
     plt.fill_between(time, 0, 1, where=(expected_location_entrainment > entrainment_threshold), transform=plt.gca().get_xaxis_transform(), color='grey', alpha=0.5)
     plt.xlabel("Time (year)")
     plt.ylabel("Temperature Anomaly (K)")

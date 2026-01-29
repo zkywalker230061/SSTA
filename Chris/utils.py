@@ -589,3 +589,9 @@ def coriolis_parameter(lat):
     f = xr.DataArray(f, coords={'LATITUDE': lat}, dims=['LATITUDE'])
     f.attrs['units'] = 's^-1'
     return f
+
+def get_month_from_time(time):
+    month = (time + 0.5) % 12
+    if month == 0:
+        month = 12.0
+    return month
