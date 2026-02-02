@@ -1,45 +1,47 @@
+"""
+Simulation of mixed-layer temperature anomalies using various models.
+
+Chengyun Zhu and Chris O'Sullivan
+
+2026-2-2
+"""
+
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
-
 from matplotlib.animation import FuncAnimation
 import matplotlib
+
+from utilities import load_and_prepare_dataset
+# from utilities import get_monthly_mean, get_anomaly
+# from utilities import save_file
 
 matplotlib.use('TkAgg')
 
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN = True
-INCLUDE_ENTRAINMENT = True
+INCLUDE_ENTRAINMENT = False
 INCLUDE_GEOSTROPHIC = True
+
 # first method for geostrophic: https://egusphere.copernicus.org/preprints/2025/egusphere-2025-3039/egusphere-2025-3039.pdf
 CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turned on
 
-# Changed from Heat Flux to Water Rate
-WATER_RATE_ALL_CONTRIBUTIONS_DATA_PATH = "datasets/Simulation-Surface_Water_Rate-(2004-2018).nc"
+
+HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "datasets/Simulation-Surface_Heat_Flux-(2004-2018).nc"
 # ['avg_ie'] and ['avg_tprate']
-
-EKMAN_ANOMALY_DATA_PATH = "datasets/Simulation-Ekman_Water_Rate-(2004-2018).nc"
-# [ANOMALY_EKMAN_WATER_RATE]
-
-# Changed TEMP to SALT
-SALT_DATA_PATH = "datasets/RG_ArgoClim_Salinity_2019.nc"
-
+EKMAN_ANOMALY_DATA_PATH = "datasets/Simulation-Ekman_Heat_Flux-(2004-2018).nc"
+# [ANOMALY_EKMAN_HEAT_FLUX]
+TEMP_DATA_PATH = "datasets/RG_ArgoClim_Temperature_2019.nc"
 MLD_DATA_PATH = "datasets/Mixed_Layer_Depth-(2004-2018).nc"
 # ['MLD']
-
-ENTRAINMENT_VEL_DATA_PATH = "datasets/Mixed_Layer_Entrainment_Velocity-(2004-2018).nc"
-# ['w_e']
-
 H_BAR_DATA_PATH = "datasets/Mixed_Layer_Depth-Seasonal_Mean.nc"
 # ['MONTHLY_MEAN_MLD']
-
-# Changed T_sub to S_sub
-S_SUB_ANOMALY_DATA_PATH = "datasets/Sub_Layer_Salinity_Anomalies-(2004-2018).nc"
-# ['ANOMALY_SUB_SALINITY']
-
-GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = "datasets/Simulation-Geostrophic_Water_Rate-(2004-2018).nc"
-# ['ANOMALY_GEOSTROPHIC_WATER_RATE']
-
+ENTRAINMENT_VEL_DATA_PATH = "datasets/Mixed_Layer_Entrainment_Velocity-(2004-2018).nc"
+# ['w_e']
+T_SUB_ANOMALY_DATA_PATH = "datasets/Sub_Layer_Temperature_Anomalies-(2004-2018).nc"
+# ['ANOMALY_SUB_TEMPERATURE']
+GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = "datasets/Simulation-Geostrophic_Heat_Flux-(2004-2018).nc"
+# ['ANOMALY_GEOSTROPHIC_HEAT_FLUX']
 
 # ------------------------------------------------------------------
 MONTHS = {
@@ -103,111 +105,6 @@ def get_anomaly(raw_ds, variable_name, monthly_mean):
     anomaly_ds = anomaly_ds.drop_vars("MONTH")
     raw_ds[variable_name + '_ANOMALY'] = anomaly_ds
     return raw_ds
-
-
-def _time_standard(ds: xr.Dataset, mid_month: bool = False) -> xr.Dataset:
-    """
-    Add a standard netCDF time coordinate to the dataset.
-    Not finished becuase data not linked to this new time coordinate yet.
-    Original:
-        'TIME' - axis T
-    New:
-        'time' - axis t, calendar 360_day
-
-    Parameters
-    ----------
-    ds: xarray.Dataset
-        Input dataset with time variable to decode.
-    mid_month: bool
-        Default is False.
-        If True, set time to the middle of the month.
-        If False, set time to the start of the month.
-
-    Returns
-    -------
-    xarray.Dataset
-        Dataset with new 'time' coordinate.
-
-    Raises
-    ------
-    ValueError
-        If mid_month is not True or False.
-    """
-    _, reference_date = ds['TIME'].attrs['units'].split('since')
-    if mid_month is False:
-        ds['time'] = pd.date_range(start=reference_date, periods=ds.sizes['TIME'], freq='MS')
-    elif mid_month is True:
-        ds['time'] = (pd.date_range(start=reference_date, periods=ds.sizes['TIME'], freq='MS')
-                      + pd.DateOffset(days=14))
-    else:
-        raise ValueError("mid_month must be True or False.")
-    ds['time'].attrs['calendar'] = '360_day'
-    ds['time'].attrs['axis'] = 't'
-    return ds
-
-
-def _longitude_180(ds: xr.Dataset) -> xr.Dataset:
-    """
-    Convert longitude from [0, 360] to [-180, 180].
-
-    Parameters
-    ----------
-    ds: xarray.Dataset
-        Input dataset with 'LONGITUDE' coordinate.
-
-    Returns
-    -------
-    xarray.Dataset
-        Dataset with 'LONGITUDE' in [-180, 180] and sorted.
-    """
-    lon_atrib = ds.coords['LONGITUDE'].attrs
-    ds['LONGITUDE'] = ((ds['LONGITUDE'] + 180) % 360) - 180
-    ds = ds.sortby(ds['LONGITUDE'])
-    ds['LONGITUDE'].attrs.update(lon_atrib)
-    ds['LONGITUDE'].attrs['modulo'] = 180
-    return ds
-
-
-def load_and_prepare_dataset(
-        filepath: str,
-        time_standard: bool = False,
-        time_standard_mid_month: bool = False,
-        longitude_180: bool = True
-) -> xr.Dataset | None:
-    """
-    Load, standardize time, and convert longitude for RG-ARGO dataset.
-
-    Parameters
-    ----------
-    filepath: str
-        Path to the RG-ARGO netCDF file.
-    time_standard: bool
-        Default is False.
-        If True, standardize the time coordinate.
-    time_standard_mid_month: bool
-        Default is False.
-        If True, standardize the time coordinate to the middle of the month.
-    longitude_180: bool
-        Default is True.
-        If True, convert longitude to [-180, 180].
-
-    Returns
-    -------
-    xarray.Dataset or None
-        The processed dataset, or None if loading fails.
-    """
-    try:
-        with xr.open_dataset(filepath, decode_times=False) as ds:
-            if time_standard:
-                ds = _time_standard(ds)
-            if time_standard_mid_month:
-                ds = _time_standard(ds, mid_month=True)
-            if longitude_180:
-                ds = _longitude_180(ds)
-            return ds
-    except (OSError, ValueError, KeyError) as e:
-        print(f"Error loading {filepath}: {e}")
-        return None
 
 
 def make_movie(dataset, vmin, vmax, colorbar_label=None, ENSO_ds=None):
@@ -369,41 +266,42 @@ def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, t
 
 
 rho_0 = 1025.0
-c_0 = 1
-gamma_0 = 0
+c_0 = 4100
+gamma_0 = 30
 g = 9.81
-f = 1       # coriolis parameter
 
-salinity_ds = load_and_prepare_dataset(SALT_DATA_PATH)
+temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
 
-s_m_a = load_and_prepare_dataset('datasets/Mixed_Layer_Salinity_Anomalies-(2004-2018).nc')
-s_m_a = s_m_a.drop_vars('MONTH')
+t_m_a = load_and_prepare_dataset('datasets/Mixed_Layer_Temperature_Anomalies-(2004-2018).nc')
+t_m_a = t_m_a.drop_vars('MONTH')
 
-water_rate_ds = xr.open_dataset(WATER_RATE_ALL_CONTRIBUTIONS_DATA_PATH, decode_times=False)
-water_rate_ds['NET_HEAT_FLUX_ANOMALY'] = water_rate_ds['ANOMALY_avg_ie'] + water_rate_ds['ANOMALY_avg_tprate']
-surface_flux_da = water_rate_ds['NET_HEAT_FLUX_ANOMALY']
+heat_flux_ds = load_and_prepare_dataset(HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH)
+heat_flux_ds['NET_HEAT_FLUX_ANOMALY'] = heat_flux_ds['ANOMALY_avg_slhtf'] + heat_flux_ds['ANOMALY_avg_ishf'] + \
+                                         heat_flux_ds['ANOMALY_avg_snswrf'] + heat_flux_ds['ANOMALY_avg_snlwrf']
+surface_flux_da = heat_flux_ds['NET_HEAT_FLUX_ANOMALY']
 
-ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
-ekman_anomaly_da = ekman_anomaly_ds['ANOMALY_EKMAN_WATER_RATE']
+ekman_anomaly_ds = load_and_prepare_dataset(EKMAN_ANOMALY_DATA_PATH)
+ekman_anomaly_da = ekman_anomaly_ds['ANOMALY_EKMAN_HEAT_FLUX']
 ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
 ekman_anomaly_da = ekman_anomaly_da.where(
         (ekman_anomaly_da['LATITUDE'] > 5) | (ekman_anomaly_da['LATITUDE'] < -5), 0
     )
 
-hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
+geostrophic_anomaly_ds = load_and_prepare_dataset(GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH)
+geostrophic_anomaly_da = geostrophic_anomaly_ds["ANOMALY_GEOSTROPHIC_HEAT_FLUX"]
+
+hbar_ds = load_and_prepare_dataset(H_BAR_DATA_PATH)
 hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
 
-s_sub_anomaly_ds = xr.open_dataset(S_SUB_ANOMALY_DATA_PATH, decode_times=False)
-s_sub_anomaly_da = s_sub_anomaly_ds["ANOMALY_SUB_SALINITY"]
+t_sub_anomaly_ds = load_and_prepare_dataset(T_SUB_ANOMALY_DATA_PATH)
+t_sub_anomaly_da = t_sub_anomaly_ds["ANOMALY_SUB_TEMPERATURE"]
 
-entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
-entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = xr.open_dataset(
-    "datasets/Mixed_Layer_Entrainment_Velocity-Seasonal_Mean.nc", decode_times=False
+entrainment_vel_ds = load_and_prepare_dataset(ENTRAINMENT_VEL_DATA_PATH)
+entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = load_and_prepare_dataset(
+    "datasets/Mixed_Layer_Entrainment_Velocity-Seasonal_Mean.nc"
 )['MONTHLY_MEAN_w_e']
 entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
 
-geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH, decode_times=False)
-geostrophic_anomaly_da = geostrophic_anomaly_ds["ANOMALY_GEOSTROPHIC_WATER_RATE"]
 
 
 def month_to_second(month):
@@ -431,7 +329,7 @@ entrainment_fluxes_implicit = []
 entrainment_fluxes_semi_implicit = []
 
 added_baseline = False
-for month in water_rate_ds.TIME.values:
+for month in heat_flux_ds.TIME.values:
     # find the previous and current month from 1 to 12 to access the monthly-averaged data (hbar, entrainment vel.)
     prev_month = month - 1
     month_in_year = int((month + 0.5) % 12)
@@ -442,8 +340,8 @@ for month in water_rate_ds.TIME.values:
         prev_month_in_year = 12
 
     if not added_baseline:  # just adds the baseline of a whole bunch of zero
-        base = s_m_a['ANOMALY_ML_SALINITY'].sel(TIME=month) - \
-               s_m_a['ANOMALY_ML_SALINITY'].sel(TIME=month)
+        base = t_m_a.sel(TIME=month)['ANOMALY_ML_TEMPERATURE'] - \
+               t_m_a.sel(TIME=month)['ANOMALY_ML_TEMPERATURE']
         base = base.expand_dims(TIME=[month])
         chris_prev_cur_model_anomalies.append(base)
         chris_mean_k_model_anomalies.append(base)
@@ -477,7 +375,7 @@ for month in water_rate_ds.TIME.values:
         # else:
         #     prev_tsub_anom = t_sub_da.sel(TIME=prev_month)
 
-        prev_tsub_anom = s_sub_anomaly_da.sel(TIME=prev_month)
+        prev_tsub_anom = t_sub_anomaly_da.sel(TIME=prev_month)
         prev_heat_flux_anom = surface_flux_da.sel(TIME=prev_month)
         prev_ekman_anom = ekman_anomaly_da.sel(TIME=prev_month)
         prev_entrainment_vel = entrainment_vel_da.sel(MONTH=prev_month_in_year)
@@ -485,7 +383,7 @@ for month in water_rate_ds.TIME.values:
         prev_hbar = hbar_da.sel(MONTH=prev_month_in_year)
 
         # get current data
-        cur_tsub_anom = s_sub_anomaly_da.sel(TIME=month)
+        cur_tsub_anom = t_sub_anomaly_da.sel(TIME=month)
         cur_heat_flux_anom = surface_flux_da.sel(TIME=month)
         cur_ekman_anom = ekman_anomaly_da.sel(TIME=month)
         cur_entrainment_vel = entrainment_vel_da.sel(MONTH=month_in_year)
@@ -637,7 +535,7 @@ if CLEAN_CHRIS_PREV_CUR:
     all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"] = all_anomalies_ds["CHRIS_PREV_CUR"].where((all_anomalies_ds["CHRIS_PREV_CUR"] > -10) & (all_anomalies_ds["CHRIS_PREV_CUR"] < 10))
     n_modes = 20
     monthly_mean = get_monthly_mean(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"])
-    map_mask = salinity_ds['BATHYMETRY_MASK'].sel(PRESSURE=2.5)
+    map_mask = temperature_ds['BATHYMETRY_MASK'].sel(PRESSURE=2.5)
     eof_ds, variance, PCs, EOFs = get_eof_with_nan_consideration(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"], map_mask, modes=n_modes, monthly_mean_ds=None, tolerance=1e-2)
     all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"] = eof_ds.rename("CHRIS_PREV_CUR_CLEAN")
     chris_prev_cur_clean_monthly_mean = get_monthly_mean(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"])
@@ -729,7 +627,7 @@ flux_components_ds = remove_empty_attributes(flux_components_ds)
 print(flux_components_ds)
 
 # flux_components_ds.to_netcdf("flux_components.nc")
-# all_anomalies_ds.to_netcdf("salinity_model_anomalies.nc")
+# all_anomalies_ds.to_netcdf("temperature_model_anomalies.nc")
 
 # make_movie(all_anomalies_ds["EXPLICIT"], -5, 5)
 make_movie(all_anomalies_ds["IMPLICIT"], -2, 2)
@@ -737,22 +635,21 @@ make_movie(all_anomalies_ds["IMPLICIT"], -2, 2)
 # make_movie(all_anomalies_ds["CHRIS_MEAN_K"], -5, 5)
 
 observed = xr.open_dataset(
-    "datasets/Mixed_Layer_Salinity_Anomalies-(2004-2018).nc", decode_times=False
-)['ANOMALY_ML_SALINITY']
+    "datasets/Mixed_Layer_Temperature_Anomalies-(2004-2018).nc", decode_times=False
+)['ANOMALY_ML_TEMPERATURE']
 observed = xr.open_dataset(
-    "datasets/Salinity_Anomalies-(2004-2018).nc", decode_times=False
-)['ANOMALY_SALINITY'].sel(PRESSURE=2.5)
+    "datasets/Temperature_Anomalies-(2004-2018).nc", decode_times=False
+)['ANOMALY_TEMPERATURE'].sel(PRESSURE=2.5)
 make_movie(observed, -2, 2)
-
-print(observed.max().item(), observed.min().item())
-print(observed.mean().item())
-print(abs(observed).mean().item())
 
 print(all_anomalies_ds["IMPLICIT"].max().item(), all_anomalies_ds["IMPLICIT"].min().item())
 print(all_anomalies_ds["IMPLICIT"].mean().item())
 print(abs(all_anomalies_ds["IMPLICIT"]).mean().item())
-print('-----')
 
+print(observed.max().item(), observed.min().item())
+print(observed.mean().item())
+print(abs(observed).mean().item())
+print('-----')
 
 rmse_difference = np.sqrt(((observed - all_anomalies_ds["IMPLICIT"]) ** 2).mean(dim=['TIME']))
 rmse_observed = np.sqrt((observed ** 2).mean(dim=['TIME']))

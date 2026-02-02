@@ -13,7 +13,7 @@ from utilities import load_and_prepare_dataset
 from utilities import get_monthly_mean, get_anomaly
 from utilities import save_file
 
-REF_PRESSURE = 2000  # dbar (~m)
+REF_PRESSURE = 950  # dbar (~m)
 G = 9.81
 RHO_O = 1025  # kg / m^3
 C_O = 4100  # J / (kg K)
@@ -49,11 +49,11 @@ def _get_alpha(
     return gsw.alpha(sa, ct, pressure)
 
 
-def save_sea_surface_height():
-    """Calculate and save sea surface height dataset."""
+def save_alpha():
+    """Calculate and save thermal expansion coefficient alpha dataset."""
 
     with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Sea_Surface_Height-(2004-2018).nc" in logs_datasets.read():
+        if "datasets/alpha.nc" in logs_datasets.read():
             return
 
     t = load_and_prepare_dataset("datasets/Temperature-(2004-2018).nc")
@@ -65,6 +65,28 @@ def save_sea_surface_height():
         input_core_dims=[["PRESSURE"], ["PRESSURE"], ["PRESSURE"], [], []],
         output_core_dims=[["PRESSURE"]], vectorize=True
     )
+
+    alpha.attrs['units'] = '1/K'
+    alpha.attrs['long_name'] = (
+        'Thermal Expansion Coefficient Jan 2004 - Dec 2018 (15.0 year)'
+    )
+    alpha.name = 'alpha'
+
+    save_file(
+        alpha,
+        "datasets/alpha.nc"
+    )
+
+
+def save_sea_surface_height():
+    """Calculate and save sea surface height dataset."""
+
+    with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
+        if "datasets/Sea_Surface_Height-(2004-2018).nc" in logs_datasets.read():
+            return
+
+    alpha = load_and_prepare_dataset("datasets/alpha.nc")['alpha']
+
     alpha_integrate = alpha.sel(PRESSURE=slice(0, REF_PRESSURE)).integrate("PRESSURE")
 
     ssh = (G * REF_PRESSURE + alpha_integrate) / G
@@ -450,6 +472,8 @@ def save_geostrophic_anomaly_salinity():
 
 def main():
     """Main function to calculate geostrophic term."""
+
+    save_alpha()
 
     save_sea_surface_height()
     save_monthly_mean_sea_surface_height()

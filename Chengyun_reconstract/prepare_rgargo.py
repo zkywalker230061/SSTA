@@ -12,6 +12,8 @@ from utilities import load_and_prepare_dataset
 from utilities import get_monthly_mean, get_anomaly
 from utilities import save_file
 
+import calculate_mixedlayerdepth
+
 
 def save_temperature():
     """Save temperature dataset."""
@@ -164,23 +166,14 @@ def _trapezoid_mean(quantity, depth, h_single):
         Integrated temperature up to h_single.
     """
 
+    if np.isnan(h_single):
+        return np.nan
+
+    q_at_h = np.interp(h_single, depth, quantity)
+
     mask_below = depth < h_single
-
-    if not np.any(mask_below) or np.isnan(h_single):
-        return np.nan
-
-    valid = ~np.isnan(quantity)
-    depth_valid = depth[valid]
-    quantity_valid = quantity[valid]
-
-    if len(depth_valid) < 2:
-        return np.nan
-
-    q_at_h = np.interp(h_single, depth_valid, quantity_valid)
-
-    mask_below_valid = depth_valid < h_single
-    p_below = depth_valid[mask_below_valid]
-    q_below = quantity_valid[mask_below_valid]
+    p_below = depth[mask_below]
+    q_below = quantity[mask_below]
     if len(p_below) < 1:
         return np.nan
 
@@ -366,6 +359,8 @@ def main():
     save_temperature_anomalies()
     save_salinity_anomalies()
 
+    calculate_mixedlayerdepth.main()
+
     save_mixed_layer_temperature()
     save_mixed_layer_salinity()
     save_monthly_mean_mixed_layer_temperature()
@@ -376,3 +371,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+    t_m_a = load_and_prepare_dataset(
+        "datasets/Mixed_Layer_Temperature_Anomalies-(2004-2018).nc",
+    )['ANOMALY_ML_TEMPERATURE']
+    t_m_a.sel(TIME=0.5).plot()

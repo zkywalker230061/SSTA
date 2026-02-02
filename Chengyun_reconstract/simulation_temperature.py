@@ -6,6 +6,8 @@ Chengyun Zhu
 """
 
 import xarray as xr
+import numpy as np
+import matplotlib.pyplot as plt
 
 from utilities import load_and_prepare_dataset
 from utilities import get_monthly_mean, get_anomaly
@@ -15,6 +17,7 @@ SURFACE = True
 ENTRAINMENT = True
 EKMAN = True
 GEOSTROPHIC = True
+LAMBDA_A = 4
 
 RHO_O = 1025  # kg / m^3
 C_O = 4100  # J / (kg K)
@@ -34,12 +37,7 @@ if SURFACE:
     q_surface.name = 'ANOMALY_SURFACE_HEAT_FLUX'
 else:
     q_surface = 0
-if ENTRAINMENT:
-    q_entrainment = load_and_prepare_dataset(
-        "datasets/Simulation-Entrainment_Heat_Flux-(2004-2018).nc"
-    )['ANOMALY_ENTRAINMENT_HEAT_FLUX']
-else:
-    q_entrainment = 0
+
 if EKMAN:
     q_ekman = load_and_prepare_dataset(
         "datasets/Simulation-Ekman_Heat_Flux-(2004-2018).nc"
@@ -49,6 +47,7 @@ if EKMAN:
     )
 else:
     q_ekman = 0
+
 if GEOSTROPHIC:
     q_geostrophic = load_and_prepare_dataset(
         "datasets/Simulation-Geostrophic_Heat_Flux-(2004-2018).nc"
@@ -59,11 +58,27 @@ if GEOSTROPHIC:
 else:
     q_geostrophic = 0
 
+if ENTRAINMENT:
+    q_entrainment = load_and_prepare_dataset(
+        "datasets/Simulation-Entrainment_Heat_Flux-(2004-2018).nc"
+    )['ANOMALY_ENTRAINMENT_HEAT_FLUX']
+else:
+    q_entrainment = 0
+
 
 t_m_a = load_and_prepare_dataset(
     "datasets/Mixed_Layer_Temperature_Anomalies-(2004-2018).nc"
 )['ANOMALY_ML_TEMPERATURE']
 t_m_a = t_m_a.drop_vars('MONTH')
+
+t_sub_a = load_and_prepare_dataset(
+    "datasets/Sub_Layer_Temperature_Anomalies-(2004-2018).nc"
+)['ANOMALY_SUB_TEMPERATURE']
+t_sub_a = t_sub_a.drop_vars('MONTH')
+
+w_e = load_and_prepare_dataset(
+    "datasets/Mixed_Layer_Entrainment_Velocity-(2004-2018).nc"
+)['w_e']
 
 h_monthly_mean = load_and_prepare_dataset(
     "datasets/Mixed_Layer_Depth-Seasonal_Mean.nc"
@@ -75,21 +90,29 @@ h_monthly_mean['TIME'] = t_m_a.TIME
 
 dt_m_a_dt = (
     q_surface
-    + q_entrainment
     + q_ekman
     + q_geostrophic
-    # - 20 * t_m_a
 ) / (RHO_O * C_O * h_monthly_mean)
+
+_lambda = LAMBDA_A / (RHO_O * C_O * h_monthly_mean) + w_e / h_monthly_mean
 
 t_m_a_simulated_list = []
 
 for month_num in t_m_a['TIME'].values:
     if month_num == 0.5:
-        t_m_a_simulated_da = t_m_a.sel(TIME=month_num)
+        t_m_a_simulated_da = t_m_a.sel(TIME=month_num) - t_m_a.sel(TIME=month_num)
     else:
         t_m_a_simulated_da = (
-            t_m_a.sel(TIME=month_num-1)
-            + dt_m_a_dt.sel(TIME=month_num-1) * SECONDS_MONTH
+            # t_m_a.sel(TIME=month_num-1)
+            # + dt_m_a_dt.sel(TIME=month_num-1) * SECONDS_MONTH
+            t_m_a.sel(TIME=month_num-1) * np.exp(-_lambda.sel(TIME=month_num-1) * SECONDS_MONTH)
+            + (
+                (
+                    t_sub_a.sel(TIME=month_num-1) * np.log(h_monthly_mean.sel(TIME=month_num)/h_monthly_mean.sel(TIME=month_num-1)) / SECONDS_MONTH
+                    + dt_m_a_dt.sel(TIME=month_num-1)
+                )
+                / _lambda.sel(TIME=month_num-1) * (1 - np.exp(-_lambda.sel(TIME=month_num-1) * SECONDS_MONTH))
+            )
         )
     t_m_a_simulated_da = t_m_a_simulated_da.expand_dims(TIME=[month_num])
     t_m_a_simulated_list.append(t_m_a_simulated_da)
@@ -102,7 +125,34 @@ t_m_a_simulated = xr.concat(
 
 t_m_a_simulated_monthly_mean = get_monthly_mean(t_m_a_simulated)
 t_m_a_simulated = get_anomaly(t_m_a_simulated, t_m_a_simulated_monthly_mean)
+t_m_a_simulated = t_m_a_simulated.drop_vars('MONTH')
 
-difference = t_m_a_simulated - t_m_a
-print(difference)
-difference.sel(TIME=6.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=-3, vmax=3)
+print(t_m_a_simulated.max().item(), t_m_a_simulated.min().item())
+print(t_m_a_simulated.mean().item())
+print(abs(t_m_a_simulated).mean().item())
+
+print(t_m_a.max().item(), t_m_a.min().item())
+print(t_m_a.mean().item())
+print(abs(t_m_a).mean().item())
+print('-----')
+
+rmse_difference = np.sqrt(((t_m_a - t_m_a_simulated) ** 2).mean(dim=['TIME']))
+rmse_observed = np.sqrt((t_m_a ** 2).mean(dim=['TIME']))
+
+print(rmse_difference.mean().item())
+rmse_difference.plot(x='LONGITUDE', y='LATITUDE', cmap='viridis', vmin=0, vmax=3)
+plt.show()
+
+print(rmse_observed.mean().item())
+rmse_observed.plot(x='LONGITUDE', y='LATITUDE', cmap='viridis', vmin=0, vmax=3)
+plt.show()
+
+rmse = rmse_difference / rmse_observed
+print(rmse.mean().item())
+rmse.plot(x='LONGITUDE', y='LATITUDE', cmap='viridis', vmin=0, vmax=3)
+plt.show()
+
+corr = xr.corr(t_m_a, t_m_a_simulated, dim='TIME')
+print(corr.mean().item())
+corr.plot(x='LONGITUDE', y='LATITUDE', cmap='viridis', vmin=-1, vmax=1)
+plt.show()
