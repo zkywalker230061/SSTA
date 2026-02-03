@@ -131,15 +131,15 @@ def entrain_detrain_split():
     # implicit_model_detrainment_ds.sel(TIME=11.5).plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
     # plt.show()
 
-    # (xr.corr(tm_anomaly_entrainment_ds, implicit_model_entrainment_ds, dim='TIME')).plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
-    # plt.title("Correlation between entrainment-only model and Tm observation in entraining regions")
-    # # plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment/entrainment_only_model_obs_correlation.jpg")
-    # plt.show()
-    #
-    # (xr.corr(tm_anomaly_detrainment_ds, implicit_model_detrainment_ds, dim='TIME')).plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
-    # plt.title("Correlation between entrainment-only model and Tm observation in detraining regions")
-    # # plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment/entrainment_only_model_obs_correlation.jpg")
-    # plt.show()
+    (xr.corr(tm_anomaly_entrainment_ds, implicit_model_entrainment_ds, dim='TIME')).plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
+    plt.title("Correlation between entrainment-only model and Tm observation in entraining regions")
+    plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment/entraining_regions_correlation_" + save_name + ".jpg")
+    plt.show()
+
+    (xr.corr(tm_anomaly_detrainment_ds, implicit_model_detrainment_ds, dim='TIME')).plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
+    plt.title("Correlation between entrainment-only model and Tm observation in detraining regions")
+    plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment/detraining_regions_correlation_" + save_name + ".jpg")
+    plt.show()
 
     def take_from_same_month(month, da):
         da_at_month = []
@@ -234,6 +234,6 @@ def track_temperature_over_time():
     plt.legend()
     plt.show()
 
-#entrain_detrain_split()
-track_temperature_over_time()
+entrain_detrain_split()
+#track_temperature_over_time()
 

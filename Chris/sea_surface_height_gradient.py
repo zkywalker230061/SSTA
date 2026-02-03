@@ -13,6 +13,7 @@ else:
     SEA_SURFACE_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_calculated.nc"
     var_name = "ssh"
 sea_surface_ds = xr.open_dataset(SEA_SURFACE_DATA_PATH, decode_times=False)
+print(sea_surface_ds)
 temp_ds = load_and_prepare_dataset("/Volumes/G-DRIVE ArmorATD/Extension/datasets/RG_ArgoClim_Temperature_2019.nc")
 
 monthly_mean_sla = get_monthly_mean(sea_surface_ds[var_name])
@@ -33,3 +34,4 @@ if DOWNLOADED:
     sea_surface_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_interpolated_grad.nc")
 else:
     sea_surface_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_calculated_grad.nc")
+    #sea_surface_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_calculated_specific_volume_method_grad.nc")
