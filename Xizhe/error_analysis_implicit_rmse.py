@@ -37,7 +37,7 @@ USE_DOWNLOADED_SSH = False
 
 rho_0 = 1025.0
 c_0 = 4100.0
-gamma_0 = 100
+gamma_0 = 15
 g = 9.81
 f = 1 
 
@@ -378,6 +378,7 @@ observed_temperature_monthly_average = get_monthly_mean(observed_temp_ds['__xarr
 observed_temperature_anomaly = get_anomaly(observed_temp_ds, '__xarray_dataarray_variable__', observed_temperature_monthly_average)
 observed_temperature_anomaly = observed_temperature_anomaly['__xarray_dataarray_variable___ANOMALY']
 
+implicit_model_anomaly_ds = all_anomalies_ds["IMPLICIT"]
 # ----- To check if the observed temperature anomaly dataset is going wrong...
 # observed_temperature_anomaly_mean = observed_temperature_anomaly.mean(dim=['TIME'])
 # vmin, vmax = -0.1, 0.1

@@ -9,15 +9,15 @@ from chris_utils import make_movie, get_eof_with_nan_consideration, remove_empty
 from chris_utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
 import matplotlib
-from scipy.stats import kurtosis, skew, pearsonr
+from scipy.stats import kurtosis, skew, pearsonr, t
 
 matplotlib.use('TkAgg')
 
-INCLUDE_SURFACE = True
-INCLUDE_EKMAN = True
-INCLUDE_ENTRAINMENT = True
-INCLUDE_GEOSTROPHIC = False
-INCLUDE_GEOSTROPHIC_DISPLACEMENT = False
+INCLUDE_SURFACE = False
+INCLUDE_EKMAN = False
+INCLUDE_ENTRAINMENT = False
+INCLUDE_GEOSTROPHIC_MEAN = False
+INCLUDE_GEOSTROPHIC_ANOM = True
 CLEAN_CHRIS_PREV_CUR = False        # only really useful when entrainment is turned on
 
 observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature(T_m).nc"
@@ -38,12 +38,15 @@ USE_DOWNLOADED_SSH = False
 
 rho_0 = 1025.0
 c_0 = 4100.0
-gamma_0 = 30
+gamma_0 = 15
 g = 9.81
 f = 1 
 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
 observed_temp_ds = xr.open_dataset(observed_path, decode_times=False)
+observed_temperature_monthly_average = get_monthly_mean(observed_temp_ds['__xarray_dataarray_variable__'])
+observed_temperature_anomaly = get_anomaly(observed_temp_ds, '__xarray_dataarray_variable__', observed_temperature_monthly_average)
+observed_temperature_anomaly = observed_temperature_anomaly['__xarray_dataarray_variable___ANOMALY']
 
 heat_flux_ds = xr.open_dataset(HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH, decode_times=False)
 heat_flux_ds['NET_HEAT_FLUX'] = heat_flux_ds['avg_slhtf'] + heat_flux_ds['avg_snlwrf'] + heat_flux_ds['avg_snswrf'] + \
@@ -84,7 +87,6 @@ t_sub_da = t_sub_ds["T_sub_ANOMALY"]
 entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
 entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
 entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
-# print(entrainment_vel_da)
 
 geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH, decode_times=False)
 geostrophic_anomaly_da = geostrophic_anomaly_ds["GEOSTROPHIC_ANOMALY"]
@@ -157,7 +159,7 @@ for month in heat_flux_anomaly_ds.TIME.values:
 
     else:
         # store previous readings Tm(n-1)
-        if INCLUDE_GEOSTROPHIC_DISPLACEMENT:    # then need to take the previous reading "back-propagated" based on current
+        if INCLUDE_GEOSTROPHIC_ANOM:    # then need to take the previous reading "back-propagated" based on current
             prev_implicit_k_tm_anom_at_cur_loc = implicit_model_anomalies[-1].isel(TIME=-1)
             # prev_chris_prev_cur_tm_anom_at_cur_loc = chris_prev_cur_model_anomalies[-1].isel(TIME=-1)
             # prev_chris_mean_k_tm_anom_at_cur_loc = chris_mean_k_model_anomalies[-1].isel(TIME=-1)
@@ -223,7 +225,7 @@ for month in heat_flux_anomaly_ds.TIME.values:
             cur_surf_ek = cur_ekman_anom - cur_ekman_anom
             prev_surf_ek = prev_ekman_anom - prev_ekman_anom
 
-        if INCLUDE_GEOSTROPHIC:
+        if INCLUDE_GEOSTROPHIC_MEAN:
             cur_surf_ek = cur_surf_ek + cur_geo_anom
             prev_surf_ek = prev_surf_ek + prev_geo_anom
 
@@ -374,358 +376,249 @@ flux_components_ds = xr.merge(flux_components_to_merge)
 
 #--- 2.1 Prepare Observed Temperature Anomaly ------------------------------------------------------------
 
-# Extract Variables
-observed_temperature_monthly_average = get_monthly_mean(observed_temp_ds['__xarray_dataarray_variable__'])
-observed_temperature_anomaly = get_anomaly(observed_temp_ds, '__xarray_dataarray_variable__', observed_temperature_monthly_average)
-observed_temperature_anomaly = observed_temperature_anomaly['__xarray_dataarray_variable___ANOMALY']
 
-#--- 2.2 Prepare Make Movie Function ------------------------------------------------------------
-def make_lag_movie(data_array, vmin=-1, vmax=1, savepath=None):
-    # Extract lag values
+implicit_model_anomaly_ds = all_anomalies_ds["IMPLICIT"]
+
+
+#--- 2.2 Helper Functions (Visualization) ------------------------------------------------------------
+def make_lag_movie(data_array, vmin=-1, vmax=1, savepath=None, cmap='RdBu_r'):
+    """Generates an animation of the correlation map across lags."""
     lags = data_array.lag.values
     
     fig, ax = plt.subplots(figsize=(8, 5))
     
-    # Initial Plot (using the first lag)
-    # We use .isel(lag=0) to get the first frame
+    # Initial Plot
     mesh = data_array.isel(lag=0).plot(
         ax=ax, 
-        cmap='nipy_spectral', 
+        cmap=cmap, 
         vmin=vmin, vmax=vmax,
         add_colorbar=True,
         cbar_kwargs={'label': 'Correlation Coefficient'}
     )
     
-    # Store title object to update later
     title = ax.set_title(f'Lag: {lags[0]} months')
     ax.set_xlabel('Longitude')
     ax.set_ylabel('Latitude')
 
     def update(frame):
-        # Update the data in the mesh
-        # .ravel() flattens the 2D array to match what pcolormesh expects
         data_slice = data_array.isel(lag=frame).values
         mesh.set_array(data_slice.ravel())
-        
-        # Update Title
-        current_lag = lags[frame]
-        title.set_text(f'Lag: {current_lag} months')
-        
+        title.set_text(f'Lag: {lags[frame]} months')
         return [mesh, title]
 
     anim = FuncAnimation(fig, update, frames=len(lags), interval=600, blit=False)
     
     if savepath:
         anim.save(savepath, fps=5, dpi=150)
-    
     plt.show()
 
+def plot_map(data, title, label, cmap="RdBu_r", vmin=None, vmax=None, levels=None):
+    fig, ax = plt.subplots(1, 1, figsize=(9, 5))
+    
+    # Handle levels if provided (for discrete colorbar)
+    plot_kwargs = {'cmap': cmap, 'cbar_kwargs': {'label': label}}
+    if vmin is not None and vmax is not None:
+        plot_kwargs.update({'vmin': vmin, 'vmax': vmax})
+    if levels is not None:
+        plot_kwargs.update({'levels': levels})
+
+    data.plot(ax=ax, **plot_kwargs)
+
+    ax.set_title(title)
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    fig.text(
+        0.99, 0.01,
+        f"Gamma = {gamma_0}\n"
+        f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
+        f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
+        f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
+        f"INCLUDE_GEOSTROPHIC = {INCLUDE_GEOSTROPHIC_MEAN}\n"
+        f"INCLUDE_GEOSTROPHIC_DISPLACEMENT = {INCLUDE_GEOSTROPHIC_ANOM}",
+        ha='right', va='bottom', fontsize=8
+        )
+    plt.tight_layout()
+    plt.show()
 
 #%%
-#--- 3. Cross Correlation ----------------------------------------------------------------------------
+#--- 3. Cross Correlation Calculation ----------------------------------------------------------------
 
+# 3.1 Setup Parameters
+lags = np.arange(-12, 13)
+scheme_name = "Implicit"
 lat = observed_temperature_anomaly['LATITUDE'].values
 lon = observed_temperature_anomaly['LONGITUDE'].values
 
-lags = np.arange(-12, 13)
-window = 36
-scheme_name = "Implicit"
+# 3.2 Pre-calculate Autocorrelation (Persistence)
+# High autocorrelation reduces the Effective Degrees of Freedom (N_eff).
+r_x = xr.corr(observed_temperature_anomaly, 
+              observed_temperature_anomaly.shift(TIME=1), dim="TIME")
+r_y = xr.corr(implicit_model_anomaly_ds, 
+              implicit_model_anomaly_ds.shift(TIME=1), dim="TIME")
 
-
-def get_cross_correlation(obs, model, month_lagged=0):
+# 3.3 Core Calculation Function
+def calculate_lag_stats(obs, model, lag, r_x_map, r_y_map):
     """
-    Calculates correlation with a specific lag.
-    Positive lag = Model is shifted forward (Model Lags Obs).
+    Calculates Correlation (r), T-statistic, and Effective N for a single lag.
     """
-    # Shift model along TIME
-    model_lag = model.shift(TIME=month_lagged)
+    # Shift model: Positive lag => Model lags Obs
+    model_shifted = model.shift(TIME=lag)
+    
+    # 1. Correlation
+    r = xr.corr(obs, model_shifted, dim="TIME")
+    
+    # 2. Effective Degrees of Freedom (Bretherton et al. 1999)
+    # N_total = 180. We subtract abs(lag) because shifting loses data points.
+    N_lagged = 180 - abs(lag)
+    N_effective = N_lagged * (1 - r_x_map * r_y_map) / (1 + r_x_map * r_y_map)
+    
+    # 3. T-Statistic
+    t_stat = r * np.sqrt((N_effective - 2) / (1 - r**2))
+    
+    return r, t_stat, N_effective
 
-    # xr.corr handles alignment automatically, but we must ensure 
-    # we are correlating along the TIME dimension.
-    return xr.corr(obs, model_lag, dim="TIME")
+# 3.4 Execute Loop over Lags
+print("Calculating cross-correlations...")
+results = [calculate_lag_stats(observed_temperature_anomaly, 
+                               implicit_model_anomaly_ds, 
+                               k, r_x, r_y) for k in lags]
 
-def get_cross_correlation_fixedN(obs, model, lag, time_common):
-    """
-    Correlate obs with lagged model using a fixed TIME window for all lags.
-    Positive lag => model is shifted forward (model lags obs).
-    """
-    obs_sel = obs.sel(TIME=time_common)
-    model_sel = model.shift(TIME=lag).sel(TIME=time_common)
+r_list, t_list, n_list = zip(*results)
+lag_dim = xr.DataArray(lags, dims="lag", name="lag")
 
-    # Ensure identical TIME coordinate alignment
-    obs_sel, model_sel = xr.align(obs_sel, model_sel, join="exact")
+corr_by_lag = xr.concat(r_list, dim=lag_dim)
+t_stat_by_lag = xr.concat(t_list, dim=lag_dim)
+n_eff_by_lag = xr.concat(n_list, dim=lag_dim)
 
-    # Pearson r along TIME (xarray will skip NaNs pairwise)
-    r = xr.corr(obs_sel, model_sel, dim="TIME")
+# 3.5 Calculate Significance (P-Value)
+# Two-tailed test using Survival Function (sf = 1 - cdf)
+p_values_da = 2 * t.sf(np.abs(t_stat_by_lag), df=n_eff_by_lag - 2)
+p_values_da = xr.DataArray(p_values_da, coords=t_stat_by_lag.coords, name="p_value")
 
-    # Optional: track sample size actually used per grid cell (after NaNs)
-    # n = xr.ufuncs.isfinite(obs_sel) & xr.ufuncs.isfinite(model_sel)
-    # n = n.sum(dim="TIME")
-    return r #, n
-
-def rolling_corr_1lag(obs, model, lag, window=36, min_periods=None):
-    """
-    Rolling correlation between obs and lagged model.
-    Returns r(t, lat, lon) with TIME being the window-center timestamps.
-
-    Positive lag: model.shift(TIME=lag) => model lags obs.
-    """
-    if min_periods is None:
-        min_periods = window  # strict: require full window
-
-    m = model.shift(TIME=lag)
-
-    # Align both arrays on the same TIME/LAT/LON
-    obs_al, m_al = xr.align(obs, m, join="inner")
-
-    # Rolling means
-    roll_obs = obs_al.rolling(TIME=window, center=True, min_periods=min_periods)
-    roll_m   = m_al.rolling(TIME=window, center=True, min_periods=min_periods)
-
-    mean_x  = roll_obs.mean()
-    mean_y  = roll_m.mean()
-    mean_xy = (obs_al * m_al).rolling(TIME=window, center=True, min_periods=min_periods).mean()
-
-    # Rolling variances
-    mean_x2 = (obs_al**2).rolling(TIME=window, center=True, min_periods=min_periods).mean()
-    mean_y2 = (m_al**2).rolling(TIME=window, center=True, min_periods=min_periods).mean()
-
-    var_x = mean_x2 - mean_x**2
-    var_y = mean_y2 - mean_y**2
-    cov   = mean_xy - mean_x * mean_y
-
-    r = cov / np.sqrt(var_x * var_y)
-    return r
+# Mask for significance (95% confidence)
+significant_mask = p_values_da < 0.05
+sig_correlations = corr_by_lag.where(significant_mask)
 
 #%%
-# --- 3.1  Calculate Single Lag (for the static map)------------------------------------------------
-target_lag = 0
-correlation_0_lag = get_cross_correlation(
-    observed_temperature_anomaly, 
-    implicit_model_anomaly_ds, 
-    month_lagged=target_lag
-)
-#%%
-# --- 3.2 Calculate All Lags (for the movie and time series) ----------------------------------------
-run_by_lag = xr.concat(
-    [get_cross_correlation(observed_temperature_anomaly, implicit_model_anomaly_ds, k) for k in lags],
-    dim=xr.DataArray(lags, dims="lag", name="lag")
-)
-
-#%%
-# --- 3.3 Calculate All Lags (for the same sample window) ----------------------------------------
-time_common = observed_temperature_anomaly["TIME"].isel(TIME=slice(12, -12))
-run_by_lag_fixedN = xr.concat(
-    [get_cross_correlation_fixedN(observed_temperature_anomaly, implicit_model_anomaly_ds, k, time_common) for k in lags],
-    dim=xr.DataArray(lags, dims="lag", name="lag")
-)
-#%%
-# --- 3.4 Calculate 3 year rolling-window correlation  ----------------------------------------
-r_roll_all = xr.concat(
-    [rolling_corr_1lag(observed_temperature_anomaly, implicit_model_anomaly_ds, lag=k, window=window) for k in lags],
-    dim=xr.DataArray(lags, dims="lag", name="lag")
-)
-r_rolling_std = r_roll_all.std(dim="TIME") 
-
-#%%
-# --- 4. Plotting: Static Map ------------------------------------------------------------------------
-fig, axes = plt.subplots(1, 1, figsize=(8,5))
-scheme_name = "Implicit"
-
-correlation_0_lag.plot(
-    ax=axes, 
-    cmap='nipy_spectral', 
-    cbar_kwargs={'label': 'Correlation'}, 
+# --- 4. Visualization: Static Map (Lag 0) -----------------------------------------------------------
+plot_map(
+    data=corr_by_lag.sel(lag=0),
+    title=f'{scheme_name} Scheme - Cross Correlation (Lag 0)',
+    label='Correlation',
+    cmap='RdBu_r', # Red-Blue reversed is standard for correlation
     vmin=-1, vmax=1
 )
 
-axes.set_xlabel("Longitude")
-axes.set_ylabel("Latitude")
-axes.set_title(f'{scheme_name} Scheme - Cross Correlation Map (lag {target_lag})')
-
-fig.text(
-    0.99, 0.01,
-    f"Gamma = {gamma_0}\n"
-    f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
-    f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
-    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
-    f"INCLUDE_GEOSTROPHIC = {INCLUDE_GEOSTROPHIC}\n"
-    f"INCLUDE_GEOSTROPHIC_DISPLACEMENT = {INCLUDE_GEOSTROPHIC_DISPLACEMENT}",
-    ha='right', va='bottom', fontsize=8
-)
-plt.tight_layout()
-plt.show()
-
 #%%
-# --- 5. Plotting: Time Series ------------------------------------------------------------------------
+# --- 5. Visualization: Time Series (Selected Locations) ---------------------------------------------
 locations = [
     {'name': 'Southern Ocean', 'lat': -52.5, 'lon': -95.5, 'color': 'red'},
     {'name': 'North Atlantic', 'lat': 41.5, 'lon': -50.5, 'color': 'green'},
     {'name': 'North Atlantic 2', 'lat': 50, 'lon': -25, 'color': 'pink'},
     {'name': 'Indian', 'lat': -20, 'lon': 75, 'color': 'blue'},
-    {'name': 'North Pacific', 'lat': 30, 'lon': -150, 'color': 'yellow'},
+    {'name': 'North Pacific', 'lat': 30, 'lon': -150, 'color': 'goldenrod'},
     {'name': 'Cape Agulhas', 'lat': -40, 'lon': 25, 'color': 'orange'},
 ]
 
 plt.figure(figsize=(10, 6))
 
 for loc in locations:
-    point_data = run_by_lag.sel(
-        LATITUDE=loc['lat'], 
-        LONGITUDE=loc['lon'], 
-        method='nearest'
-    )
+    # 'nearest' selects the closest grid cell to the specified lat/lon
+    point_data = corr_by_lag.sel(LATITUDE=loc['lat'], LONGITUDE=loc['lon'], method='nearest')
     
     plt.plot(
         point_data['lag'], 
         point_data, 
-        label=f"{loc['name']} (lat:{loc['lat']}, lon:{loc['lon']})",
-        color=loc['color'],
-        marker='o', markersize=4
+        label=f"{loc['name']}", 
+        color=loc['color'], 
+        marker='o', markersize=4, alpha=0.8
     )
 
 plt.axvline(0, color='k', linestyle='--', alpha=0.5, label='Zero Lag')
 plt.axhline(0, color='k', linewidth=0.8)
 plt.ylim(-1, 1)
-plt.xlabel("Lag (months)\n(Positive: Model lags Obs | Negative: Model leads Obs)")
+plt.xlabel("Lag (months)\n(Positive: Model lags Obs)")
 plt.ylabel("Cross-correlation")
 plt.title(f"{scheme_name} Scheme: Lagged Cross-Correlation")
-plt.legend()
+plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
 plt.grid(True, alpha=0.3)
+plt.tight_layout()
 plt.show()
 
 #%%
-# --- 6. Run the Movie ----------------------------------------------------------------------------------------
-
-# Note: You can uncomment savepath to save the file
-make_lag_movie(run_by_lag, vmin=-1, vmax=1, savepath=None) # savepath='lag_movie.mp4'
-
+# --- 6. Visualization: Movie ------------------------------------------------------------------------
+# make_lag_movie(corr_by_lag, vmin=-1, vmax=1, savepath=None)
 
 #%%
-# --- 7. Map of best lag (per grid cell) ------------------------------------------------------------
+# --- 7. Visualization: Maps of Best Lag -------------------------------------------------------------
 
-# Choose what "best" means:
+# Strategy: Find the lag that produces the Strongest Magnitude Correlation (Positive OR Negative)
 # A) best positive correlation:
-# best_lag = run_by_lag.idxmax(dim="lag")
-# best_corr = run_by_lag.max(dim="lag")
+# best_lag = corr_by_lag.idxmax(dim="lag")
+# best_corr = corr_by_lag.max(dim="lag")
 
 # B) strongest magnitude (ignoring sign):
-mask_obs = run_by_lag.notnull().all(dim="lag")
-abs_run = np.abs(run_by_lag)
+mask_obs = corr_by_lag.notnull().all(dim="lag")
+abs_run = np.abs(corr_by_lag)
 abs_filled = abs_run.where(np.isfinite(abs_run), -np.inf)
-best_idx = abs_filled.argmax(dim="lag")          # dims: (LATITUDE, LONGITUDE)
-best_lag = run_by_lag["lag"].isel(lag=best_idx)  # dims: (LATITUDE, LONGITUDE)
+best_idx = abs_filled.argmax(dim="lag") # dims: (LATITUDE, LONGITUDE)
+best_lag = corr_by_lag["lag"].isel(lag=best_idx) # dims: (LATITUDE, LONGITUDE)
 best_lag = best_lag.where(mask_obs)
-best_corr = run_by_lag.isel(lag=best_idx)        # dims: (LATITUDE, LONGITUDE)
+best_corr = corr_by_lag.isel(lag=best_idx) # dims: (LATITUDE, LONGITUDE)
 
 # # C) best (most negative) correlation:
-# best_lag = run_by_lag.idxmin(dim="lag")
-# best_corr = run_by_lag.min(dim="lag")
+# best_lag = corr_by_lag.idxmin(dim="lag")
+# best_corr = corr_by_lag.min(dim="lag")
 
-
-# --- Plot 1: Best correlation value (signed)
-fig, ax = plt.subplots(1, 1, figsize=(9, 5))
-
-best_corr.plot(
-    ax=ax,
+# --- Plot 7.1: Value of the Best Correlation ---
+plot_map(
+    data=best_corr,
+    title=f"{scheme_name}: Max Correlation Value (at best lag)",
+    label="Correlation",
     cmap="nipy_spectral",
-    vmin=-1, vmax=1,
-    cbar_kwargs={"label": "Correlation at best lag"},
+    vmin=-1, vmax=1
 )
 
-ax.set_title(f"{scheme_name}: Best correlation value at each grid cell")
-ax.set_xlabel("Longitude")
-ax.set_ylabel("Latitude")
-plt.tight_layout()
-plt.show()
-
-
-# --- Plot 2: Lag at which best correlation occurs
-fig, ax = plt.subplots(1, 1, figsize=(9, 5))
-
-levels = np.arange(lags.min() - 0.5, lags.max() + 1.5, 1)
-
-best_lag.plot(
-    ax=ax,
+# --- Plot 7.2: Which Lag was the Best? ---
+# define discrete levels for the colorbar so each month is distinct
+lag_levels = np.arange(lags.min() - 0.5, lags.max() + 1.5, 1)
+plot_map(
+    data=best_lag,
+    title=f"{scheme_name}: Lag (months) of Max Correlation",
+    label="Lag (months)",
     cmap="nipy_spectral",
-    levels=levels,
-    cbar_kwargs={"label": "Lag (months) at best correlation"},
+    levels=lag_levels
 )
-
-ax.set_title(f"{scheme_name}: lag (in months) at which the strongest correlation occurs at each grid cell")
-ax.set_xlabel("Longitude")
-ax.set_ylabel("Latitude")
-plt.tight_layout()
-plt.show()
 
 #%%
-# --- 7.2 Map of best lag (per grid cell) ------------------------------------------------------------
+# --- 8. Visualization: Maps of Best Lag (SIGNIFICAN ADDED) -------------------------------------------------------------
+
 # B) strongest magnitude (ignoring sign):
-mask_obs_fixedN = run_by_lag_fixedN.notnull().all(dim="lag")
-abs_run_fixedN = np.abs(run_by_lag_fixedN)
-abs_filled_fixedN = abs_run_fixedN.where(np.isfinite(abs_run_fixedN), -np.inf)
-best_idx_fixedN = abs_filled_fixedN.argmax(dim="lag")          # dims: (LATITUDE, LONGITUDE)
-best_lag_fixedN = run_by_lag_fixedN["lag"].isel(lag=best_idx_fixedN)  # dims: (LATITUDE, LONGITUDE)
-best_lag_fixedN = best_lag_fixedN.where(mask_obs_fixedN)
-best_corr_fixedN = run_by_lag_fixedN.isel(lag=best_idx_fixedN)        # dims: (LATITUDE, LONGITUDE)
+mask_obs_sig = sig_correlations.notnull().all(dim="lag")
+abs_run_sig = np.abs(sig_correlations)
+abs_filled_sig = abs_run_sig.where(np.isfinite(abs_run_sig), -np.inf)
+best_idx_sig = abs_filled_sig.argmax(dim="lag") # dims: (LATITUDE, LONGITUDE)
+best_lag_sog =  sig_correlations["lag"].isel(lag=best_idx) # dims: (LATITUDE, LONGITUDE)
+best_lag_sig = best_lag_sog.where(mask_obs_sig)
+best_corr_sig = sig_correlations.isel(lag=best_idx_sig) # dims: (LATITUDE, LONGITUDE)
 
-# --- 7.2.1 Plot 1: Best correlation value (signed)
-fig, ax = plt.subplots(1, 1, figsize=(9, 5))
 
-best_corr_fixedN.plot(
-    ax=ax,
+# --- Plot 7.1: Value of the Best Correlation ---
+plot_map(
+    data=best_corr_sig,
+    title=f"{scheme_name}: Max Correlation Value (at best lag with significance level 95%)",
+    label="Correlation",
     cmap="nipy_spectral",
-    vmin=-1, vmax=1,
-    cbar_kwargs={"label": "Correlation at best lag"},
+    vmin=-1, vmax=1
 )
 
-ax.set_title(f"{scheme_name}: Best correlation value at each grid cell (Sample Window Selected)")
-ax.set_xlabel("Longitude")
-ax.set_ylabel("Latitude")
-plt.tight_layout()
-plt.show()
-
-
-# --- Plot 2: Lag at which best correlation occurs
-fig, ax = plt.subplots(1, 1, figsize=(9, 5))
-
-levels = np.arange(lags.min() - 0.5, lags.max() + 1.5, 1)
-
-best_lag_fixedN.plot(
-    ax=ax,
+# --- Plot 7.2: Which Lag was the Best? ---
+# define discrete levels for the colorbar so each month is distinct
+lag_levels = np.arange(lags.min() - 0.5, lags.max() + 1.5, 1)
+plot_map(
+    data=best_lag,
+    title=f"{scheme_name}: Lag (months) of Max Correlation with significance level 95%",
+    label="Lag (months)",
     cmap="nipy_spectral",
-    levels=levels,
-    cbar_kwargs={"label": "Lag (months) at best correlation"},
+    levels=lag_levels
 )
-
-ax.set_title(f"{scheme_name}: lag (in months) at which the strongest correlation occurs at each grid cell (Sample Window Selected)")
-ax.set_xlabel("Longitude")
-ax.set_ylabel("Latitude")
-plt.tight_layout()
-plt.show()
-
-
-#%%
-# --- 8. Map of rolling map ------------------------------------------------------------
-has_any = np.isfinite(r_rolling_std).any(dim="lag")
-rstd_ok = r_rolling_std.where(has_any)
-
-std_for_argmin = rstd_ok.where(np.isfinite(rstd_ok), np.inf)
-best_idx = std_for_argmin.argmin("lag")
-
-best_lag_stable = r_rolling_std["lag"].isel(lag=best_idx)                 # (lat, lon)
-best_std_stable = r_rolling_std.isel(lag=best_idx)                        # (lat, lon)
-
-# Plot instability at the most stable lag
-fig, ax = plt.subplots(1, 1, figsize=(9, 5))
-best_std_stable.plot(ax=ax,
-    cmap="nipy_spectral",
-    vmin = 0,
-    vmax = 0.2,
-    cbar_kwargs={"label": "Standard Deviation of Cross Correlation"},
-)
-ax.set_title(f"{scheme_name}: Standard Deviaion of a rolling cross correlation")
-ax.set_xlabel("Longitude")
-ax.set_ylabel("Latitude")
-plt.show()
-# %%
