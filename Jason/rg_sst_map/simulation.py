@@ -1,245 +1,473 @@
-"""
-Simulation adapted from code made by Chris and Chengyun
-Adapted an Implicit scheme and various other schemes
-"""
-
-#%%
-import gsw
-import netCDF4 as nc
+# --- 1. Running Implicit Scheme ---------------------------------- 
 import xarray as xr
 import numpy as np
-import matplotlib.ticker as mticker
-import matplotlib.pyplot as plt
-#import esmpy as ESMF
-from read_nc import get_monthly_mean, get_anomaly, load_and_prepare_dataset
-from matplotlib.animation import FuncAnimation
 import matplotlib
-import cartopy.crs as ccrs
-from cartopy.mpl.ticker import (LongitudeFormatter, LatitudeFormatter,
-                                LatitudeLocator)
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+from chris_utils import get_anomaly, coriolis_parameter
+from chris_utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
+from chris_utils import remove_empty_attributes, make_movie, get_eof_with_nan_consideration
+from utils_read_nc import get_monthly_mean, load_and_prepare_dataset
+from matplotlib.animation import FuncAnimation
+from matplotlib.animation import FuncAnimation
+
+
+
 matplotlib.use('TkAgg')
 
-#HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "../datasets/heat_flux_interpolated_all_contributions.nc"
-#HEAT_FLUX_DATA_PATH = "../datasets/heat_flux_interpolated.nc"
-MLD_TEMP_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature-(2004-2018).nc"
-MLD_DEPTH_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
-#TEMP_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
-HEAT_FLUX_DATA_PATH = r"C:\Users\jason\MSciProject\ERA5-ARGO_Mean_Surface_Heat_Flux.nc"
-EK_DATA_PATH = r"C:\Users\jason\MSciProject\Ekman_Current_Anomaly.nc"
-
-mld_temperature_ds = xr.open_dataset(MLD_TEMP_PATH, decode_times=False)
-mld_depth_ds = xr.open_dataset(MLD_DEPTH_PATH, decode_times=False)
-heat_flux_ds = load_and_prepare_dataset(HEAT_FLUX_DATA_PATH)
-ekman_ds = load_and_prepare_dataset(EK_DATA_PATH)
-
-temperature = mld_temperature_ds['__xarray_dataarray_variable__']
-temperature_monthly_mean = get_monthly_mean(temperature)
-temperature_anomaly = get_anomaly(temperature, temperature_monthly_mean)
-
-mld_depth_ds = mld_depth_ds.rename({'MONTH': 'TIME'})
-
-heat_flux = (heat_flux_ds['avg_slhtf'] + heat_flux_ds['avg_ishf'] + heat_flux_ds['avg_snswrf'] + heat_flux_ds['avg_snlwrf'])
-heat_flux.attrs.update(units='W m**-2', long_name='Net Surface Heat Flux')
-heat_flux.name = 'NET_HEAT_FLUX'
-heat_flux_monthly_mean = get_monthly_mean(heat_flux)
-heat_flux_anomaly = get_anomaly(heat_flux, heat_flux_monthly_mean)
-heat_flux_anomaly = heat_flux_anomaly.drop_vars(['MONTH'])
-
-ekman_anomaly = ekman_ds['Q_Ek_anom']
-
-# print(heat_flux_anomaly)
-# print('temperature_anomaly: \n',temperature_anomaly)
-# print('heat_flux_ds: \n', heat_flux_ds)
-# print('mld_ds:\n',mld_depth_ds )
+USE_DOWNLOADED_SSH = False
 
 
-#%%
-RHO_O = 1025  # kg / m^3
-C_O = 4100  # J / (kg K)
-SECONDS_MONTH = 30.4375 * 24 * 60 * 60  # average seconds in a month
-GAMMA = 10
+INCLUDE_SURFACE = True
+INCLUDE_EKMAN = True
+INCLUDE_ENTRAINMENT = True
+INCLUDE_GEOSTROPHIC = False
+INCLUDE_GEOSTROPHIC_DISPLACEMENT = False
+CLEAN_CHRIS_PREV_CUR = False        # only really useful when entrainment is turned on
+
+
+USE_NEW_H_BAR_NEW_T_SUB = True 
 
 
 
-MONTH = 0.5
-times = temperature.TIME.values
+observed_path = r"C:\Users\jason\MSciProject\Mixed_Layer_Datasets.nc"
+HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = r"C:\Users\jason\MSciProject\heat_flux_interpolated_all_contributions.nc"
+# HEAT_FLUX_DATA_PATH = "../datasets/heat_flux_interpolated.nc"
+EKMAN_ANOMALY_DATA_PATH = r"C:\Users\jason\MSciProject\Ekman_Anomaly_Full_Datasets.nc"
+TEMP_DATA_PATH = r"C:\Users\jason\MSciProject\RG_ArgoClim_Temperature_2019.nc"
+ENTRAINMENT_VEL_DATA_PATH = r"C:\Users\jason\MSciProject\Entrainment_Velocity-(2004-2018).nc"
+# ENTRAINMENT_VEL_DENOISED_DATA_PATH = "../datasets/entrainment_vel_denoised.nc"
+# H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
 
-COMPUTE_IMPLICIT = True
-COMPUTE_EXPLICIT = False
+# Note we were using the uncapped hbar previously 
+H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\hbar.nc"
+NEW_H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\new_hbar.nc"
 
-if COMPUTE_IMPLICIT == True:
-    for i, month in enumerate(times):
-        if month == MONTH:
-            model_anomaly_ds = (
-                temperature_anomaly.sel(TIME=MONTH, method='nearest', tolerance=0.51)
-                - temperature_anomaly.sel(TIME=MONTH, method='nearest', tolerance=0.51)
-            ).expand_dims(TIME=[MONTH])
+T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\t_sub.nc"
+NEW_T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\new_T_sub_prime.nc"
+
+GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH = r"C:\Users\jason\MSciProject\geostrophic_anomaly_downloaded.nc"
+GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = r"C:\Users\jason\MSciProject\geostrophic_anomaly_calculated.nc"
+SEA_SURFACE_GRAD_DATA_PATH = r"C:\Users\jason\MSciProject\sea_surface_interpolated_grad.nc"
+
+rho_0 = 1025.0
+c_0 = 4100.0
+gamma_0 = 15
+g = 9.81
+
+
+if USE_NEW_H_BAR_NEW_T_SUB:
+    # New h bar
+    hbar_ds = xr.open_dataset(NEW_H_BAR_DATA_PATH, decode_times=False)
+    hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
+
+    # New t sub
+    t_sub_ds = xr.open_dataset(NEW_T_SUB_DATA_PATH, decode_times=False)
+    t_sub_da = t_sub_ds["ANOMALY_SUB_TEMPERATURE"]
+        
+    # Observed Data (Tm) using new h
+    observed_temp_ds_full = xr.open_dataset(observed_path, decode_times=False)
+    observed_temp_ds = observed_temp_ds_full["UPDATED_MIXED_LAYER_TEMP"]
+    obs_temp_mean = get_monthly_mean(observed_temp_ds)
+    obs_temp_anom = get_anomaly(observed_temp_ds_full, "UPDATED_MIXED_LAYER_TEMP", obs_temp_mean)
+    obs_temp_anom = obs_temp_anom["UPDATED_MIXED_LAYER_TEMP_ANOMALY"]
+
+    # Ekman Anomaly using new h
+    ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
+    ekman_anomaly_da = ekman_anomaly_ds['UPDATED_TEMP_EKMAN_ANOM']
+    # ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
+
+    # ekman_anomaly_da_centred_mean = get_monthly_mean(ekman_anomaly_ds["Q_Ek_anom"])
+    # ekman_anomaly_da_final = get_anomaly(ekman_anomaly_ds, "Q_Ek_anom", ekman_anomaly_da_centred_mean)
+    # ekman_anomaly_da_final = ekman_anomaly_da_final["Q_Ek_anom_ANOMALY"]
+
+    # print(f"Original Mean Ekman: {ekman_anomaly_ds['Q_Ek_anom'].mean().values}")
+    # print(f"Centered Mean Ekman: {ekman_anomaly_da_final.mean().values}")
+
+else:
+    # New "old" h bar
+    hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
+    hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
+
+    # New "old" t sub
+    t_sub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
+    t_sub_da = t_sub_ds["SUB_TEMPERATURE"]
+
+    t_sub_mean = get_monthly_mean(t_sub_da)
+    t_sub_anom = get_anomaly(t_sub_ds, "SUB_TEMPERATURE", t_sub_mean)
+    t_sub_anom = t_sub_anom["SUB_TEMPERATURE_ANOMALY"]
+
+    t_sub_da = t_sub_anom
+
+    # Observed Data (Tm) using new "old" h
+    observed_temp_ds_full = xr.open_dataset(observed_path, decode_times=False)
+    observed_temp_ds = observed_temp_ds_full["MIXED_LAYER_TEMP"]
+    obs_temp_mean = get_monthly_mean(observed_temp_ds)
+    obs_temp_anom = get_anomaly(observed_temp_ds_full, "MIXED_LAYER_TEMP", obs_temp_mean)
+    obs_temp_anom = obs_temp_anom["MIXED_LAYER_TEMP_ANOMALY"]
+
+    # Ekman Anomaly using new "old" h
+    ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
+    ekman_anomaly_da = ekman_anomaly_ds["TEMP_EKMAN_ANOM"]
+    # ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
+
+    # ekman_anomaly_da_centred_mean = get_monthly_mean(ekman_anomaly_ds["Q_Ek_anom"])
+    # ekman_anomaly_da_final = get_anomaly(ekman_anomaly_ds, "Q_Ek_anom", ekman_anomaly_da_centred_mean)
+    # ekman_anomaly_da_final = ekman_anomaly_da_final["Q_Ek_anom_ANOMALY"]
+
+    # print(f"Original Mean Ekman: {ekman_anomaly_ds['Q_Ek_anom'].mean().values}")
+    # print(f"Centered Mean Ekman: {ekman_anomaly_da_final.mean().values}")
+
+
+
+# Unchanged Parameters for the simulation 
+temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
+
+# Surface Heat Flux 
+heat_flux_ds = xr.open_dataset(HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH, decode_times=False)
+heat_flux_ds['NET_HEAT_FLUX'] = heat_flux_ds['avg_slhtf'] + heat_flux_ds['avg_snlwrf'] + heat_flux_ds['avg_snswrf'] + \
+                                heat_flux_ds['avg_ishf']
+heat_flux_monthly_mean = get_monthly_mean(heat_flux_ds['NET_HEAT_FLUX'])
+heat_flux_anomaly_ds = get_anomaly(heat_flux_ds, 'NET_HEAT_FLUX', heat_flux_monthly_mean)
+surface_flux_da = heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY']
+
+# surface_flux_da_centred_mean = get_monthly_mean(heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY'])
+# surface_flux_da_anomaly = get_anomaly(heat_flux_anomaly_ds, 'NET_HEAT_FLUX_ANOMALY', surface_flux_da_centred_mean)
+# surface_flux_da_final = heat_flux_anomaly_ds["NET_HEAT_FLUX_ANOMALY_ANOMALY"]
+
+# print(surface_flux_da)
+# print(surface_flux_da_final)
+# print(f"Original Net Heat Flux Mean: {heat_flux_ds['NET_HEAT_FLUX'].mean().values}")
+# print(f"Double-Centered Mean: {surface_flux_da_final.mean().values}")
+
+# Entrainment Velocity
+entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
+entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
+entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
+print(entrainment_vel_da)
+
+# Overwrite off-centred anomalies to avoid changing variables in the simulation
+# surface_flux_da = surface_flux_da_final
+# ekman_anomaly_da = ekman_anomaly_da_final
+# ekman_anomaly_da = ekman_anomaly_da.fillna(0)
+
+
+# Edit Geostrophic terms once I receive files from Chris
+geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH, decode_times=False)
+geostrophic_anomaly_da = geostrophic_anomaly_ds["GEOSTROPHIC_ANOMALY"]
+
+if USE_DOWNLOADED_SSH:
+    geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH, decode_times=False)
+    SEA_SURFACE_GRAD_DATA_PATH = r"C:\Users\jason\MSciProject\sea_surface_interpolated_grad.nc"
+    ssh_var_name = "sla"
+else:
+    geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH, decode_times=False)
+    SEA_SURFACE_GRAD_DATA_PATH = r"C:\Users\jason\MSciProject\sea_surface_calculated_grad.nc"
+    ssh_var_name = "ssh"
+geostrophic_anomaly_da = geostrophic_anomaly_ds["GEOSTROPHIC_ANOMALY"]
+
+sea_surface_grad_ds = xr.open_dataset(SEA_SURFACE_GRAD_DATA_PATH, decode_times=False)
+
+
+def month_to_second(month):
+    return month * 30.4375 * 24 * 60 * 60
+
+delta_t = month_to_second(1)
+
+
+
+# initialise lists for temperature anomalies for each model
+implicit_model_anomalies = []
+chris_prev_cur_model_anomalies = []
+chris_mean_k_model_anomalies = []
+chris_prev_k_model_anomalies = []
+chris_capped_exponent_model_anomalies = []
+explicit_model_anomalies = []
+semi_implicit_model_anomalies = []
+
+# initialise lists for entrainment fluxes for each model; for categorising each component
+entrainment_fluxes_implicit = []
+entrainment_fluxes_prev_cur = []
+entrainment_fluxes_mean_k = []
+entrainment_fluxes_prev_k = []
+entrainment_fluxes_capped_exponent = []
+entrainment_fluxes_explicit = []
+entrainment_fluxes_semi_implicit = []
+
+
+
+added_baseline = False
+testparam = False
+
+
+
+# Testing drift before sim
+
+components = {
+    "Heat Flux Anomaly": surface_flux_da,
+    "Ekman Anomaly": ekman_anomaly_da,
+    "T Sub Anomaly": t_sub_da  
+}
+
+print("---Mean Anomaly Diagnostic----")
+
+for name, da in components.items():
+    mean_da = da.fillna(0).mean().values
+    print(f"{name} Mean: {mean_da}")
+
+
+
+for month in heat_flux_anomaly_ds.TIME.values:
+    # find the previous and current month from 1 to 12 to access the monthly-averaged data (hbar, entrainment vel.)
+    prev_month = month - 1
+    month_in_year = int((month + 0.5) % 12)
+    if month_in_year == 0:
+        month_in_year = 12
+    prev_month_in_year = month_in_year - 1
+    if prev_month_in_year == 0:
+        prev_month_in_year = 12
+
+    if not added_baseline:  # just adds the baseline of a whole bunch of zero
+        base = temperature_ds.sel(PRESSURE=2.5, TIME=month)['ARGO_TEMPERATURE_ANOMALY'] - \
+               temperature_ds.sel(PRESSURE=2.5, TIME=month)['ARGO_TEMPERATURE_ANOMALY']
+        base = base.expand_dims(TIME=[month])
+        implicit_model_anomalies.append(base)
+        chris_prev_cur_model_anomalies.append(base)
+        chris_mean_k_model_anomalies.append(base)
+        chris_prev_k_model_anomalies.append(base)
+        chris_capped_exponent_model_anomalies.append(base)
+        explicit_model_anomalies.append(base)
+        semi_implicit_model_anomalies.append(base)
+        added_baseline = True
+
+    else:
+        # store previous readings Tm(n-1)
+        if INCLUDE_GEOSTROPHIC_DISPLACEMENT:    # then need to take the previous reading "back-propagated" based on current
+            prev_implicit_k_tm_anom_at_cur_loc = implicit_model_anomalies[-1].isel(TIME=-1)
+            prev_chris_prev_cur_tm_anom_at_cur_loc = chris_prev_cur_model_anomalies[-1].isel(TIME=-1)
+            prev_chris_mean_k_tm_anom_at_cur_loc = chris_mean_k_model_anomalies[-1].isel(TIME=-1)
+            prev_chris_prev_k_tm_anom_at_cur_loc = chris_prev_k_model_anomalies[-1].isel(TIME=-1)
+            prev_chris_capped_exponent_k_tm_anom_at_cur_loc = chris_capped_exponent_model_anomalies[-1].isel(TIME=-1)
+            prev_explicit_k_tm_anom_at_cur_loc = explicit_model_anomalies[-1].isel(TIME=-1)
+            prev_semi_implicit_k_tm_anom_at_cur_loc = semi_implicit_model_anomalies[-1].isel(TIME=-1)
+
+            f = coriolis_parameter(sea_surface_grad_ds['LATITUDE']).broadcast_like(sea_surface_grad_ds[ssh_var_name]).broadcast_like(sea_surface_grad_ds[ssh_var_name + '_anomaly_grad_long'])  # broadcasting based on Jason/Julia's usage
+            alpha = g / f.sel(TIME=month) * sea_surface_grad_ds[ssh_var_name + '_anomaly_grad_long'].sel(TIME=month)
+            beta = g / f.sel(TIME=month) * sea_surface_grad_ds[ssh_var_name + '_anomaly_grad_lat'].sel(TIME=month)
+            back_x = sea_surface_grad_ds['LONGITUDE'] + alpha * month_to_second(1)      # just need a list of long/lat
+            back_y = sea_surface_grad_ds['LATITUDE'] - beta * month_to_second(1)        # ss_grad is a useful dummy for that
+
+            # interpolate to the "back-propagated" x and y position, but if that turns out nan (due to coastline), then
+            # just use the temperature at current position. BC == "coast buffer"
+            prev_implicit_k_tm_anom = prev_implicit_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_implicit_k_tm_anom_at_cur_loc)
+            prev_chris_prev_cur_tm_anom = prev_chris_prev_cur_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_chris_prev_cur_tm_anom_at_cur_loc)
+            prev_chris_mean_k_tm_anom = prev_chris_mean_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_chris_mean_k_tm_anom_at_cur_loc)
+            prev_chris_prev_k_tm_anom = prev_chris_prev_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_chris_prev_k_tm_anom_at_cur_loc)
+            prev_chris_capped_exponent_k_tm_anom = prev_chris_capped_exponent_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_chris_capped_exponent_k_tm_anom_at_cur_loc)
+            prev_explicit_k_tm_anom = prev_explicit_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_explicit_k_tm_anom_at_cur_loc)
+            prev_semi_implicit_k_tm_anom = prev_semi_implicit_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_semi_implicit_k_tm_anom_at_cur_loc)
         else:
-            prev = model_anomaly_ds.sel(TIME=times[i-1], method='nearest', tolerance=0.51)
+            prev_implicit_k_tm_anom = implicit_model_anomalies[-1].isel(TIME=-1)
+            prev_chris_prev_cur_tm_anom = chris_prev_cur_model_anomalies[-1].isel(TIME=-1)
+            prev_chris_mean_k_tm_anom = chris_mean_k_model_anomalies[-1].isel(TIME=-1)
+            prev_chris_prev_k_tm_anom = chris_prev_k_model_anomalies[-1].isel(TIME=-1)
+            prev_chris_capped_exponent_k_tm_anom = chris_capped_exponent_model_anomalies[-1].isel(TIME=-1)
+            prev_explicit_k_tm_anom = explicit_model_anomalies[-1].isel(TIME=-1)
+            prev_semi_implicit_k_tm_anom = semi_implicit_model_anomalies[-1].isel(TIME=-1)
 
-            # month-of-year mid-point 
-            moy = ((month - 0.5) % 12) + 0.5
+        # get previous data
+        prev_tsub_anom = t_sub_da.sel(TIME=prev_month)
+        prev_heat_flux_anom = surface_flux_da.sel(TIME=prev_month)
+        prev_ekman_anom = ekman_anomaly_da.sel(TIME=prev_month)
+        prev_entrainment_vel = entrainment_vel_da.sel(MONTH=prev_month_in_year)
+        prev_geo_anom = geostrophic_anomaly_da.sel(TIME=prev_month)
+        prev_hbar = hbar_da.sel(MONTH=prev_month_in_year)
 
-            denominator = (
-                RHO_O * C_O *
-                mld_depth_ds
-                .sel(TIME=moy, method='nearest', tolerance=0.51)['MONTHLY_MEAN_MLD_PRESSURE']
-            )
-            damp_factor  = GAMMA / denominator
+        # get current data
+        cur_tsub_anom = t_sub_da.sel(TIME=month)
+        cur_heat_flux_anom = surface_flux_da.sel(TIME=month)
+        cur_ekman_anom = ekman_anomaly_da.sel(TIME=month)
+        cur_entrainment_vel = entrainment_vel_da.sel(MONTH=month_in_year)
+        cur_geo_anom = geostrophic_anomaly_da.sel(TIME=month)
+        cur_hbar = hbar_da.sel(MONTH=month_in_year)
 
-            forcing_term = (
-                heat_flux_anomaly.sel(TIME=month, method='nearest', tolerance=0.51) +
-                ekman_anomaly.sel(TIME=month, method='nearest', tolerance=0.51)
-            ) / denominator
 
-            next_ = (prev + SECONDS_MONTH * forcing_term) / (1 + SECONDS_MONTH * damp_factor)
-            model_anomaly_ds = xr.concat([model_anomaly_ds, next_.expand_dims(TIME=[month])], dim='TIME')
+        # Testing if mean anomalies = 0
 
-if COMPUTE_EXPLICIT == True:
-    for i, month in enumerate(times):
-        if month == MONTH:
-            model_anomaly_ds = (
-                temperature_anomaly.sel(TIME=MONTH, method='nearest', tolerance=0.51)
-                - temperature_anomaly.sel(TIME=MONTH, method='nearest', tolerance=0.51)
-            ).expand_dims(TIME=[MONTH])
+        # generate the right dataset depending on whether surface flux and/or Ekman and/or geostrophic terms are desired
+        if INCLUDE_SURFACE and INCLUDE_EKMAN:
+            cur_surf_ek = cur_heat_flux_anom + cur_ekman_anom
+            prev_surf_ek = prev_heat_flux_anom + prev_ekman_anom
+
+        elif INCLUDE_SURFACE:
+            cur_surf_ek = cur_heat_flux_anom
+            prev_surf_ek = prev_heat_flux_anom
+
+        elif INCLUDE_EKMAN:
+            cur_surf_ek = cur_ekman_anom
+            prev_surf_ek = prev_ekman_anom
+
+        else:       # just a way to get a zero dataset
+            cur_surf_ek = cur_ekman_anom - cur_ekman_anom
+            prev_surf_ek = prev_ekman_anom - prev_ekman_anom
+
+        if INCLUDE_GEOSTROPHIC:
+            cur_surf_ek = cur_surf_ek + cur_geo_anom
+            prev_surf_ek = prev_surf_ek + prev_geo_anom
+
+        if INCLUDE_ENTRAINMENT:
+            cur_b = cur_surf_ek / (rho_0 * c_0 * cur_hbar) + cur_entrainment_vel / cur_hbar * cur_tsub_anom
+            cur_a = cur_entrainment_vel / cur_hbar + gamma_0 / (rho_0 * c_0 * cur_hbar)
+            cur_k = (gamma_0 / (rho_0 * c_0) + cur_entrainment_vel) / cur_hbar
+
+            prev_b = prev_surf_ek / (rho_0 * c_0 * prev_hbar) + prev_entrainment_vel / prev_hbar * prev_tsub_anom
+            prev_a = prev_entrainment_vel / prev_hbar + gamma_0 / (rho_0 * c_0 * prev_hbar)
+            prev_k = (gamma_0 / (rho_0 * c_0) + prev_entrainment_vel) / prev_hbar
         else:
-            prev_time = times[i-1]
-            prev = model_anomaly_ds.sel(TIME=prev_time, method='nearest', tolerance=0.51)
+            cur_b = cur_surf_ek / (rho_0 * c_0 * cur_hbar)
+            cur_a = gamma_0 / (rho_0 * c_0 * cur_hbar)
+            cur_k = cur_a
 
-            moy = ((prev_time - 0.5) % 12) + 0.5
-            denominator = (
-                RHO_O * C_O *
-                mld_depth_ds
-                .sel(TIME=moy, method='nearest', tolerance=0.51)['MONTHLY_MEAN_MLD_PRESSURE']
-            )
+            prev_b = prev_surf_ek / (rho_0 * c_0 * prev_hbar)
+            prev_a = gamma_0 / (rho_0 * c_0 * prev_hbar)
+            prev_k = prev_a
 
-            damp_factor = GAMMA / denominator
-            forcing_term = (
-                heat_flux_anomaly.sel(TIME=moy, method='nearest', tolerance=0.51)
-                + ekman_anomaly.sel(TIME=moy, method='nearest', tolerance=0.51)
-            ) / denominator
-            
-            cur = (1 - SECONDS_MONTH * damp_factor) * prev + SECONDS_MONTH * forcing_term
-            cur = cur.expand_dims(TIME=[month])
-            model_anomaly_ds = xr.concat([model_anomaly_ds, cur], dim='TIME')
+        exponent_prev_cur = prev_k * month_to_second(prev_month) - cur_k * month_to_second(month)
+        exponent_mean_k = -0.5 * (prev_k + cur_k) * delta_t
+        exponent_prev_k = prev_k * month_to_second(prev_month) - prev_k * month_to_second(month)
+        exponent_capped = exponent_prev_cur.where(exponent_prev_cur <= 0, 0)
 
-# model_anomaly_ds.sel(TIME=100.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r')
-# plt.show()
+        # update anomalies
+        if INCLUDE_ENTRAINMENT:
+            cur_chris_prev_cur_tm_anom = (cur_entrainment_vel / (cur_k * cur_hbar)) * cur_tsub_anom + cur_surf_ek / (cur_k * rho_0 * c_0 * cur_hbar) + (prev_chris_prev_cur_tm_anom - (prev_entrainment_vel / (prev_k * prev_hbar)) * prev_tsub_anom - prev_surf_ek / (prev_k * rho_0 * c_0 * prev_hbar)) * np.exp(exponent_prev_cur)
+            cur_chris_mean_k_tm_anom = (cur_entrainment_vel / (cur_k * cur_hbar)) * cur_tsub_anom + cur_surf_ek / (cur_k * rho_0 * c_0 * cur_hbar) + (prev_chris_mean_k_tm_anom - (prev_entrainment_vel / (prev_k * prev_hbar)) * prev_tsub_anom - prev_surf_ek / (prev_k * rho_0 * c_0 * prev_hbar)) * np.exp(exponent_mean_k)
+            cur_chris_prev_k_tm_anom = (cur_entrainment_vel / (cur_k * cur_hbar)) * cur_tsub_anom + cur_surf_ek / (cur_k * rho_0 * c_0 * cur_hbar) + (prev_chris_prev_k_tm_anom - (prev_entrainment_vel / (prev_k * prev_hbar)) * prev_tsub_anom - prev_surf_ek / (prev_k * rho_0 * c_0 * prev_hbar)) * np.exp(exponent_prev_k)
+            cur_chris_capped_exponent_k_tm_anom = (cur_entrainment_vel / (cur_k * cur_hbar)) * cur_tsub_anom + cur_surf_ek / (cur_k * rho_0 * c_0 * cur_hbar) + (prev_chris_capped_exponent_k_tm_anom - (prev_entrainment_vel / (prev_k * prev_hbar)) * prev_tsub_anom - prev_surf_ek / (prev_k * rho_0 * c_0 * prev_hbar)) * np.exp(exponent_capped)
+        else:
+            cur_chris_prev_cur_tm_anom = cur_surf_ek / gamma_0 + (prev_chris_prev_cur_tm_anom - prev_surf_ek / gamma_0) * np.exp(exponent_prev_cur)
+            cur_chris_mean_k_tm_anom = cur_surf_ek / gamma_0 + (prev_chris_mean_k_tm_anom - prev_surf_ek / gamma_0) * np.exp(exponent_mean_k)
+            cur_chris_prev_k_tm_anom = cur_surf_ek / gamma_0 + (prev_chris_prev_k_tm_anom - prev_surf_ek / gamma_0) * np.exp(exponent_prev_k)
+            cur_chris_capped_exponent_k_tm_anom = cur_surf_ek / gamma_0 + (prev_chris_capped_exponent_k_tm_anom - prev_surf_ek / gamma_0) * np.exp(exponent_capped)
 
-# make a movie
-times = model_anomaly_ds.TIME.values
+        cur_implicit_k_tm_anom = (prev_implicit_k_tm_anom + delta_t * cur_b) / (1 + delta_t * cur_a)
+        cur_explicit_k_tm_anom = prev_explicit_k_tm_anom + delta_t * (prev_b - prev_a * prev_explicit_k_tm_anom)
+        cur_semi_implicit_k_tm_anom = (prev_semi_implicit_k_tm_anom + delta_t * prev_b) / (1 + delta_t * cur_a)
 
-fig, ax = plt.subplots(figsize=(12, 6))
+        # reformat and save each model
+        cur_implicit_k_tm_anom = cur_implicit_k_tm_anom.drop_vars('MONTH', errors='ignore')
+        cur_implicit_k_tm_anom = cur_implicit_k_tm_anom.expand_dims(TIME=[month])
+        implicit_model_anomalies.append(cur_implicit_k_tm_anom)
+        cur_chris_prev_cur_tm_anom = cur_chris_prev_cur_tm_anom.drop_vars('MONTH', errors='ignore')
+        cur_chris_prev_cur_tm_anom = cur_chris_prev_cur_tm_anom.expand_dims(TIME=[month])
+        chris_prev_cur_model_anomalies.append(cur_chris_prev_cur_tm_anom)
+        cur_chris_mean_k_tm_anom = cur_chris_mean_k_tm_anom.drop_vars('MONTH', errors='ignore')
+        cur_chris_mean_k_tm_anom = cur_chris_mean_k_tm_anom.expand_dims(TIME=[month])
+        chris_mean_k_model_anomalies.append(cur_chris_mean_k_tm_anom)
+        cur_chris_prev_k_tm_anom = cur_chris_prev_k_tm_anom.drop_vars('MONTH', errors='ignore')
+        cur_chris_prev_k_tm_anom = cur_chris_prev_k_tm_anom.expand_dims(TIME=[month])
+        chris_prev_k_model_anomalies.append(cur_chris_prev_k_tm_anom)
+        cur_chris_capped_exponent_k_tm_anom = cur_chris_capped_exponent_k_tm_anom.drop_vars('MONTH', errors='ignore')
+        cur_chris_capped_exponent_k_tm_anom = cur_chris_capped_exponent_k_tm_anom.expand_dims(TIME=[month])
+        chris_capped_exponent_model_anomalies.append(cur_chris_capped_exponent_k_tm_anom)
+        cur_explicit_k_tm_anom = cur_explicit_k_tm_anom.drop_vars('MONTH', errors='ignore')
+        cur_explicit_k_tm_anom = cur_explicit_k_tm_anom.expand_dims(TIME=[month])
+        explicit_model_anomalies.append(cur_explicit_k_tm_anom)
+        cur_semi_implicit_k_tm_anom = cur_semi_implicit_k_tm_anom.drop_vars('MONTH', errors='ignore')
+        cur_semi_implicit_k_tm_anom = cur_semi_implicit_k_tm_anom.expand_dims(TIME=[month])
+        semi_implicit_model_anomalies.append(cur_semi_implicit_k_tm_anom)
 
-ax = plt.axes(projection=ccrs.PlateCarree())
-
-pcolormesh = ax.pcolormesh(
-    model_anomaly_ds.LONGITUDE.values,
-    model_anomaly_ds.LATITUDE.values,
-    model_anomaly_ds.isel(TIME=0),
-    cmap='RdBu_r',
-    vmin=-20, vmax=20
-)
-# contourf = ax.contourf(
-#     model_anomaly_ds.LONGITUDE.values,
-#     model_anomaly_ds.LATITUDE.values,
-#     model_anomaly_ds.isel(TIME=0),
-#     cmap='RdBu_r',
-#     levels=200,
-#     vmin=-20, vmax=20
-# )
-ax.coastlines()
-ax.set_xlim(-180, 180)
-ax.set_ylim(-90, 90)
-
-gl = ax.gridlines(
-    crs=ccrs.PlateCarree(), draw_labels=True,
-    linewidth=2, color='gray', alpha=0.5, linestyle='--'
-    )
-gl.top_labels = False
-gl.left_labels = True
-gl.right_labels = False
-gl.xlines = False
-gl.ylines = False
-gl.xlocator = mticker.FixedLocator([-180, -90, 0, 90, 180])
-gl.ylocator = LatitudeLocator()
-gl.xformatter = LongitudeFormatter()
-gl.yformatter = LatitudeFormatter()
-gl.ylabel_style = {'size': 15, 'color': 'gray'}
-gl.xlabel_style = {'size': 15, 'color': 'gray'}
-
-cbar = plt.colorbar(pcolormesh, ax=ax, label=model_anomaly_ds.attrs.get('units'))
-# cbar = plt.colorbar(contourf, ax=ax, label=model_anomaly_ds.attrs.get('units'))
-
-title = ax.set_title(f'Time = {times[0]}')
-
-
-def update(frame):
-    pcolormesh.set_array(model_anomaly_ds.isel(TIME=frame).values.ravel())
-    cbar.update_normal(pcolormesh)
-    title.set_text(
-        f'Months since January 2004: {times[frame]}; month in year: {(times[frame] + 0.5) % 12}'
-    )
-    return [pcolormesh, title]
-    # contourf.set_array(model_anomaly_ds.isel(TIME=frame).values.ravel())
-    # cbar.update_normal(contourf)
-    # contourf = ax.contourf(
-    #     model_anomaly_ds.LONGITUDE.values,
-    #     model_anomaly_ds.LATITUDE.values,
-    #     model_anomaly_ds.isel(TIME=frame),
-    #     cmap='RdBu_r',
-    #     levels=200,
-    #     vmin=-20, vmax=20
-    # )
-    # title.set_text(
-    #     f'Months since January 2004: {times[frame]}; month in year: {(times[frame] + 0.5) % 12}'
-    # )
-    # return [contourf, title]
+        # get entrainment flux components; for categorising each component
+        if INCLUDE_ENTRAINMENT:
+            entrainment_flux_implicit = rho_0 * c_0 * cur_entrainment_vel * (cur_tsub_anom - cur_implicit_k_tm_anom)
+            entrainment_fluxes_implicit.append(entrainment_flux_implicit)
+            entrainment_flux_prev_cur = rho_0 * c_0 * cur_entrainment_vel * (cur_tsub_anom - cur_chris_prev_cur_tm_anom)
+            entrainment_fluxes_prev_cur.append(entrainment_flux_prev_cur)
+            entrainment_flux_mean_k = rho_0 * c_0 * cur_entrainment_vel * (cur_tsub_anom - cur_chris_mean_k_tm_anom)
+            entrainment_fluxes_mean_k.append(entrainment_flux_mean_k)
+            entrainment_flux_prev_k = rho_0 * c_0 * cur_entrainment_vel * (cur_tsub_anom - cur_chris_prev_k_tm_anom)
+            entrainment_fluxes_prev_k.append(entrainment_flux_prev_k)
+            entrainment_flux_capped_exponent = rho_0 * c_0 * cur_entrainment_vel * (cur_tsub_anom - cur_chris_capped_exponent_k_tm_anom)
+            entrainment_fluxes_capped_exponent.append(entrainment_flux_capped_exponent)
+            entrainment_flux_explicit = rho_0 * c_0 * cur_entrainment_vel * (cur_tsub_anom - cur_explicit_k_tm_anom)
+            entrainment_fluxes_explicit.append(entrainment_flux_explicit)
+            entrainment_flux_semi_implicit = rho_0 * c_0 * cur_entrainment_vel * (cur_tsub_anom - cur_semi_implicit_k_tm_anom)
+            entrainment_fluxes_semi_implicit.append(entrainment_flux_semi_implicit)
 
 
-animation = FuncAnimation(fig, update, frames=len(times), interval=300, blit=False)
-plt.show()
+# concatenate anomalies into a ds
+implicit_model_anomaly_ds = xr.concat(implicit_model_anomalies, 'TIME')
+chris_prev_cur_model_anomaly_ds = xr.concat(chris_prev_cur_model_anomalies, 'TIME')
+chris_mean_k_model_anomaly_ds = xr.concat(chris_mean_k_model_anomalies, 'TIME')
+chris_prev_k_model_anomaly_ds = xr.concat(chris_prev_k_model_anomalies, 'TIME')
+chris_capped_exponent_model_anomaly_ds = xr.concat(chris_capped_exponent_model_anomalies, 'TIME')
+explicit_model_anomaly_ds = xr.concat(explicit_model_anomalies, 'TIME')
+semi_implicit_model_anomaly_ds = xr.concat(semi_implicit_model_anomalies, 'TIME')
+
+# rename all models
+implicit_model_anomaly_ds = implicit_model_anomaly_ds.rename("IMPLICIT")
+chris_prev_cur_model_anomaly_ds = chris_prev_cur_model_anomaly_ds.rename("CHRIS_PREV_CUR")
+chris_mean_k_model_anomaly_ds = chris_mean_k_model_anomaly_ds.rename("CHRIS_MEAN_K")
+chris_prev_k_model_anomaly_ds = chris_prev_k_model_anomaly_ds.rename("CHRIS_PREV_K")
+chris_capped_exponent_model_anomaly_ds = chris_capped_exponent_model_anomaly_ds.rename("CHRIS_CAPPED_EXPONENT")
+explicit_model_anomaly_ds = explicit_model_anomaly_ds.rename("EXPLICIT")
+semi_implicit_model_anomaly_ds = semi_implicit_model_anomaly_ds.rename("SEMI_IMPLICIT")
+
+# combine to a single ds
+all_anomalies_ds = xr.merge([chris_prev_cur_model_anomaly_ds, chris_mean_k_model_anomaly_ds, chris_prev_k_model_anomaly_ds, chris_capped_exponent_model_anomaly_ds, explicit_model_anomaly_ds, semi_implicit_model_anomaly_ds,
+                             implicit_model_anomaly_ds])
+
+# remove whatever seasonal cycle remains
+model_names = ["CHRIS_PREV_CUR", "CHRIS_MEAN_K", "CHRIS_PREV_K", "CHRIS_CAPPED_EXPONENT", "EXPLICIT", "SEMI_IMPLICIT",
+               "IMPLICIT"]
+for variable_name in model_names:
+    monthly_mean = get_monthly_mean(all_anomalies_ds[variable_name])
+    all_anomalies_ds[variable_name] = get_anomaly(all_anomalies_ds, variable_name, monthly_mean)[variable_name + "_ANOMALY"]
+    all_anomalies_ds = all_anomalies_ds.drop_vars(variable_name + "_ANOMALY")
+
+# clean up prev_cur model
+if CLEAN_CHRIS_PREV_CUR:
+    all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"] = all_anomalies_ds["CHRIS_PREV_CUR"].where((all_anomalies_ds["CHRIS_PREV_CUR"] > -10) & (all_anomalies_ds["CHRIS_PREV_CUR"] < 10))
+    n_modes = 20
+    monthly_mean = get_monthly_mean(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"])
+    map_mask = temperature_ds['BATHYMETRY_MASK'].sel(PRESSURE=2.5)
+    eof_ds, variance, PCs, EOFs = get_eof_with_nan_consideration(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"], map_mask, modes=n_modes, monthly_mean_ds=None, tolerance=1e-2)
+    all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"] = eof_ds.rename("CHRIS_PREV_CUR_CLEAN")
+    chris_prev_cur_clean_monthly_mean = get_monthly_mean(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"])
+    all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"] = get_anomaly(all_anomalies_ds, "CHRIS_PREV_CUR_CLEAN", chris_prev_cur_clean_monthly_mean)["CHRIS_PREV_CUR_CLEAN_ANOMALY"]
+    all_anomalies_ds = all_anomalies_ds.drop_vars("CHRIS_PREV_CUR_CLEAN_ANOMALY")
+
+# save files
+# all_anomalies_ds.to_netcdf("../datasets/all_anomalies_10.nc")
+
+# format entrainment flux datasets
+if INCLUDE_ENTRAINMENT:
+    entrainment_flux_implicit_ds = xr.concat(entrainment_fluxes_implicit, 'TIME')
+    entrainment_flux_implicit_ds = entrainment_flux_implicit_ds.drop_vars(["MONTH", "PRESSURE"])
+    entrainment_flux_implicit_ds = entrainment_flux_implicit_ds.transpose("TIME", "LATITUDE", "LONGITUDE")
+    entrainment_flux_implicit_ds = entrainment_flux_implicit_ds.rename("ENTRAINMENT_FLUX_IMPLICIT_ANOMALY")
 
 
+# merge the relevant fluxes into a single dataset
+flux_components_to_merge = []
+if INCLUDE_SURFACE:
+    surface_flux_da = surface_flux_da.rename("SURFACE_FLUX_ANOMALY")
+    flux_components_to_merge.append(surface_flux_da)
+if INCLUDE_EKMAN:
+    ekman_anomaly_da = ekman_anomaly_da.rename("EKMAN_FLUX_ANOMALY")
+    flux_components_to_merge.append(ekman_anomaly_da)
+if INCLUDE_ENTRAINMENT:
+    flux_components_to_merge.append(entrainment_flux_implicit_ds)
 
-#%%
-#--Chris Code----------------------------------------------
-# model_anomalies = []
-# added_baseline = False
-# for month in heat_flux_anomaly_ds.TIME.values:
-#     if not added_baseline:
-#         base = temperature_ds.sel(PRESSURE=2.5, TIME=month)['ARGO_TEMPERATURE_ANOMALY']
-#         base = base.expand_dims(TIME=[month])  # <-- keep its time
-#         model_anomalies.append(base)
-#         added_baseline = True
-#     else:
-#         prev = model_anomalies[-1].isel(TIME=-1)
-#         cur = prev + (30.4375 * 24 * 60 * 60) * heat_flux_anomaly_ds.sel(TIME=month)['NET_HEAT_FLUX_ANOMALY'] / (mld_ds.sel(TIME=month)['MLD_PRESSURE'] * 1025 * 4100)
-#         cur = cur.expand_dims(TIME=[month])
-#         model_anomalies.append(cur)
-# model_anomaly_ds = xr.concat(model_anomalies, 'TIME')
-# model_anomaly_ds = model_anomaly_ds.drop_vars(["PRESSURE"])
-# print(model_anomaly_ds)
-
-# times = model_anomaly_ds.TIME.values
-
-# fig, ax = plt.subplots()
-# pcolormesh = ax.pcolormesh(model_anomaly_ds.LONGITUDE.values, model_anomaly_ds.LATITUDE.values, model_anomaly_ds.isel(TIME=0), cmap='RdBu_r')
-# title = ax.set_title(f'Time = {times[0]}')
-
-# cbar = plt.colorbar(pcolormesh, ax=ax, label='Modelled anomaly from surface heat flux')
-# ax.set_xlabel('Longitude')
-# ax.set_ylabel('Latitude')
+flux_components_ds = xr.merge(flux_components_to_merge)
 
 
-# def update(frame):
-#     pcolormesh.set_array(model_anomaly_ds.isel(TIME=frame).values.ravel())
-#     #pcolormesh.set_clim(vmin=float(model_anomaly_ds.isel(TIME=frame).min()), vmax=float(model_anomaly_ds.isel(TIME=frame).max()))
-#     pcolormesh.set_clim(vmin=-20, vmax=20)
-#     cbar.update_normal(pcolormesh)
-#     title.set_text(f'Months since January 2004: {times[frame]}; month in year: {(times[frame] + 0.5) % 12}')
-#     return [pcolormesh, title]
+print(entrainment_vel_da.min().values)
 
-# animation = FuncAnimation(fig, update, frames=len(times), interval=300, blit=False)
-# plt.show()
 
+# Plotting 
+
+make_movie(obs_temp_anom, -5, 5)
+
+for element in model_names:
+    make_movie(all_anomalies_ds[f"{element}"], -5, 5)
