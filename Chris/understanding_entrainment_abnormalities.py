@@ -15,16 +15,26 @@ INCLUDE_ENTRAINMENT = True
 INCLUDE_GEOSTROPHIC = False
 INCLUDE_GEOSTROPHIC_DISPLACEMENT = False
 USE_DOWNLOADED_SSH = False
+USE_OTHER_MLD = True
 gamma_0 = 0.0
 entrainment_threshold = 5e-8        # entrainment velocities below this value are not considered as entraining
 
-save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH=USE_DOWNLOADED_SSH, gamma0=gamma_0, INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_DISPLACEMENT)
+save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH=USE_DOWNLOADED_SSH, gamma0=gamma_0, INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_DISPLACEMENT, OTHER_MLD=USE_OTHER_MLD)
 ALL_SCHEMES_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/all_anomalies/" + save_name + ".nc"
 MLD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
 T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub.nc"
 H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
 OBSERVATIONS_JJ_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/observed_anomaly_JJ.nc"
 ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Entrainment_Velocity-(2004-2018).nc"
+
+if USE_OTHER_MLD:
+    MLD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_h.nc"
+    H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_h_bar.nc"
+    T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_t_sub_anomaly.nc"
+else:
+    H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
+    MLD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
+    T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub.nc"
 
 all_models_ds = xr.open_dataset(ALL_SCHEMES_DATA_PATH, decode_times=False)
 mld_ds = xr.open_dataset(MLD_DATA_PATH, decode_times=False)
@@ -33,7 +43,11 @@ hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
 obs_ds = xr.open_dataset(OBSERVATIONS_JJ_DATA_PATH, decode_times=False)
 entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
 
-hbar_da = hbar_ds["MONTHLY_MEAN_MLD_PRESSURE"]
+if USE_OTHER_MLD:
+    hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
+else:
+    hbar_da = hbar_ds["MONTHLY_MEAN_MLD_PRESSURE"]
+
 entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
 entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
 
@@ -42,7 +56,10 @@ tm_monthly_mean = get_monthly_mean(tm)
 obs_ds = get_anomaly(obs_ds, '__xarray_dataarray_variable__', tm_monthly_mean)
 tm_anomaly = obs_ds['__xarray_dataarray_variable___ANOMALY']
 
-tsub_anomaly = tsub_ds['T_sub_ANOMALY']
+if USE_OTHER_MLD:
+    tsub_anomaly = tsub_ds["ANOMALY_SUB_TEMPERATURE"]
+else:
+    tsub_anomaly = tsub_ds["T_sub_ANOMALY"]
 
 implicit_model = all_models_ds["IMPLICIT"]
 
@@ -54,21 +71,21 @@ def make_movies():
 def show_correlation_over_all_time():
     (xr.corr(tm_anomaly, tsub_anomaly, dim='TIME')).plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
     plt.title("Correlation between Tsub and Tm observation")
-    plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment/tm_tsub_correlation.jpg")
+    #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment/tm_tsub_correlation.jpg")
     plt.show()
 
     (xr.corr(tm_anomaly, implicit_model, dim='TIME')).plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
     plt.title("Correlation between entrainment-only model and Tm observation")
-    plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment/entrainment_only_model_obs_correlation.jpg")
+    #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment/entrainment_only_model_obs_correlation.jpg")
     plt.show()
 
     (xr.corr(tsub_anomaly, implicit_model, dim='TIME')).plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
     plt.title("Correlation between entrainment-only model and Tsub observation")
-    plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment/entrainment_only_model_tsub_correlation.jpg")
+    #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment/entrainment_only_model_tsub_correlation.jpg")
     plt.show()
 
 
-def entrain_detrain_split():
+def entrain_detrain_split(show_month_by_month=False):
     # split into entraining and detraining periods
     def get_nan_mask(month, da):
         da = da.sel(MONTH=month)
@@ -133,35 +150,36 @@ def entrain_detrain_split():
 
     (xr.corr(tm_anomaly_entrainment_ds, implicit_model_entrainment_ds, dim='TIME')).plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
     plt.title("Correlation between entrainment-only model and Tm observation in entraining regions")
-    plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment/entraining_regions_correlation_" + save_name + ".jpg")
+    #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment/entraining_regions_correlation_" + save_name + ".jpg")
     plt.show()
 
     (xr.corr(tm_anomaly_detrainment_ds, implicit_model_detrainment_ds, dim='TIME')).plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
     plt.title("Correlation between entrainment-only model and Tm observation in detraining regions")
-    plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment/detraining_regions_correlation_" + save_name + ".jpg")
+    #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment/detraining_regions_correlation_" + save_name + ".jpg")
     plt.show()
 
-    def take_from_same_month(month, da):
-        da_at_month = []
-        for time in da.TIME.values:
-            month_of_this_time = get_month_from_time(time)
-            if month_of_this_time == month:
-                da_at_month.append(da.sel(TIME=time))
-        da_at_month = xr.concat(da_at_month, 'TIME')
-        return da_at_month
+    if show_month_by_month:
+        def take_from_same_month(month, da):
+            da_at_month = []
+            for time in da.TIME.values:
+                month_of_this_time = get_month_from_time(time)
+                if month_of_this_time == month:
+                    da_at_month.append(da.sel(TIME=time))
+            da_at_month = xr.concat(da_at_month, 'TIME')
+            return da_at_month
 
-    for month in range(1, 13):
-        plt.figure()
-        (xr.corr(take_from_same_month(month, tm_anomaly_entrainment_ds), take_from_same_month(month, implicit_model_entrainment_ds), dim='TIME')).plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
-        plt.title("Correlation between entrainment-only model and Tm observation in entraining regions")
-        plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment/" + str(gamma_0) + "gamma_entrainment_only_model_obs_correlation_entrainingregions_month" + str(month) + ".jpg")
-        #plt.show()
+        for month in range(1, 13):
+            plt.figure()
+            (xr.corr(take_from_same_month(month, tm_anomaly_entrainment_ds), take_from_same_month(month, implicit_model_entrainment_ds), dim='TIME')).plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
+            plt.title("Correlation between entrainment-only model and Tm observation in entraining regions")
+            #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment/" + str(gamma_0) + "gamma_entrainment_only_model_obs_correlation_entrainingregions_month" + str(month) + ".jpg")
+            plt.show()
 
-        plt.figure()
-        (xr.corr(take_from_same_month(month, tm_anomaly_detrainment_ds), take_from_same_month(month, implicit_model_detrainment_ds), dim='TIME')).plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
-        plt.title("Correlation between entrainment-only model and Tm observation in detraining regions")
-        plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment/" + str(gamma_0) + "gamma_entrainment_only_model_obs_correlation_detrainingregions_month" + str(month) + ".jpg")
-        #plt.show()
+            plt.figure()
+            (xr.corr(take_from_same_month(month, tm_anomaly_detrainment_ds), take_from_same_month(month, implicit_model_detrainment_ds), dim='TIME')).plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
+            plt.title("Correlation between entrainment-only model and Tm observation in detraining regions")
+            #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment/" + str(gamma_0) + "gamma_entrainment_only_model_obs_correlation_detrainingregions_month" + str(month) + ".jpg")
+            plt.show()
 
 
 def track_temperature_over_time():
@@ -234,6 +252,7 @@ def track_temperature_over_time():
     plt.legend()
     plt.show()
 
+show_correlation_over_all_time()
 entrain_detrain_split()
 #track_temperature_over_time()
 

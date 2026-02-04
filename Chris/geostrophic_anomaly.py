@@ -26,7 +26,7 @@ ssh_anomaly = xr.open_dataset(SEA_SURFACE_HEIGHT_DATA_PATH, decode_times=False)
 hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
 hbar_da = hbar_ds["MONTHLY_MEAN_MLD_PRESSURE"]
 
-temp_grad_lat = compute_gradient_lat(mean_temp["MONTHLY_MEAN_TEMPERATURE"]).sel(PRESSURE=2.5)
+temp_grad_lat = compute_gradient_lat(mean_temp["MONTHLY_MEAN_TEMPERATURE"]).sel(PRESSURE=2.5)   # really should integrate over mixed layer, but this should be close enough
 temp_grad_long = compute_gradient_lon(mean_temp["MONTHLY_MEAN_TEMPERATURE"]).sel(PRESSURE=2.5)
 ssh_grad_anomaly_lat = ssh_anomaly[var_name + '_anomaly_grad_lat']
 ssh_grad_anomaly_long = ssh_anomaly[var_name + '_anomaly_grad_long']
@@ -48,7 +48,6 @@ for time in ssh_grad_anomaly_lat.TIME.values:
 geostrophic_anomaly = xr.concat(geostropic_anomalies, "TIME")
 geostrophic_anomaly = geostrophic_anomaly.rename("GEOSTROPHIC_ANOMALY")
 
-print(geostrophic_anomaly)
 geostrophic_anomaly = geostrophic_anomaly.where((geostrophic_anomaly['LATITUDE'] > 5) | (geostrophic_anomaly['LATITUDE'] < -5), 0)
 if DOWNLOADED_SSH:
     geostrophic_anomaly.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly_downloaded.nc")

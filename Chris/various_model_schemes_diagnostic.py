@@ -12,10 +12,11 @@ from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN = True
 INCLUDE_ENTRAINMENT = True
-INCLUDE_GEOSTROPHIC = False
-INCLUDE_GEOSTROPHIC_DISPLACEMENT = False
+INCLUDE_GEOSTROPHIC = True
+INCLUDE_GEOSTROPHIC_DISPLACEMENT = True
 USE_DOWNLOADED_SSH = False
-gamma_0 = 15
+USE_OTHER_MLD = False
+gamma_0 = 15.0
 
 MASK_TROPICS = False
 MASK_TROPICS_LATITUDE = 10
@@ -32,7 +33,7 @@ CONSIDER_OBSERVATIONS = True
 
 save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC,
                           USE_DOWNLOADED_SSH=USE_DOWNLOADED_SSH, gamma0=gamma_0,
-                          INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_DISPLACEMENT)
+                          INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_DISPLACEMENT, OTHER_MLD=USE_OTHER_MLD)
 ALL_SCHEMES_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/all_anomalies/" + save_name + ".nc"
 DENOISED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/cur_prev_denoised.nc"
 OBSERVATIONS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/RG_ArgoClim_Temperature_2019.nc"
@@ -70,12 +71,12 @@ enso_indices_ds = enso_indices_ds.assign_coords(time=np.arange(len(enso_indices_
 """Plot results"""
 
 
-def plot_full_model(to_plot="implicit", obs=False):
+def plot_full_model(to_plot="IMPLICIT", obs=False):
     if obs:
         make_movie(observed_anomaly, -3, 3, colorbar_label="Argo Anomaly", ENSO_ds=enso_indices_ds,
                    savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/all_anomalies/videos/observations.mp4")
     else:
-        make_movie(all_schemes_ds[to_plot], -3, 3, colorbar_label="Chris Prev-Cur Scheme", ENSO_ds=enso_indices_ds)
+        make_movie(all_schemes_ds[to_plot], -3, 3, colorbar_label=(to_plot + " Scheme"), ENSO_ds=enso_indices_ds)
 
     # make_movie(all_schemes_ds["CHRIS_PREV_CUR"], -10, 10, colorbar_label="Chris Prev-Cur Scheme", ENSO_ds=enso_indices_ds)
     # make_movie(all_schemes_ds["CHRIS_MEAN_K"], -10, 10, colorbar_label="Chris Mean-k Scheme", ENSO_ds=enso_indices_ds)
@@ -401,8 +402,18 @@ def track_anomaly_persistence(lag, start_month=None):
         plot_autocorrelation(obs_autocorrelation_functions_ds, lag, "observations")
 
 
+def plot_correlation():
+    if CONSIDER_OBSERVATIONS:
+        correlation = xr.corr(to_plot, observed_anomaly, dim='TIME')
+        print(correlation.mean().values)
+        correlation.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
+        plt.title("Correlation between model and Tm observation")
+        plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/correlations/" + save_name + "_correlation.jpg")
+        plt.show()
+    else:
+        print("PLOT_CORRELATION requires CONSIDER_OBSERVATIONS=True")
 
-# plot_full_model()
+plot_full_model()
 # plot_enso()
 # eof_movie()
 # explained_variance_from_each_mode()
@@ -410,4 +421,5 @@ def track_anomaly_persistence(lag, start_month=None):
 # plot_PCs_over_time()
 # regression_map()
 # track_warming_effects()
-track_anomaly_persistence(6, 9)
+# track_anomaly_persistence(6, 9)
+plot_correlation()

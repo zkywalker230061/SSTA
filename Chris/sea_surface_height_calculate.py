@@ -11,7 +11,7 @@ from utils import load_and_prepare_dataset, make_movie
 
 ALREADY_COMBINED = True
 g = 9.81
-ref_pressure = 950     # dbar (==m more or less); choose to be where horizontal gradient is 0
+ref_pressure = 1500     # dbar (==m more or less); choose to be where horizontal gradient is 0
 ref_dym_pressure = g * ref_pressure
 
 if ALREADY_COMBINED:
@@ -92,7 +92,7 @@ def get_ssh_by_integrating_alpha(ds):
 
     print("saving")
     with ProgressBar():
-        ssh_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_calculated.nc", encoding=encoding, compute=True)
+        ssh_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_calculated_" + str(ref_pressure) + ".nc", encoding=encoding, compute=True)
 
     # with ProgressBar():     # lengthy. adjust chunk sizes as needed; bigger chunk gives shorter loading time.
     #     ssh_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_calculated.nc")
