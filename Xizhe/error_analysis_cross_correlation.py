@@ -13,10 +13,10 @@ from scipy.stats import kurtosis, skew, pearsonr, t
 
 matplotlib.use('TkAgg')
 
-INCLUDE_SURFACE = False
-INCLUDE_EKMAN = False
-INCLUDE_ENTRAINMENT = False
-INCLUDE_GEOSTROPHIC_MEAN = False
+INCLUDE_SURFACE = True
+INCLUDE_EKMAN = True
+INCLUDE_ENTRAINMENT = True
+INCLUDE_GEOSTROPHIC_MEAN = True
 INCLUDE_GEOSTROPHIC_ANOM = True
 CLEAN_CHRIS_PREV_CUR = False        # only really useful when entrainment is turned on
 
@@ -25,7 +25,7 @@ HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data
 # HEAT_FLUX_DATA_PATH = "../datasets/heat_flux_interpolated.nc"
 EKMAN_ANOMALY_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Ekman_Current_Anomaly.nc"
 TEMP_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
-MLD_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
+# MLD_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
 ENTRAINMENT_VEL_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Entrainment_Velocity-(2004-2018).nc"
 # ENTRAINMENT_VEL_DENOISED_DATA_PATH = "../datasets/entrainment_vel_denoised.nc"
 # H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"

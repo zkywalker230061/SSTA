@@ -3,6 +3,7 @@ from matplotlib.widgets import Slider, Button, CheckButtons, RadioButtons
 import xarray as xr
 import numpy as np
 from chris_utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset, coriolis_parameter
+from scipy.stats import t
 
 
 observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature(T_m).nc"
@@ -119,6 +120,7 @@ class InteractiveSSTModel:
         # Storage for calculated data
         self.model_anom = None
         self.da_corr = None
+        self.da_corr_significance = None
         self.da_rmse_norm = None
         self.da_rmse_abs = None
         self.da_rmse_seasonal = None
@@ -147,7 +149,7 @@ class InteractiveSSTModel:
         
         # 2. Display Mode (RadioButtons) - NEW
         # This lets us switch between Correlation and different RMSE modes
-        self.display_options = ('Correlation', 'RMSE (Norm)', 'RMSE (Abs)', 'RMSE (Seasonal)')
+        self.display_options = ('Correlation', 'Correlation (95% Significance Level)', 'RMSE (Norm)', 'RMSE (Abs)', 'RMSE (Seasonal)')
         self.radio = RadioButtons(self.ax_radio, self.display_options, active=0)
         self.radio.on_clicked(self.update_display_mode)
 
@@ -270,6 +272,7 @@ class InteractiveSSTModel:
         # --- E. Calculate Statistics (All at once) ---
         print("Calculating Statistics...")
         self.calc_correlations()
+        self.calc_correlations_significance()
         self.calc_rmse_all()
         
         # --- F. Update Plot ---
@@ -286,6 +289,58 @@ class InteractiveSSTModel:
             r.coords['lag'] = k
             corrs.append(r)
         self.da_corr = xr.concat(corrs, dim='lag')
+    
+    def calc_correlations_significance(self):
+        """Calculates Correlation (r), T-statistic, and Effective N for a single lag."""
+        # 1. Initialize list to store results per lag
+        lags = np.arange(-12, 13)
+        sig_corr_list = []
+        
+        # 2. Calculate Auto-correlation (Lag 1) ONCE for Effective Degrees of Freedom
+        #    (Bretherton et al. 1999). We use the whole time series estimate.
+        r_x = xr.corr(self.obs_anom, self.obs_anom.shift(TIME=1), dim="TIME")
+        r_y = xr.corr(self.model_anom, self.model_anom.shift(TIME=1), dim="TIME")
+        
+        # Get total time steps (N)
+        N_total = len(self.obs_anom.TIME)
+
+        for k in lags:
+            # Shift model relative to observations
+            model_shifted = self.model_anom.shift(TIME=k)
+        
+            # A. Calculate Correlation (r)
+            r = xr.corr(self.obs_anom, model_shifted, dim="TIME")
+            r.coords['lag'] = k
+        
+            # B. Effective Degrees of Freedom
+            #    Account for data loss due to lag (N - k)
+            N_lagged = N_total - abs(k)
+            
+            #    Account for serial correlation (Bretherton formula)
+            #    N_eff = N * (1 - r1*r2) / (1 + r1*r2)
+            autocorr_term = r_x * r_y
+            N_effective = N_lagged * (1 - autocorr_term) / (1 + autocorr_term)
+        
+            # C. T-Statistic
+            #    t = r * sqrt( (N_eff - 2) / (1 - r^2) )
+            t_stat = r * np.sqrt((N_effective - 2) / (1 - r**2))
+            
+            # D. P-Value (Two-tailed test)
+            #    Using scipy.stats.t (imported as t)
+            #    We use survival function (sf) which is 1-CDF. Multiply by 2 for two-tailed.
+            p_values = 2 * t.sf(np.abs(t_stat), df=(N_effective - 2))
+            
+            #    Convert numpy result back to DataArray to preserve coordinates
+            p_values_da = xr.DataArray(p_values, coords=r.coords, dims=r.dims)
+            
+            # E. Masking
+            #    Keep correlation values only where p < 0.05
+            r_significant = r.where(p_values_da < 0.05)
+            
+            sig_corr_list.append(r_significant)
+
+        # 3. Concatenate the list of DataArrays
+        self.da_corr_significance = xr.concat(sig_corr_list, dim='lag')
 
     def calc_rmse_all(self):
         """Calculates Norm RMSE, Abs RMSE, and Seasonal RMSE."""
@@ -364,6 +419,18 @@ class InteractiveSSTModel:
             vmin, vmax = -1, 1
             cmap = 'nipy_spectral'
             title = f"Correlation (Lag {lag_val})\nGamma: {self.params['gamma']:.1f}"
+
+        elif mode == 'Correlation (95% Significance Level)': 
+            # Enable Lag Slider
+            self.ax_lag.set_visible(True)
+            self.s_lag.ax.set_visible(True)
+
+            lag_val = int(self.s_lag.val)
+            data_to_plot = self.da_corr_significance.sel(lag=lag_val)
+
+            vmin, vmax = -1, 1
+            cmap = 'nipy_spectral'
+            title = f"Correlation (95% Sig) (Lag {lag_val})\nGamma: {self.params['gamma']:.1f}"
 
         else:
             # Disable Lag Slider for RMSE modes
