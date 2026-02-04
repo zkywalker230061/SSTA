@@ -16,25 +16,29 @@ matplotlib.use('TkAgg')
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN = True
 INCLUDE_ENTRAINMENT = True
-INCLUDE_GEOSTROPHIC_MEAN = True
-INCLUDE_GEOSTROPHIC_ANOM = True
+INCLUDE_GEOSTROPHIC_MEAN = False
+INCLUDE_GEOSTROPHIC_ANOM = False
 CLEAN_CHRIS_PREV_CUR = False        # only really useful when entrainment is turned on
 
-observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature(T_m).nc"
+observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Datasets.nc"
 HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/heat_flux_interpolated_all_contributions.nc"
-# HEAT_FLUX_DATA_PATH = "../datasets/heat_flux_interpolated.nc"
-EKMAN_ANOMALY_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Ekman_Current_Anomaly.nc"
+EKMAN_ANOMALY_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Ekman_Anomaly_Full_Datasets.nc"
 TEMP_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
-# MLD_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
 ENTRAINMENT_VEL_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Entrainment_Velocity-(2004-2018).nc"
 # ENTRAINMENT_VEL_DENOISED_DATA_PATH = "../datasets/entrainment_vel_denoised.nc"
 # H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
-H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
-T_SUB_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/t_sub.nc"
+H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/New MLD & T_sub/hbar.nc"
+NEW_H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/New MLD & T_sub/new_hbar.nc"
+
+T_SUB_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/New MLD & T_sub/t_sub.nc"
+NEW_T_SUB_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/New MLD & T_sub/new_T_sub_prime.nc"
+
 GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/geostrophic_anomaly_downloaded.nc"
-GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/geostrophic_anomaly_calculated.nc"
+GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/geostrophic_anomaly_calculated_2.nc"
 SEA_SURFACE_GRAD_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/sea_surface_interpolated_grad.nc"
+
 USE_DOWNLOADED_SSH = False
+USE_NEW_H_BAR_NEW_T_SUB = True 
 
 rho_0 = 1025.0
 c_0 = 4100.0
@@ -42,12 +46,65 @@ gamma_0 = 15
 g = 9.81
 f = 1 
 
-temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
-observed_temp_ds = xr.open_dataset(observed_path, decode_times=False)
-observed_temperature_monthly_average = get_monthly_mean(observed_temp_ds['__xarray_dataarray_variable__'])
-observed_temperature_anomaly = get_anomaly(observed_temp_ds, '__xarray_dataarray_variable__', observed_temperature_monthly_average)
-observed_temperature_anomaly = observed_temperature_anomaly['__xarray_dataarray_variable___ANOMALY']
+if USE_NEW_H_BAR_NEW_T_SUB:
+    # New h bar
+    hbar_ds = xr.open_dataset(NEW_H_BAR_DATA_PATH, decode_times=False)
+    hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
 
+    # New t sub
+    t_sub_ds = xr.open_dataset(NEW_T_SUB_DATA_PATH, decode_times=False)
+    t_sub_da = t_sub_ds["ANOMALY_SUB_TEMPERATURE"]
+        
+    # Observed Data (Tm) using new h
+    observed_temp_ds_full = xr.open_dataset(observed_path, decode_times=False)
+    observed_temp_ds = observed_temp_ds_full["UPDATED_MIXED_LAYER_TEMP"]
+    obs_temp_mean = get_monthly_mean(observed_temp_ds)
+    obs_temp_anom = get_anomaly(observed_temp_ds_full, "UPDATED_MIXED_LAYER_TEMP", obs_temp_mean)
+    observed_temperature_anomaly = obs_temp_anom["UPDATED_MIXED_LAYER_TEMP_ANOMALY"]
+
+    # Ekman Anomaly using new h
+    ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
+    ekman_anomaly_da = ekman_anomaly_ds['UPDATED_TEMP_EKMAN_ANOM']
+    ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
+
+else:
+    hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
+    hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
+
+    t_sub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
+    t_sub_da = t_sub_ds["SUB_TEMPERATURE"]
+
+    t_sub_mean = get_monthly_mean(t_sub_da)
+    t_sub_anom = get_anomaly(t_sub_ds, "SUB_TEMPERATURE", t_sub_mean)
+    t_sub_anom = t_sub_anom["SUB_TEMPERATURE_ANOMALY"]
+
+    t_sub_da = t_sub_anom
+
+    # Observed Data (Tm) using new "old" h
+    observed_temp_ds_full = xr.open_dataset(observed_path, decode_times=False)
+    observed_temp_ds = observed_temp_ds_full["MIXED_LAYER_TEMP"]
+    obs_temp_mean = get_monthly_mean(observed_temp_ds)
+    observed_temperature_anomaly = get_anomaly(observed_temp_ds_full, "MIXED_LAYER_TEMP", obs_temp_mean)
+    observed_temperature_anomaly = observed_temperature_anomaly["MIXED_LAYER_TEMP_ANOMALY"]
+
+    # Ekman Anomaly using new "old" h
+    ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
+    ekman_anomaly_da = ekman_anomaly_ds["TEMP_EKMAN_ANOM"]
+    ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
+
+    # ekman_anomaly_da_centred_mean = get_monthly_mean(ekman_anomaly_ds["Q_Ek_anom"])
+    # ekman_anomaly_da_final = get_anomaly(ekman_anomaly_ds, "Q_Ek_anom", ekman_anomaly_da_centred_mean)
+    # ekman_anomaly_da_final = ekman_anomaly_da_final["Q_Ek_anom_ANOMALY"]
+
+    # print(f"Original Mean Ekman: {ekman_anomaly_ds['Q_Ek_anom'].mean().values}")
+    # print(f"Centered Mean Ekman: {ekman_anomaly_da_final.mean().values}")
+
+
+
+# Unchanged Parameters for the simulation 
+temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
+
+# Surface Heat Flux 
 heat_flux_ds = xr.open_dataset(HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH, decode_times=False)
 heat_flux_ds['NET_HEAT_FLUX'] = heat_flux_ds['avg_slhtf'] + heat_flux_ds['avg_snlwrf'] + heat_flux_ds['avg_snswrf'] + \
                                 heat_flux_ds['avg_ishf']
@@ -55,41 +112,31 @@ heat_flux_monthly_mean = get_monthly_mean(heat_flux_ds['NET_HEAT_FLUX'])
 heat_flux_anomaly_ds = get_anomaly(heat_flux_ds, 'NET_HEAT_FLUX', heat_flux_monthly_mean)
 surface_flux_da = heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY']
 
-surface_flux_da_centred_mean = get_monthly_mean(heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY'])
-surface_flux_da_anomaly = get_anomaly(heat_flux_anomaly_ds, 'NET_HEAT_FLUX_ANOMALY', surface_flux_da_centred_mean)
-surface_flux_da_final = heat_flux_anomaly_ds["NET_HEAT_FLUX_ANOMALY_ANOMALY"]
+# surface_flux_da_centred_mean = get_monthly_mean(heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY'])
+# surface_flux_da_anomaly = get_anomaly(heat_flux_anomaly_ds, 'NET_HEAT_FLUX_ANOMALY', surface_flux_da_centred_mean)
+# surface_flux_da_final = heat_flux_anomaly_ds["NET_HEAT_FLUX_ANOMALY_ANOMALY"]
 
 # print(surface_flux_da)
 # print(surface_flux_da_final)
 # print(f"Original Net Heat Flux Mean: {heat_flux_ds['NET_HEAT_FLUX'].mean().values}")
 # print(f"Double-Centered Mean: {surface_flux_da_final.mean().values}")
 
-ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
-ekman_anomaly_da = ekman_anomaly_ds['Q_Ek_anom']
-ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
-ekman_anomaly_da_centred_mean = get_monthly_mean(ekman_anomaly_ds["Q_Ek_anom"])
-ekman_anomaly_da_final = get_anomaly(ekman_anomaly_ds, "Q_Ek_anom", ekman_anomaly_da_centred_mean)
-ekman_anomaly_da_final = ekman_anomaly_da_final["Q_Ek_anom_ANOMALY"]
-# print(f"Original Mean Ekman: {ekman_anomaly_ds['Q_Ek_anom'].mean().values}")
-# print(f"Centered Mean Ekman: {ekman_anomaly_da_final.mean().values}")
-
-# Overwrite off-centred anomalies to avoid changing variables in the simulation
-surface_flux_da = surface_flux_da_final
-ekman_anomaly_da = ekman_anomaly_da_final
-ekman_anomaly_da = ekman_anomaly_da.fillna(0)
-
-hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
-hbar_da = hbar_ds["MONTHLY_MEAN_MLD_PRESSURE"]
-
-t_sub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
-t_sub_da = t_sub_ds["T_sub_ANOMALY"]
-
+# Entrainment Velocity
 entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
 entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
 entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
+print(entrainment_vel_da)
 
+# Overwrite off-centred anomalies to avoid changing variables in the simulation
+# surface_flux_da = surface_flux_da_final
+# ekman_anomaly_da = ekman_anomaly_da_final
+# ekman_anomaly_da = ekman_anomaly_da.fillna(0)
+
+
+# Edit Geostrophic terms once I receive files from Chris
 geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH, decode_times=False)
 geostrophic_anomaly_da = geostrophic_anomaly_ds["GEOSTROPHIC_ANOMALY"]
+
 
 
 if USE_DOWNLOADED_SSH:
@@ -412,7 +459,7 @@ def make_lag_movie(data_array, vmin=-1, vmax=1, savepath=None, cmap='RdBu_r'):
         anim.save(savepath, fps=5, dpi=150)
     plt.show()
 
-def plot_map(data, title, label, cmap="RdBu_r", vmin=None, vmax=None, levels=None):
+def plot_map(data, title, label, cmap="nipy_spectral", vmin=None, vmax=None, levels=None):
     fig, ax = plt.subplots(1, 1, figsize=(9, 5))
     
     # Handle levels if provided (for discrete colorbar)
@@ -505,7 +552,7 @@ plot_map(
     data=corr_by_lag.sel(lag=0),
     title=f'{scheme_name} Scheme - Cross Correlation (Lag 0)',
     label='Correlation',
-    cmap='RdBu_r', # Red-Blue reversed is standard for correlation
+    cmap='nipy_spectral', 
     vmin=-1, vmax=1
 )
 
