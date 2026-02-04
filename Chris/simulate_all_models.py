@@ -21,29 +21,36 @@ e.g.
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN = True
 INCLUDE_ENTRAINMENT = True
-INCLUDE_GEOSTROPHIC = False
-INCLUDE_GEOSTROPHIC_DISPLACEMENT = False
+INCLUDE_GEOSTROPHIC = True
+INCLUDE_GEOSTROPHIC_DISPLACEMENT = True
 # geostrophic displacement integral: https://egusphere.copernicus.org/preprints/2025/egusphere-2025-3039/egusphere-2025-3039.pdf
 CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turned on
 USE_DOWNLOADED_SSH = False
+USE_OTHER_MLD = False
 rho_0 = 1025.0
 c_0 = 4100.0
-gamma_0 = 30.0
+gamma_0 = 15.0
 g = 9.81
 
-save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH, gamma0=gamma_0, INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_DISPLACEMENT)
+save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH, gamma0=gamma_0, INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_DISPLACEMENT, OTHER_MLD=USE_OTHER_MLD)
 
 HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/heat_flux_interpolated_all_contributions.nc"
 EKMAN_ANOMALY_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Ekman_Current_Anomaly.nc"
 TEMP_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/RG_ArgoClim_Temperature_2019.nc"
-MLD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
 ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Entrainment_Velocity-(2004-2018).nc"
-#H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
-H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
-T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub.nc"
-T_SUB_DENOISED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub_denoised.nc"
 GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly_downloaded.nc"
 GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly_calculated.nc"
+
+if USE_OTHER_MLD:
+    MLD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_h.nc"
+    H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_h_bar.nc"
+    T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_t_sub_anomaly.nc"
+else:
+    # H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
+    H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
+    MLD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
+    T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub.nc"
+    T_SUB_DENOISED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub_denoised.nc"
 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
 
@@ -59,10 +66,16 @@ ekman_anomaly_da = ekman_anomaly_ds['Q_Ek_anom']
 ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
 
 hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
-hbar_da = hbar_ds["MONTHLY_MEAN_MLD_PRESSURE"]
+if USE_OTHER_MLD:
+    hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
+else:
+    hbar_da = hbar_ds["MONTHLY_MEAN_MLD_PRESSURE"]
 
 t_sub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
-t_sub_da = t_sub_ds["T_sub_ANOMALY"]
+if USE_OTHER_MLD:
+    t_sub_da = t_sub_ds["ANOMALY_SUB_TEMPERATURE"]
+else:
+    t_sub_da = t_sub_ds["T_sub_ANOMALY"]
 
 entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
 entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
@@ -71,15 +84,17 @@ entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
 if USE_DOWNLOADED_SSH:
     geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH, decode_times=False)
     SEA_SURFACE_GRAD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_interpolated_grad.nc"
+    SEA_SURFACE_MONTHLY_MEAN_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_monthly_mean_interpolated_grad.nc"
     ssh_var_name = "sla"
 else:
     geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH, decode_times=False)
     SEA_SURFACE_GRAD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_calculated_grad.nc"
+    SEA_SURFACE_MONTHLY_MEAN_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_monthly_mean_calculated_grad.nc"
     ssh_var_name = "ssh"
 geostrophic_anomaly_da = geostrophic_anomaly_ds["GEOSTROPHIC_ANOMALY"]
 
 sea_surface_grad_ds = xr.open_dataset(SEA_SURFACE_GRAD_DATA_PATH, decode_times=False)
-
+sea_surface_monthlymean_ds = xr.open_dataset(SEA_SURFACE_MONTHLY_MEAN_DATA_PATH, decode_times=False)
 
 def month_to_second(month):
     return month * 30.4375 * 24 * 60 * 60
@@ -133,30 +148,36 @@ for month in heat_flux_anomaly_ds.TIME.values:
     else:
         # store previous readings Tm(n-1)
         if INCLUDE_GEOSTROPHIC_DISPLACEMENT:    # then need to take the previous reading "back-propagated" based on current
-            prev_chris_prev_cur_tm_anom_at_cur_loc = chris_prev_cur_model_anomalies[-1].isel(TIME=-1)
-            prev_chris_mean_k_tm_anom_at_cur_loc = chris_mean_k_model_anomalies[-1].isel(TIME=-1)
-            prev_chris_prev_k_tm_anom_at_cur_loc = chris_prev_k_model_anomalies[-1].isel(TIME=-1)
-            prev_chris_capped_exponent_k_tm_anom_at_cur_loc = chris_capped_exponent_model_anomalies[-1].isel(TIME=-1)
-            prev_explicit_k_tm_anom_at_cur_loc = explicit_model_anomalies[-1].isel(TIME=-1)
-            prev_implicit_k_tm_anom_at_cur_loc = implicit_model_anomalies[-1].isel(TIME=-1)
-            prev_semi_implicit_k_tm_anom_at_cur_loc = semi_implicit_model_anomalies[-1].isel(TIME=-1)
-
-            f = coriolis_parameter(sea_surface_grad_ds['LATITUDE']).broadcast_like(sea_surface_grad_ds[ssh_var_name]).broadcast_like(sea_surface_grad_ds[ssh_var_name + '_anomaly_grad_long'])  # broadcasting based on Jason/Julia's usage
-            alpha = g / f.sel(TIME=month) * sea_surface_grad_ds[ssh_var_name + '_anomaly_grad_long'].sel(TIME=month)
-            beta = g / f.sel(TIME=month) * sea_surface_grad_ds[ssh_var_name + '_anomaly_grad_lat'].sel(TIME=month)
-            back_x = sea_surface_grad_ds['LONGITUDE'] + alpha * month_to_second(1)      # just need a list of long/lat
-            back_y = sea_surface_grad_ds['LATITUDE'] - beta * month_to_second(1)        # ss_grad is a useful dummy for that
-
-            # interpolate to the "back-propagated" x and y position, but if that turns out nan (due to coastline), then
-            # just use the temperature at current position. BC == "coast buffer"
-            prev_chris_prev_cur_tm_anom = prev_chris_prev_cur_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_chris_prev_cur_tm_anom_at_cur_loc)
-            prev_chris_mean_k_tm_anom = prev_chris_mean_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_chris_mean_k_tm_anom_at_cur_loc)
-            prev_chris_prev_k_tm_anom = prev_chris_prev_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_chris_prev_k_tm_anom_at_cur_loc)
-            prev_chris_capped_exponent_k_tm_anom = prev_chris_capped_exponent_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_chris_capped_exponent_k_tm_anom_at_cur_loc)
-            prev_explicit_k_tm_anom = prev_explicit_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_explicit_k_tm_anom_at_cur_loc)
-            prev_implicit_k_tm_anom = prev_implicit_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_implicit_k_tm_anom_at_cur_loc)
-            prev_semi_implicit_k_tm_anom = prev_semi_implicit_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_semi_implicit_k_tm_anom_at_cur_loc)
-        else:
+            # """Old semi-lagrangian approach; doesn't work because not conservative"""
+            # prev_chris_prev_cur_tm_anom_at_cur_loc = chris_prev_cur_model_anomalies[-1].isel(TIME=-1)
+            # prev_chris_mean_k_tm_anom_at_cur_loc = chris_mean_k_model_anomalies[-1].isel(TIME=-1)
+            # prev_chris_prev_k_tm_anom_at_cur_loc = chris_prev_k_model_anomalies[-1].isel(TIME=-1)
+            # prev_chris_capped_exponent_k_tm_anom_at_cur_loc = chris_capped_exponent_model_anomalies[-1].isel(TIME=-1)
+            # prev_explicit_k_tm_anom_at_cur_loc = explicit_model_anomalies[-1].isel(TIME=-1)
+            # prev_implicit_k_tm_anom_at_cur_loc = implicit_model_anomalies[-1].isel(TIME=-1)
+            # prev_semi_implicit_k_tm_anom_at_cur_loc = semi_implicit_model_anomalies[-1].isel(TIME=-1)
+            #
+            #
+            # f = coriolis_parameter(sea_surface_grad_ds['LATITUDE']).broadcast_like(sea_surface_grad_ds[ssh_var_name]).broadcast_like(sea_surface_grad_ds[ssh_var_name + '_anomaly_grad_long'])  # broadcasting based on Jason/Julia's usage
+            # alpha = g / f.sel(TIME=month) * sea_surface_monthlymean_ds[ssh_var_name + '_monthlymean_grad_long'].sel(MONTH=month_in_year)
+            # beta = g / f.sel(TIME=month) * sea_surface_monthlymean_ds[ssh_var_name + '_monthlymean_grad_lat'].sel(MONTH=month_in_year)
+            # # print(alpha.mean().values)
+            # # print(beta.mean().values)
+            # # print()
+            # back_x = sea_surface_grad_ds['LONGITUDE'] + alpha * month_to_second(1)      # just need a list of long/lat
+            # back_y = sea_surface_grad_ds['LATITUDE'] - beta * month_to_second(1)        # ss_grad is a useful dummy for that
+            #
+            # # interpolate to the "back-propagated" x and y position, but if that turns out nan (due to coastline), then
+            # # just use the temperature at current position. BC == "coast buffer"
+            # prev_chris_prev_cur_tm_anom = prev_chris_prev_cur_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_chris_prev_cur_tm_anom_at_cur_loc)
+            # prev_chris_mean_k_tm_anom = prev_chris_mean_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_chris_mean_k_tm_anom_at_cur_loc)
+            # prev_chris_prev_k_tm_anom = prev_chris_prev_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_chris_prev_k_tm_anom_at_cur_loc)
+            # prev_chris_capped_exponent_k_tm_anom = prev_chris_capped_exponent_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_chris_capped_exponent_k_tm_anom_at_cur_loc)
+            # prev_explicit_k_tm_anom = prev_explicit_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_explicit_k_tm_anom_at_cur_loc)
+            # prev_implicit_k_tm_anom = prev_implicit_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_implicit_k_tm_anom_at_cur_loc)
+            # prev_semi_implicit_k_tm_anom = prev_semi_implicit_k_tm_anom_at_cur_loc.interp(LONGITUDE=back_x, LATITUDE=back_y).combine_first(prev_semi_implicit_k_tm_anom_at_cur_loc)
+            # """end of old approach"""
+            """new approach: finite volume upwind scheme"""
             prev_chris_prev_cur_tm_anom = chris_prev_cur_model_anomalies[-1].isel(TIME=-1)
             prev_chris_mean_k_tm_anom = chris_mean_k_model_anomalies[-1].isel(TIME=-1)
             prev_chris_prev_k_tm_anom = chris_prev_k_model_anomalies[-1].isel(TIME=-1)
@@ -164,6 +185,278 @@ for month in heat_flux_anomaly_ds.TIME.values:
             prev_explicit_k_tm_anom = explicit_model_anomalies[-1].isel(TIME=-1)
             prev_implicit_k_tm_anom = implicit_model_anomalies[-1].isel(TIME=-1)
             prev_semi_implicit_k_tm_anom = semi_implicit_model_anomalies[-1].isel(TIME=-1)
+
+            earth_radius = 6371000
+            latitudes = np.deg2rad(sea_surface_monthlymean_ds['LATITUDE'])  # any ds to get latitude
+            dx = (2 * np.pi * earth_radius / 360) * np.cos(latitudes)
+            dy = (2 * np.pi * earth_radius / 360) * np.ones_like(latitudes)
+            dx = xr.DataArray(dx, coords={'LATITUDE': sea_surface_monthlymean_ds['LATITUDE'].values},
+                              dims=['LATITUDE'])  # convert dx, dy to xarray for use below
+            dy = xr.DataArray(dy, coords={'LATITUDE': sea_surface_monthlymean_ds['LATITUDE'].values}, dims=['LATITUDE'])
+            dt = month_to_second(1)
+            alpha = sea_surface_monthlymean_ds['alpha'].sel(MONTH=prev_month_in_year)
+            beta = sea_surface_monthlymean_ds['beta'].sel(MONTH=prev_month_in_year)
+
+            CFL_x = (abs(alpha) * dt / dx).max()
+            CFL_y = (abs(beta) * dt / dy).max()
+            CFL_max = max(float(CFL_x), float(CFL_y))
+            substeps = int(np.ceil(CFL_max)) + 1      # require CFL<1 for stability
+            sub_dt = dt / substeps
+
+            tm_chris_prev_cur_div_total = xr.zeros_like(prev_chris_prev_cur_tm_anom)
+            tm_chris_mean_k_div_total = xr.zeros_like(prev_chris_mean_k_tm_anom)
+            tm_chris_prev_k_div_total = xr.zeros_like(prev_chris_prev_k_tm_anom)
+            tm_chris_capped_exponent_k_div_total = xr.zeros_like(prev_chris_capped_exponent_k_tm_anom)
+            tm_explicit_div_total = xr.zeros_like(prev_explicit_k_tm_anom)
+            tm_implicit_div_total = xr.zeros_like(prev_implicit_k_tm_anom)
+            tm_semi_implicit_div_total = xr.zeros_like(prev_semi_implicit_k_tm_anom)
+
+            for step in range(substeps):
+                # get upwind flux
+                prev_chris_prev_cur_tm_anom_east = prev_chris_prev_cur_tm_anom.shift(LONGITUDE=-1)
+                prev_chris_mean_k_tm_anom_east = prev_chris_mean_k_tm_anom.shift(LONGITUDE=-1)
+                prev_chris_prev_k_tm_anom_east = prev_chris_prev_k_tm_anom.shift(LONGITUDE=-1)
+                prev_chris_capped_exponent_k_tm_anom_east = prev_chris_capped_exponent_k_tm_anom.shift(LONGITUDE=-1)
+                prev_explicit_k_tm_anom_east = prev_explicit_k_tm_anom.shift(LONGITUDE=-1)
+                prev_implicit_k_tm_anom_east = prev_implicit_k_tm_anom.shift(LONGITUDE=-1)
+                prev_semi_implicit_k_tm_anom_east = prev_semi_implicit_k_tm_anom.shift(LONGITUDE=-1)
+
+                prev_chris_prev_cur_tm_anom_west = prev_chris_prev_cur_tm_anom.shift(LONGITUDE=1)
+                prev_chris_mean_k_tm_anom_west = prev_chris_mean_k_tm_anom.shift(LONGITUDE=1)
+                prev_chris_prev_k_tm_anom_west = prev_chris_prev_k_tm_anom.shift(LONGITUDE=1)
+                prev_chris_capped_exponent_k_tm_anom_west = prev_chris_capped_exponent_k_tm_anom.shift(LONGITUDE=1)
+                prev_explicit_k_tm_anom_west = prev_explicit_k_tm_anom.shift(LONGITUDE=1)
+                prev_implicit_k_tm_anom_west = prev_implicit_k_tm_anom.shift(LONGITUDE=1)
+                prev_semi_implicit_k_tm_anom_west = prev_semi_implicit_k_tm_anom.shift(LONGITUDE=1)
+
+                prev_chris_prev_cur_tm_anom_north = prev_chris_prev_cur_tm_anom.shift(LATITUDE=-1)
+                prev_chris_mean_k_tm_anom_north = prev_chris_mean_k_tm_anom.shift(LATITUDE=-1)
+                prev_chris_prev_k_tm_anom_north = prev_chris_prev_k_tm_anom.shift(LATITUDE=-1)
+                prev_chris_capped_exponent_k_tm_anom_north = prev_chris_capped_exponent_k_tm_anom.shift(LATITUDE=-1)
+                prev_explicit_k_tm_anom_north = prev_explicit_k_tm_anom.shift(LATITUDE=-1)
+                prev_implicit_k_tm_anom_north = prev_implicit_k_tm_anom.shift(LATITUDE=-1)
+                prev_semi_implicit_k_tm_anom_north = prev_semi_implicit_k_tm_anom.shift(LATITUDE=-1)
+
+                prev_chris_prev_cur_tm_anom_south = prev_chris_prev_cur_tm_anom.shift(LATITUDE=1)
+                prev_chris_mean_k_tm_anom_south = prev_chris_mean_k_tm_anom.shift(LATITUDE=1)
+                prev_chris_prev_k_tm_anom_south = prev_chris_prev_k_tm_anom.shift(LATITUDE=1)
+                prev_chris_capped_exponent_k_tm_anom_south = prev_chris_capped_exponent_k_tm_anom.shift(LATITUDE=1)
+                prev_explicit_k_tm_anom_south = prev_explicit_k_tm_anom.shift(LATITUDE=1)
+                prev_implicit_k_tm_anom_south = prev_implicit_k_tm_anom.shift(LATITUDE=1)
+                prev_semi_implicit_k_tm_anom_south = prev_semi_implicit_k_tm_anom.shift(LATITUDE=1)
+
+                # get alpha/beta at the edges of gridboxes
+                alpha_east = (alpha + alpha.shift(LONGITUDE=-1)) / 2
+                alpha_west = (alpha + alpha.shift(LONGITUDE=1)) / 2
+                beta_north = (beta + beta.shift(LATITUDE=-1)) / 2
+                beta_south = (beta + beta.shift(LATITUDE=1)) / 2
+
+                # check for nans nearby
+                chris_prev_cur_ocean_mask = ~prev_chris_prev_cur_tm_anom.isnull()
+                chris_prev_cur_has_east_ocean = ~prev_chris_prev_cur_tm_anom_east.isnull()
+                chris_prev_cur_has_west_ocean = ~prev_chris_prev_cur_tm_anom_west.isnull()
+                chris_prev_cur_has_north_ocean = ~prev_chris_prev_cur_tm_anom_north.isnull()
+                chris_prev_cur_has_south_ocean = ~prev_chris_prev_cur_tm_anom_south.isnull()
+
+                chris_mean_k_ocean_mask = ~prev_chris_mean_k_tm_anom.isnull()
+                chris_mean_k_has_east_ocean = ~prev_chris_mean_k_tm_anom_east.isnull()
+                chris_mean_k_has_west_ocean = ~prev_chris_mean_k_tm_anom_west.isnull()
+                chris_mean_k_has_north_ocean = ~prev_chris_mean_k_tm_anom_north.isnull()
+                chris_mean_k_has_south_ocean = ~prev_chris_mean_k_tm_anom_south.isnull()
+
+                chris_prev_k_ocean_mask = ~prev_chris_prev_k_tm_anom.isnull()
+                chris_prev_k_has_east_ocean = ~prev_chris_prev_k_tm_anom_east.isnull()
+                chris_prev_k_has_west_ocean = ~prev_chris_prev_k_tm_anom_west.isnull()
+                chris_prev_k_has_north_ocean = ~prev_chris_prev_k_tm_anom_north.isnull()
+                chris_prev_k_has_south_ocean = ~prev_chris_prev_k_tm_anom_south.isnull()
+
+                chris_capped_exponent_k_ocean_mask = ~prev_chris_capped_exponent_k_tm_anom.isnull()
+                chris_capped_exponent_k_has_east_ocean = ~prev_chris_capped_exponent_k_tm_anom_east.isnull()
+                chris_capped_exponent_k_has_west_ocean = ~prev_chris_capped_exponent_k_tm_anom_west.isnull()
+                chris_capped_exponent_k_has_north_ocean = ~prev_chris_capped_exponent_k_tm_anom_north.isnull()
+                chris_capped_exponent_k_has_south_ocean = ~prev_chris_capped_exponent_k_tm_anom_south.isnull()
+
+                explicit_ocean_mask = ~prev_explicit_k_tm_anom.isnull()
+                explicit_has_east_ocean = ~prev_explicit_k_tm_anom_east.isnull()
+                explicit_has_west_ocean = ~prev_explicit_k_tm_anom_west.isnull()
+                explicit_has_north_ocean = ~prev_explicit_k_tm_anom_north.isnull()
+                explicit_has_south_ocean = ~prev_explicit_k_tm_anom_south.isnull()
+
+                implicit_ocean_mask = ~prev_implicit_k_tm_anom.isnull()
+                implicit_has_east_ocean = ~prev_implicit_k_tm_anom_east.isnull()
+                implicit_has_west_ocean = ~prev_implicit_k_tm_anom_west.isnull()
+                implicit_has_north_ocean = ~prev_implicit_k_tm_anom_north.isnull()
+                implicit_has_south_ocean = ~prev_implicit_k_tm_anom_south.isnull()
+
+                semi_implicit_ocean_mask = ~prev_semi_implicit_k_tm_anom.isnull()
+                semi_implicit_has_east_ocean = ~prev_semi_implicit_k_tm_anom_east.isnull()
+                semi_implicit_has_west_ocean = ~prev_semi_implicit_k_tm_anom_west.isnull()
+                semi_implicit_has_north_ocean = ~prev_semi_implicit_k_tm_anom_north.isnull()
+                semi_implicit_has_south_ocean = ~prev_semi_implicit_k_tm_anom_south.isnull()
+
+                # get upwind parts
+                F_east_chris_prev_cur = xr.where(alpha_east < 0, -alpha_east * prev_chris_prev_cur_tm_anom, -alpha_east * prev_chris_prev_cur_tm_anom_east)
+                F_west_chris_prev_cur = xr.where(alpha_west < 0, -alpha_west * prev_chris_prev_cur_tm_anom_west, -alpha_west * prev_chris_prev_cur_tm_anom)
+                G_north_chris_prev_cur = xr.where(beta_north > 0, beta_north * prev_chris_prev_cur_tm_anom, beta_north * prev_chris_prev_cur_tm_anom_north)
+                G_south_chris_prev_cur = xr.where(beta_south > 0, beta_south * prev_chris_prev_cur_tm_anom_south, beta_south * prev_chris_prev_cur_tm_anom)
+
+                F_east_chris_mean_k = xr.where(alpha_east < 0, -alpha_east * prev_chris_mean_k_tm_anom, -alpha_east * prev_chris_mean_k_tm_anom_east)
+                F_west_chris_mean_k = xr.where(alpha_west < 0, -alpha_west * prev_chris_mean_k_tm_anom_west, -alpha_west * prev_chris_mean_k_tm_anom)
+                G_north_chris_mean_k = xr.where(beta_north > 0, beta_north * prev_chris_mean_k_tm_anom, beta_north * prev_chris_mean_k_tm_anom_north)
+                G_south_chris_mean_k = xr.where(beta_south > 0, beta_south * prev_chris_mean_k_tm_anom_south, beta_south * prev_chris_mean_k_tm_anom)
+
+                F_east_chris_prev_k = xr.where(alpha_east < 0, -alpha_east * prev_chris_prev_k_tm_anom, -alpha_east * prev_chris_prev_k_tm_anom_east)
+                F_west_chris_prev_k = xr.where(alpha_west < 0, -alpha_west * prev_chris_prev_k_tm_anom_west, -alpha_west * prev_chris_prev_k_tm_anom)
+                G_north_chris_prev_k = xr.where(beta_north > 0, beta_north * prev_chris_prev_k_tm_anom, beta_north * prev_chris_prev_k_tm_anom_north)
+                G_south_chris_prev_k = xr.where(beta_south > 0, beta_south * prev_chris_prev_k_tm_anom_south, beta_south * prev_chris_prev_k_tm_anom)
+
+                F_east_chris_capped_exponent_k = xr.where(alpha_east < 0, -alpha_east * prev_chris_capped_exponent_k_tm_anom, -alpha_east * prev_chris_capped_exponent_k_tm_anom_east)
+                F_west_chris_capped_exponent_k = xr.where(alpha_west < 0, -alpha_west * prev_chris_capped_exponent_k_tm_anom_west, -alpha_west * prev_chris_capped_exponent_k_tm_anom)
+                G_north_chris_capped_exponent_k = xr.where(beta_north > 0, beta_north * prev_chris_capped_exponent_k_tm_anom, beta_north * prev_chris_capped_exponent_k_tm_anom_north)
+                G_south_chris_capped_exponent_k = xr.where(beta_south > 0, beta_south * prev_chris_capped_exponent_k_tm_anom_south, beta_south * prev_chris_capped_exponent_k_tm_anom)
+
+                F_east_explicit = xr.where(alpha_east < 0, -alpha_east * prev_explicit_k_tm_anom, -alpha_east * prev_explicit_k_tm_anom_east)
+                F_west_explicit = xr.where(alpha_west < 0, -alpha_west * prev_explicit_k_tm_anom_west, -alpha_west * prev_explicit_k_tm_anom)
+                G_north_explicit = xr.where(beta_north > 0, beta_north * prev_explicit_k_tm_anom, beta_north * prev_explicit_k_tm_anom_north)
+                G_south_explicit = xr.where(beta_south > 0, beta_south * prev_explicit_k_tm_anom_south, beta_south * prev_explicit_k_tm_anom)
+
+                F_east_implicit = xr.where(alpha_east < 0, -alpha_east * prev_implicit_k_tm_anom, -alpha_east * prev_implicit_k_tm_anom_east)
+                F_west_implicit = xr.where(alpha_west < 0, -alpha_west * prev_implicit_k_tm_anom_west, -alpha_west * prev_implicit_k_tm_anom)
+                G_north_implicit = xr.where(beta_north > 0, beta_north * prev_implicit_k_tm_anom, beta_north * prev_implicit_k_tm_anom_north)
+                G_south_implicit = xr.where(beta_south > 0, beta_south * prev_implicit_k_tm_anom_south, beta_south * prev_implicit_k_tm_anom)
+
+                F_east_semi_implicit = xr.where(alpha_east < 0, -alpha_east * prev_semi_implicit_k_tm_anom, -alpha_east * prev_semi_implicit_k_tm_anom_east)
+                F_west_semi_implicit = xr.where(alpha_west < 0, -alpha_west * prev_semi_implicit_k_tm_anom_west, -alpha_west * prev_semi_implicit_k_tm_anom)
+                G_north_semi_implicit = xr.where(beta_north > 0, beta_north * prev_semi_implicit_k_tm_anom, beta_north * prev_semi_implicit_k_tm_anom_north)
+                G_south_semi_implicit = xr.where(beta_south > 0, beta_south * prev_semi_implicit_k_tm_anom_south, beta_south * prev_semi_implicit_k_tm_anom)
+
+                # ignore flux if advecting from land
+                F_east_chris_prev_cur = xr.where(chris_prev_cur_has_east_ocean, F_east_chris_prev_cur, 0)
+                F_west_chris_prev_cur = xr.where(chris_prev_cur_has_west_ocean, F_west_chris_prev_cur, 0)
+                G_north_chris_prev_cur = xr.where(chris_prev_cur_has_north_ocean, G_north_chris_prev_cur, 0)
+                G_south_chris_prev_cur = xr.where(chris_prev_cur_has_south_ocean, G_south_chris_prev_cur, 0)
+
+                F_east_chris_mean_k = xr.where(chris_mean_k_has_east_ocean, F_east_chris_mean_k, 0)
+                F_west_chris_mean_k = xr.where(chris_mean_k_has_west_ocean, F_west_chris_mean_k, 0)
+                G_north_chris_mean_k = xr.where(chris_mean_k_has_north_ocean, G_north_chris_mean_k, 0)
+                G_south_chris_mean_k = xr.where(chris_mean_k_has_south_ocean, G_south_chris_mean_k, 0)
+
+                F_east_chris_prev_k = xr.where(chris_prev_k_has_east_ocean, F_east_chris_prev_k, 0)
+                F_west_chris_prev_k = xr.where(chris_prev_k_has_west_ocean, F_west_chris_prev_k, 0)
+                G_north_chris_prev_k = xr.where(chris_prev_k_has_north_ocean, G_north_chris_prev_k, 0)
+                G_south_chris_prev_k = xr.where(chris_prev_k_has_south_ocean, G_south_chris_prev_k, 0)
+
+                F_east_chris_capped_exponent_k = xr.where(chris_capped_exponent_k_has_east_ocean, F_east_chris_capped_exponent_k, 0)
+                F_west_chris_capped_exponent_k = xr.where(chris_capped_exponent_k_has_west_ocean, F_west_chris_capped_exponent_k, 0)
+                G_north_chris_capped_exponent_k = xr.where(chris_capped_exponent_k_has_north_ocean, G_north_chris_capped_exponent_k, 0)
+                G_south_chris_capped_exponent_k = xr.where(chris_capped_exponent_k_has_south_ocean, G_south_chris_capped_exponent_k, 0)
+
+                F_east_explicit = xr.where(explicit_has_east_ocean, F_east_explicit, 0)
+                F_west_explicit = xr.where(explicit_has_west_ocean, F_west_explicit, 0)
+                G_north_explicit = xr.where(explicit_has_north_ocean, G_north_explicit, 0)
+                G_south_explicit = xr.where(explicit_has_south_ocean, G_south_explicit, 0)
+
+                F_east_implicit = xr.where(implicit_has_east_ocean, F_east_implicit, 0)
+                F_west_implicit = xr.where(implicit_has_west_ocean, F_west_implicit, 0)
+                G_north_implicit = xr.where(implicit_has_north_ocean, G_north_implicit, 0)
+                G_south_implicit = xr.where(implicit_has_south_ocean, G_south_implicit, 0)
+
+                F_east_semi_implicit = xr.where(semi_implicit_has_east_ocean, F_east_semi_implicit, 0)
+                F_west_semi_implicit = xr.where(semi_implicit_has_west_ocean, F_west_semi_implicit, 0)
+                G_north_semi_implicit = xr.where(semi_implicit_has_north_ocean, G_north_semi_implicit, 0)
+                G_south_semi_implicit = xr.where(semi_implicit_has_south_ocean, G_south_semi_implicit, 0)
+
+                # ignore flux if current cell is land
+                F_east_chris_prev_cur = xr.where(chris_prev_cur_ocean_mask, F_east_chris_prev_cur, 0)
+                F_west_chris_prev_cur = xr.where(chris_prev_cur_ocean_mask, F_west_chris_prev_cur, 0)
+                G_north_chris_prev_cur = xr.where(chris_prev_cur_ocean_mask, G_north_chris_prev_cur, 0)
+                G_south_chris_prev_cur = xr.where(chris_prev_cur_ocean_mask, G_south_chris_prev_cur, 0)
+
+                F_east_chris_mean_k = xr.where(chris_mean_k_ocean_mask, F_east_chris_mean_k, 0)
+                F_west_chris_mean_k = xr.where(chris_mean_k_ocean_mask, F_west_chris_mean_k, 0)
+                G_north_chris_mean_k = xr.where(chris_mean_k_ocean_mask, G_north_chris_mean_k, 0)
+                G_south_chris_mean_k = xr.where(chris_mean_k_ocean_mask, G_south_chris_mean_k, 0)
+
+                F_east_chris_prev_k = xr.where(chris_prev_k_ocean_mask, F_east_chris_prev_k, 0)
+                F_west_chris_prev_k = xr.where(chris_prev_k_ocean_mask, F_west_chris_prev_k, 0)
+                G_north_chris_prev_k = xr.where(chris_prev_k_ocean_mask, G_north_chris_prev_k, 0)
+                G_south_chris_prev_k = xr.where(chris_prev_k_ocean_mask, G_south_chris_prev_k, 0)
+
+                F_east_chris_capped_exponent_k = xr.where(chris_capped_exponent_k_ocean_mask, F_east_chris_capped_exponent_k, 0)
+                F_west_chris_capped_exponent_k = xr.where(chris_capped_exponent_k_ocean_mask, F_west_chris_capped_exponent_k, 0)
+                G_north_chris_capped_exponent_k = xr.where(chris_capped_exponent_k_ocean_mask, G_north_chris_capped_exponent_k, 0)
+                G_south_chris_capped_exponent_k = xr.where(chris_capped_exponent_k_ocean_mask, G_south_chris_capped_exponent_k, 0)
+
+                F_east_explicit = xr.where(explicit_ocean_mask, F_east_explicit, 0)
+                F_west_explicit = xr.where(explicit_ocean_mask, F_west_explicit, 0)
+                G_north_explicit = xr.where(explicit_ocean_mask, G_north_explicit, 0)
+                G_south_explicit = xr.where(explicit_ocean_mask, G_south_explicit, 0)
+
+                F_east_implicit = xr.where(implicit_ocean_mask, F_east_implicit, 0)
+                F_west_implicit = xr.where(implicit_ocean_mask, F_west_implicit, 0)
+                G_north_implicit = xr.where(implicit_ocean_mask, G_north_implicit, 0)
+                G_south_implicit = xr.where(implicit_ocean_mask, G_south_implicit, 0)
+
+                F_east_semi_implicit = xr.where(semi_implicit_ocean_mask, F_east_semi_implicit, 0)
+                F_west_semi_implicit = xr.where(semi_implicit_ocean_mask, F_west_semi_implicit, 0)
+                G_north_semi_implicit = xr.where(semi_implicit_ocean_mask, G_north_semi_implicit, 0)
+                G_south_semi_implicit = xr.where(semi_implicit_ocean_mask, G_south_semi_implicit, 0)
+
+                tm_chris_prev_cur_div = (F_east_chris_prev_cur - F_west_chris_prev_cur) / dx + (G_north_chris_prev_cur - G_south_chris_prev_cur) / dy
+                tm_chris_mean_k_div = (F_east_chris_mean_k - F_west_chris_mean_k) / dx + (G_north_chris_mean_k - G_south_chris_mean_k) / dy
+                tm_chris_prev_k_div = (F_east_chris_prev_k - F_west_chris_prev_k) / dx + (G_north_chris_prev_k - G_south_chris_prev_k) / dy
+                tm_chris_capped_exponent_k_div = (F_east_chris_capped_exponent_k - F_west_chris_capped_exponent_k) / dx + (G_north_chris_capped_exponent_k - G_south_chris_capped_exponent_k) / dy
+                tm_explicit_div = (F_east_explicit - F_west_explicit) / dx + (G_north_explicit - G_south_explicit) / dy
+                tm_implicit_div = (F_east_implicit - F_west_implicit) / dx + (G_north_implicit - G_south_implicit) / dy
+                tm_semi_implicit_div = (F_east_semi_implicit - F_west_semi_implicit) / dx + (G_north_semi_implicit - G_south_semi_implicit) / dy
+
+                tm_chris_prev_cur_div_total += tm_chris_prev_cur_div
+                tm_chris_mean_k_div_total += tm_chris_mean_k_div
+                tm_chris_prev_k_div_total += tm_chris_prev_k_div
+                tm_chris_capped_exponent_k_div_total += tm_chris_capped_exponent_k_div
+                tm_explicit_div_total += tm_explicit_div
+                tm_implicit_div_total += tm_implicit_div
+                tm_semi_implicit_div_total += tm_semi_implicit_div
+
+                prev_chris_prev_cur_tm_anom = prev_chris_prev_cur_tm_anom - sub_dt * tm_chris_prev_cur_div
+                prev_chris_mean_k_tm_anom = prev_chris_mean_k_tm_anom - sub_dt * tm_chris_mean_k_div
+                prev_chris_prev_k_tm_anom = prev_chris_prev_k_tm_anom - sub_dt * tm_chris_prev_k_div
+                prev_chris_capped_exponent_k_tm_anom = prev_chris_capped_exponent_k_tm_anom - sub_dt * tm_chris_capped_exponent_k_div
+                prev_explicit_k_tm_anom = prev_explicit_k_tm_anom - sub_dt * tm_explicit_div
+                prev_implicit_k_tm_anom = prev_implicit_k_tm_anom - sub_dt * tm_implicit_div
+                prev_semi_implicit_k_tm_anom = prev_semi_implicit_k_tm_anom - sub_dt * tm_semi_implicit_div
+
+                prev_chris_prev_cur_tm_anom = prev_chris_prev_cur_tm_anom.where(chris_prev_cur_ocean_mask, chris_prev_cur_model_anomalies[-1].isel(TIME=-1))
+                prev_chris_mean_k_tm_anom = prev_chris_mean_k_tm_anom.where(chris_mean_k_ocean_mask, chris_mean_k_model_anomalies[-1].isel(TIME=-1))
+                prev_chris_prev_k_tm_anom = prev_chris_prev_k_tm_anom.where(chris_prev_k_ocean_mask, chris_prev_k_model_anomalies[-1].isel(TIME=-1))
+                prev_chris_capped_exponent_k_tm_anom = prev_chris_capped_exponent_k_tm_anom.where(chris_capped_exponent_k_ocean_mask, chris_capped_exponent_model_anomalies[-1].isel(TIME=-1))
+                prev_explicit_k_tm_anom = prev_explicit_k_tm_anom.where(explicit_ocean_mask, explicit_model_anomalies[-1].isel(TIME=-1))
+                prev_implicit_k_tm_anom = prev_implicit_k_tm_anom.where(implicit_ocean_mask, implicit_model_anomalies[-1].isel(TIME=-1))
+                prev_semi_implicit_k_tm_anom = prev_semi_implicit_k_tm_anom.where(semi_implicit_ocean_mask, semi_implicit_model_anomalies[-1].isel(TIME=-1))
+
+            tm_chris_prev_cur_div = tm_chris_prev_cur_div_total / substeps
+            tm_chris_mean_k_div = tm_chris_mean_k_div_total / substeps
+            tm_chris_prev_k_div = tm_chris_prev_k_div_total / substeps
+            tm_chris_capped_exponent_k_div = tm_chris_capped_exponent_k_div_total / substeps
+            tm_explicit_div = tm_explicit_div_total / substeps
+            tm_implicit_div = tm_implicit_div_total / substeps
+            tm_semi_implicit_div = tm_semi_implicit_div_total / substeps
+            """end of new approach"""
+        # else:
+        #     prev_chris_prev_cur_tm_anom = chris_prev_cur_model_anomalies[-1].isel(TIME=-1)
+        #     prev_chris_mean_k_tm_anom = chris_mean_k_model_anomalies[-1].isel(TIME=-1)
+        #     prev_chris_prev_k_tm_anom = chris_prev_k_model_anomalies[-1].isel(TIME=-1)
+        #     prev_chris_capped_exponent_k_tm_anom = chris_capped_exponent_model_anomalies[-1].isel(TIME=-1)
+        #     prev_explicit_k_tm_anom = explicit_model_anomalies[-1].isel(TIME=-1)
+        #     prev_implicit_k_tm_anom = implicit_model_anomalies[-1].isel(TIME=-1)
+        #     prev_semi_implicit_k_tm_anom = semi_implicit_model_anomalies[-1].isel(TIME=-1)
+        prev_chris_prev_cur_tm_anom = chris_prev_cur_model_anomalies[-1].isel(TIME=-1)
+        prev_chris_mean_k_tm_anom = chris_mean_k_model_anomalies[-1].isel(TIME=-1)
+        prev_chris_prev_k_tm_anom = chris_prev_k_model_anomalies[-1].isel(TIME=-1)
+        prev_chris_capped_exponent_k_tm_anom = chris_capped_exponent_model_anomalies[-1].isel(TIME=-1)
+        prev_explicit_k_tm_anom = explicit_model_anomalies[-1].isel(TIME=-1)
+        prev_implicit_k_tm_anom = implicit_model_anomalies[-1].isel(TIME=-1)
+        prev_semi_implicit_k_tm_anom = semi_implicit_model_anomalies[-1].isel(TIME=-1)
 
         # get previous data
         prev_tsub_anom = t_sub_da.sel(TIME=prev_month)
@@ -210,6 +503,7 @@ for month in heat_flux_anomaly_ds.TIME.values:
             prev_b = prev_surf_ek / (rho_0 * c_0 * prev_hbar) + prev_entrainment_vel / prev_hbar * prev_tsub_anom
             prev_a = prev_entrainment_vel / prev_hbar + gamma_0 / (rho_0 * c_0 * prev_hbar)
             prev_k = (gamma_0 / (rho_0 * c_0) + prev_entrainment_vel) / prev_hbar
+
         else:
             cur_b = cur_surf_ek / (rho_0 * c_0 * cur_hbar)
             cur_a = gamma_0 / (rho_0 * c_0 * cur_hbar)
@@ -218,6 +512,11 @@ for month in heat_flux_anomaly_ds.TIME.values:
             prev_b = prev_surf_ek / (rho_0 * c_0 * prev_hbar)
             prev_a = gamma_0 / (rho_0 * c_0 * prev_hbar)
             prev_k = prev_a
+
+        if INCLUDE_GEOSTROPHIC_DISPLACEMENT:
+            cur_a = cur_a + (- sea_surface_monthlymean_ds["alpha_grad_long"].sel(MONTH=month_in_year) + sea_surface_monthlymean_ds["beta_grad_lat"].sel(MONTH=month_in_year)).clip(-1e-7, 1e-7)
+            prev_a = prev_a + (- sea_surface_monthlymean_ds["alpha_grad_long"].sel(MONTH=prev_month_in_year) + sea_surface_monthlymean_ds["beta_grad_lat"].sel(MONTH=prev_month_in_year)).clip(-1e-7, 1e-7)
+            # technically these corrections are required. However they do explode – I think the reason why is because the grid is too coarse and the changes therefore too sudden.
 
         exponent_prev_cur = prev_k * month_to_second(prev_month) - cur_k * month_to_second(month)
         exponent_mean_k = -0.5 * (prev_k + cur_k) * delta_t
@@ -239,6 +538,23 @@ for month in heat_flux_anomaly_ds.TIME.values:
         cur_explicit_k_tm_anom = prev_explicit_k_tm_anom + delta_t * (prev_b - prev_a * prev_explicit_k_tm_anom)
         cur_implicit_k_tm_anom = (prev_implicit_k_tm_anom + delta_t * cur_b) / (1 + delta_t * cur_a)
         cur_semi_implicit_k_tm_anom = (prev_semi_implicit_k_tm_anom + delta_t * prev_b) / (1 + delta_t * cur_a)
+
+        if INCLUDE_GEOSTROPHIC_DISPLACEMENT:
+            cur_chris_prev_cur_tm_anom = cur_chris_prev_cur_tm_anom - tm_chris_prev_cur_div * month_to_second(1)
+            cur_chris_mean_k_tm_anom = cur_chris_mean_k_tm_anom - tm_chris_mean_k_div * month_to_second(1)
+            cur_chris_prev_k_tm_anom = cur_chris_prev_k_tm_anom - tm_chris_prev_k_div * month_to_second(1)
+            cur_chris_capped_exponent_k_tm_anom = cur_chris_capped_exponent_k_tm_anom - tm_chris_capped_exponent_k_div * month_to_second(1)
+            cur_explicit_k_tm_anom = cur_explicit_k_tm_anom - tm_explicit_div * month_to_second(1)
+            cur_implicit_k_tm_anom = cur_implicit_k_tm_anom - tm_implicit_div * month_to_second(1)
+            cur_semi_implicit_k_tm_anom = cur_semi_implicit_k_tm_anom - tm_semi_implicit_div * month_to_second(1)
+
+            cur_chris_prev_cur_tm_anom = cur_chris_prev_cur_tm_anom.where(chris_prev_cur_ocean_mask, prev_chris_prev_cur_tm_anom)
+            cur_chris_mean_k_tm_anom = cur_chris_mean_k_tm_anom.where(chris_mean_k_ocean_mask, prev_chris_mean_k_tm_anom)
+            cur_chris_prev_k_tm_anom = cur_chris_prev_k_tm_anom.where(chris_prev_k_ocean_mask, prev_chris_prev_k_tm_anom)
+            cur_chris_capped_exponent_k_tm_anom = cur_chris_capped_exponent_k_tm_anom.where(chris_capped_exponent_k_ocean_mask, prev_chris_capped_exponent_k_tm_anom)
+            cur_explicit_k_tm_anom = cur_explicit_k_tm_anom.where(explicit_ocean_mask, prev_explicit_k_tm_anom)
+            cur_implicit_k_tm_anom = cur_implicit_k_tm_anom.where(implicit_ocean_mask, prev_implicit_k_tm_anom)
+            cur_semi_implicit_k_tm_anom = cur_semi_implicit_k_tm_anom.where(semi_implicit_ocean_mask, prev_semi_implicit_k_tm_anom)
 
         # reformat and save each model
         cur_chris_prev_cur_tm_anom = cur_chris_prev_cur_tm_anom.drop_vars('MONTH', errors='ignore')

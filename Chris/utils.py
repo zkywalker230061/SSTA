@@ -555,7 +555,7 @@ def compute_gradient_lon(
     return grad
 
 
-def get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH=False, gamma0=10, INCLUDE_GEOSTROPHIC_DISPLACEMENT=False):
+def get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH=False, gamma0=10, INCLUDE_GEOSTROPHIC_DISPLACEMENT=False, OTHER_MLD=False):
     save_name = ""
     if INCLUDE_SURFACE:
         save_name = save_name + "1"
@@ -577,6 +577,8 @@ def get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_G
             save_name = save_name + "_downloadedSSH"
     else:
         save_name = save_name + "0"
+    if OTHER_MLD:
+        save_name = save_name + "_otherMLD"
     if gamma0 != 10.0:
         save_name += "_gamma" + str(gamma0)
     return save_name
@@ -589,3 +591,9 @@ def coriolis_parameter(lat):
     f = xr.DataArray(f, coords={'LATITUDE': lat}, dims=['LATITUDE'])
     f.attrs['units'] = 's^-1'
     return f
+
+def get_month_from_time(time):
+    month = (time + 0.5) % 12
+    if month == 0:
+        month = 12.0
+    return month
