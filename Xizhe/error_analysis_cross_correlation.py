@@ -13,8 +13,8 @@ from scipy.stats import kurtosis, skew, pearsonr, t
 
 matplotlib.use('TkAgg')
 
-INCLUDE_SURFACE = True
-INCLUDE_EKMAN = True
+INCLUDE_SURFACE = False
+INCLUDE_EKMAN = False
 INCLUDE_ENTRAINMENT = True
 INCLUDE_GEOSTROPHIC_MEAN = False
 INCLUDE_GEOSTROPHIC_ANOM = False

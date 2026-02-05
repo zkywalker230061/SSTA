@@ -14,9 +14,9 @@ matplotlib.use('TkAgg')
 
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN = True
-INCLUDE_ENTRAINMENT = False
-INCLUDE_GEOSTROPHIC = False
-INCLUDE_GEOSTROPHIC_DISPLACEMENT = False
+INCLUDE_ENTRAINMENT = True
+INCLUDE_GEO_MEAN = True
+INCLUDE_GEO_ANOM = True
 CLEAN_CHRIS_PREV_CUR = False        # only really useful when entrainment is turned on
 
 observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Temperature(T_m).nc"
@@ -132,7 +132,7 @@ for month in heat_flux_anomaly_ds.TIME.values:
 
     else:
         # store previous readings Tm(n-1)
-        if INCLUDE_GEOSTROPHIC_DISPLACEMENT:    # then need to take the previous reading "back-propagated" based on current
+        if INCLUDE_GEO_ANOM:    # then need to take the previous reading "back-propagated" based on current
             prev_implicit_k_tm_anom_at_cur_loc = implicit_model_anomalies[-1].isel(TIME=-1)
             # prev_chris_prev_cur_tm_anom_at_cur_loc = chris_prev_cur_model_anomalies[-1].isel(TIME=-1)
             # prev_chris_mean_k_tm_anom_at_cur_loc = chris_mean_k_model_anomalies[-1].isel(TIME=-1)
@@ -198,7 +198,7 @@ for month in heat_flux_anomaly_ds.TIME.values:
             cur_surf_ek = cur_ekman_anom - cur_ekman_anom
             prev_surf_ek = prev_ekman_anom - prev_ekman_anom
 
-        if INCLUDE_GEOSTROPHIC:
+        if INCLUDE_GEO_MEAN:
             cur_surf_ek = cur_surf_ek + cur_geo_anom
             prev_surf_ek = prev_surf_ek + prev_geo_anom
 
@@ -360,6 +360,17 @@ def calculate_RMSE (obs, model, dim = 'TIME'):
     rmse = np.sqrt(mean_squared_error)
     return rmse
 
+def calculate_RMSE_weighted(obs, model, dim= 'TIME'):
+    error = (model - obs)
+    squared_error = error ** 2
+    mean_squared_error = squared_error.mean(dim=dim)
+    rmse = np.sqrt(mean_squared_error)
+
+    weights = np.cos(np.deg2rad(mean_squared_error.LATITUDE))
+    weighted_rmse = mean_squared_error.weighted(weights).mean (dim = ("LATITUDE", "LONGITUDE"))
+    rmse_weighted = float(np.sqrt(weighted_rmse))
+    return rmse_weighted
+
 def calculate_RMSE_norm(obs, model, dim = 'TIME'):
     error = (model - obs)
     squared_error = error ** 2
@@ -390,9 +401,9 @@ fig, axes = plt.subplots(1, 1, figsize=(8,5))
 
 scheme_name = "Implicit"
 rmse_map = calculate_RMSE(observed_temperature_anomaly, implicit_model_anomaly_ds, dim='TIME')
+rmse_weighted = calculate_RMSE_weighted(observed_temperature_anomaly, implicit_model_anomaly_ds, dim='TIME')
 rmse_map_norm = calculate_RMSE_norm(observed_temperature_anomaly, implicit_model_anomaly_ds, dim='TIME')
-# rmse_map = calculate_RMSE(observed_temperature_anomaly, implicit_ds, dim='TIME')
-
+print("rmse_weighted", rmse_weighted)
 
 # Plotting
 # ax = plt.subplot(3, 2, i + 1)
@@ -409,8 +420,8 @@ fig.text(
     f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
     f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
     f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
-    f"INCLUDE_GEOSTROPHIC = {INCLUDE_GEOSTROPHIC}\n"
-    f"INCLUDE_GEOSTROPHIC_DISPLACEMENT = {INCLUDE_GEOSTROPHIC_DISPLACEMENT}",
+    f"INCLUDE_GEO_MEAN = {INCLUDE_GEO_MEAN}\n"
+    f"INCLUDE_GEO_ANOM = {INCLUDE_GEO_ANOM}",
     ha='right', va='bottom', fontsize=8
 )
 plt.show()
@@ -431,8 +442,8 @@ fig.text(
     f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
     f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
     f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
-    f"INCLUDE_GEOSTROPHIC = {INCLUDE_GEOSTROPHIC}\n"
-    f"INCLUDE_GEOSTROPHIC_DISPLACEMENT = {INCLUDE_GEOSTROPHIC_DISPLACEMENT}",
+    f"INCLUDE_GEO_MEAN = {INCLUDE_GEO_MEAN}\n"
+    f"INCLUDE_GEO_ANOM = {INCLUDE_GEO_ANOM}",
     ha='right', va='bottom', fontsize=8
 )
 plt.show()
@@ -493,8 +504,8 @@ fig.text(
     f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
     f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
     f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
-    f"INCLUDE_GEOSTROPHIC = {INCLUDE_GEOSTROPHIC}\n"
-    f"INCLUDE_GEOSTROPHIC_DISPLACEMENT = {INCLUDE_GEOSTROPHIC_DISPLACEMENT}",
+    f"INCLUDE_GEO_MEAN = {INCLUDE_GEO_MEAN}\n"
+    f"INCLUDE_GEO_ANOM = {INCLUDE_GEO_ANOM}",
     ha='right', va='bottom', fontsize=10
 )
 plt.show()
@@ -544,8 +555,8 @@ fig.text(
     f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
     f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
     f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
-    f"INCLUDE_GEOSTROPHIC = {INCLUDE_GEOSTROPHIC}\n"
-    f"INCLUDE_GEOSTROPHIC_DISPLACEMENT = {INCLUDE_GEOSTROPHIC_DISPLACEMENT}",
+    f"INCLUDE_GEO_MEAN = {INCLUDE_GEO_MEAN}\n"
+    f"INCLUDE_GEO_ANOM = {INCLUDE_GEO_ANOM}",
     ha='right', va='bottom', fontsize=10
 )
 plt.show()

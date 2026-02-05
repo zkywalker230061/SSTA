@@ -23,7 +23,7 @@ GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/g
 GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/geostrophic_anomaly_calculated_2.nc"
 SEA_SURFACE_GRAD_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/sea_surface_interpolated_grad.nc"
 USE_DOWNLOADED_SSH = False
-USE_NEW_H_BAR_NEW_T_SUB = True 
+USE_NEW_H_BAR_NEW_T_SUB = False
 
 
 
@@ -488,3 +488,6 @@ dashboard = InteractiveSSTModel(
 )
 
 plt.show()
+
+
+
