@@ -6,7 +6,8 @@ from chris_utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset,
 from scipy.stats import t
 
 
-observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Datasets.nc"
+# observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Datasets.nc"
+observed_path = "/Users/julia/Desktop/SSTA/datasets/Reynold_sst_anomalies-(2004-2018).nc"
 HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/heat_flux_interpolated_all_contributions.nc"
 EKMAN_ANOMALY_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Ekman_Anomaly_Full_Datasets.nc"
 TEMP_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
@@ -38,10 +39,12 @@ if USE_NEW_H_BAR_NEW_T_SUB:
         
     # Observed Data (Tm) using new h
     observed_temp_ds_full = xr.open_dataset(observed_path, decode_times=False)
-    observed_temp_ds = observed_temp_ds_full["UPDATED_MIXED_LAYER_TEMP"]
-    obs_temp_mean = get_monthly_mean(observed_temp_ds)
-    observed_temperature_anomaly = get_anomaly(observed_temp_ds_full, "UPDATED_MIXED_LAYER_TEMP", obs_temp_mean)
-    observed_temperature_anomaly = observed_temperature_anomaly["UPDATED_MIXED_LAYER_TEMP_ANOMALY"]
+    # observed_temp_ds = observed_temp_ds_full["UPDATED_MIXED_LAYER_TEMP"]
+    # obs_temp_mean = get_monthly_mean(observed_temp_ds)
+    # observed_temperature_anomaly = get_anomaly(observed_temp_ds_full, "UPDATED_MIXED_LAYER_TEMP", obs_temp_mean)
+    # observed_temperature_anomaly = observed_temperature_anomaly["UPDATED_MIXED_LAYER_TEMP_ANOMALY"]
+
+    observed_temperature_anomaly = observed_temp_ds_full['anom']
 
     # Ekman Anomaly using new h
     ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
@@ -66,10 +69,13 @@ else:
 
     # Observed Data (Tm) using new "old" h
     observed_temp_ds_full = xr.open_dataset(observed_path, decode_times=False)
-    observed_temp_ds = observed_temp_ds_full["MIXED_LAYER_TEMP"]
-    obs_temp_mean = get_monthly_mean(observed_temp_ds)
-    observed_temperature_anomaly = get_anomaly(observed_temp_ds_full, "MIXED_LAYER_TEMP", obs_temp_mean)
-    observed_temperature_anomaly = observed_temperature_anomaly["MIXED_LAYER_TEMP_ANOMALY"]
+    # observed_temp_ds = observed_temp_ds_full["MIXED_LAYER_TEMP"]
+    # obs_temp_mean = get_monthly_mean(observed_temp_ds)
+    # observed_temperature_anomaly = get_anomaly(observed_temp_ds_full, "MIXED_LAYER_TEMP", obs_temp_mean)
+    # observed_temperature_anomaly = observed_temperature_anomaly["MIXED_LAYER_TEMP_ANOMALY"]
+
+    observed_temperature_anomaly = observed_temp_ds_full['anom']
+
 
     # Ekman Anomaly using new "old" h
     ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
