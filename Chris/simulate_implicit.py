@@ -20,7 +20,7 @@ e.g.
 
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN_ANOM_ADVECTION = True
-INCLUDE_EKMAN_MEAN_ADVECTION = False
+INCLUDE_EKMAN_MEAN_ADVECTION = True
 INCLUDE_ENTRAINMENT = True
 INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
 INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
@@ -32,7 +32,7 @@ c_0 = 4100.0
 gamma_0 = 15.0
 g = 9.81
 
-save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION, USE_DOWNLOADED_SSH, gamma0=gamma_0, INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, OTHER_MLD=USE_OTHER_MLD)
+save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION, USE_DOWNLOADED_SSH, gamma0=gamma_0, INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION=INCLUDE_EKMAN_MEAN_ADVECTION, OTHER_MLD=USE_OTHER_MLD)
 
 """Open all required datasets"""
 
@@ -42,6 +42,7 @@ TEMP_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/RG_ArgoClim_Tempe
 ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Entrainment_Velocity-(2004-2018).nc"
 GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly_downloaded.nc"
 GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly_calculated.nc"
+EKMAN_MEAN_ADVECTION_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/ekman_mean_advection.nc"
 
 if USE_OTHER_MLD:
     MLD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_h.nc"
@@ -68,10 +69,7 @@ ekman_anomaly_da = ekman_anomaly_ds['Q_Ek_anom']
 ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
 
 hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
-if USE_OTHER_MLD:
-    hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
-else:
-    hbar_da = hbar_ds["MONTHLY_MEAN_MLD_PRESSURE"]
+hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
 
 t_sub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
 if USE_OTHER_MLD:
@@ -98,6 +96,8 @@ geostrophic_anomaly_da = geostrophic_anomaly_ds["GEOSTROPHIC_ANOMALY"]
 sea_surface_grad_ds = xr.open_dataset(SEA_SURFACE_GRAD_DATA_PATH, decode_times=False)
 sea_surface_monthlymean_ds = xr.open_dataset(SEA_SURFACE_MONTHLY_MEAN_DATA_PATH, decode_times=False)
 
+ekman_mean_advection = xr.open_dataset(EKMAN_MEAN_ADVECTION_DATA_PATH, decode_times=False)
+
 def month_to_second(month):
     return month * 30.4375 * 24 * 60 * 60
 
@@ -108,6 +108,8 @@ model_anomalies = []
 entrainment_fluxes = []
 added_baseline = False
 for month in heat_flux_anomaly_ds.TIME.values:
+    if month % 25 == 0:
+        print("Month " + str(month) + " of " + str(heat_flux_anomaly_ds.TIME.max()))
     # find the previous and current month from 1 to 12 to access the monthly-averaged data (hbar, entrainment vel.)
     prev_month = month - 1
     month_in_year = get_month_from_time(month)
@@ -133,9 +135,9 @@ for month in heat_flux_anomaly_ds.TIME.values:
                 alpha += sea_surface_monthlymean_ds['alpha'].sel(MONTH=prev_month_in_year)
                 beta += sea_surface_monthlymean_ds['beta'].sel(MONTH=prev_month_in_year)
 
-            if INCLUDE_EKMAN_MEAN_ADVECTION:    #TODO: properly implement mean Ekman advection
-                alpha += 1
-                beta += 1
+            if INCLUDE_EKMAN_MEAN_ADVECTION:
+                alpha = alpha + ekman_mean_advection["ekman_alpha"].sel(MONTH=prev_month_in_year)
+                beta = beta + ekman_mean_advection["ekman_beta"].sel(MONTH=prev_month_in_year)
 
             # calculate mean advection contributions
             earth_radius = 6371000
@@ -153,6 +155,8 @@ for month in heat_flux_anomaly_ds.TIME.values:
 
             tm_div_total = xr.zeros_like(prev_anomaly)
             for step in range(substeps):
+                if step % 25 == 0:
+                    print("Step " + str(step) + " of " + str(substeps))
                 # get upwind flux
                 prev_anom_east = prev_anomaly.shift(LONGITUDE=-1)
                 prev_anom_west = prev_anomaly.shift(LONGITUDE=1)
@@ -250,6 +254,9 @@ for month in heat_flux_anomaly_ds.TIME.values:
         if INCLUDE_GEOSTROPHIC_MEAN_ADVECTION:
             cur_a += (- sea_surface_monthlymean_ds["alpha_grad_long"].sel(MONTH=month_in_year) + sea_surface_monthlymean_ds["beta_grad_lat"].sel(MONTH=month_in_year)).clip(-1e-7, 1e-7)
             prev_a += (- sea_surface_monthlymean_ds["alpha_grad_long"].sel(MONTH=prev_month_in_year) + sea_surface_monthlymean_ds["beta_grad_lat"].sel(MONTH=prev_month_in_year)).clip(-1e-7, 1e-7)
+        if INCLUDE_EKMAN_MEAN_ADVECTION:
+            cur_a += (- ekman_mean_advection["ekman_alpha_grad_long"].sel(MONTH=month_in_year) + ekman_mean_advection["ekman_beta_grad_lat"].sel(MONTH=month_in_year)).clip(-1e-7, 1e-7)
+            prev_a += (- ekman_mean_advection["ekman_alpha_grad_long"].sel(MONTH=prev_month_in_year) + ekman_mean_advection["ekman_beta_grad_lat"].sel(MONTH=prev_month_in_year)).clip(-1e-7, 1e-7)
 
         # update anomaly
         cur_anomaly = (prev_anomaly + delta_t * cur_b) / (1 + delta_t * cur_a)
