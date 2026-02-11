@@ -10,18 +10,22 @@ from SSTA.Chris.utils import make_movie, get_eof, get_eof_with_nan_consideration
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 
 INCLUDE_SURFACE = True
-INCLUDE_EKMAN = True
+INCLUDE_EKMAN_ANOM_ADVECTION = True
+INCLUDE_EKMAN_MEAN_ADVECTION = True
 INCLUDE_ENTRAINMENT = True
-INCLUDE_GEOSTROPHIC = True
-INCLUDE_GEOSTROPHIC_DISPLACEMENT = True
+INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
+INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
 USE_DOWNLOADED_SSH = False
 USE_OTHER_MLD = False
 gamma_0 = 15.0
+
+IMPLICIT_MODEL = True
 
 MASK_TROPICS = False
 MASK_TROPICS_LATITUDE = 10
 
 CONSIDER_OBSERVATIONS = True
+USE_REYNOLDS = True
 # note: changed everything to functions to be cleaner; no longer need these conditionals
 # MAKE_MOVIE = False
 # PLOT_MODE_CONTRIBUTIONS = False
@@ -31,31 +35,41 @@ CONSIDER_OBSERVATIONS = True
 # MAKE_REGRESSION_MAPS = False
 # TRACK_WARMING_EFFECTS = True
 
-save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC,
+save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION,
                           USE_DOWNLOADED_SSH=USE_DOWNLOADED_SSH, gamma0=gamma_0,
-                          INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_DISPLACEMENT, OTHER_MLD=USE_OTHER_MLD)
+                          INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, OTHER_MLD=USE_OTHER_MLD)
 ALL_SCHEMES_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/all_anomalies/" + save_name + ".nc"
+IMPLICIT_SCHEME_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/" + save_name + ".nc"
 DENOISED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/cur_prev_denoised.nc"
 OBSERVATIONS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/RG_ArgoClim_Temperature_2019.nc"
 OBSERVATIONS_JJ_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/observed_anomaly_JJ.nc"
+REYNOLDS_OBS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sst_anomalies-(2004-2018).nc"
 ENSO_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/nina34.anom.nc"
 
-all_schemes_ds = xr.open_dataset(ALL_SCHEMES_DATA_PATH, decode_times=False)
-all_schemes_ds["CHRIS_PREV_CUR_NAN"] = all_schemes_ds["CHRIS_PREV_CUR"].where(
-    (all_schemes_ds["CHRIS_PREV_CUR"] > -10) & (all_schemes_ds["CHRIS_PREV_CUR"] < 10))
+if IMPLICIT_MODEL:
+    all_schemes_ds = xr.open_dataset(IMPLICIT_SCHEME_DATA_PATH, decode_times=False)
+else:
+    all_schemes_ds = xr.open_dataset(ALL_SCHEMES_DATA_PATH, decode_times=False)
+    all_schemes_ds["CHRIS_PREV_CUR_NAN"] = all_schemes_ds["CHRIS_PREV_CUR"].where(
+        (all_schemes_ds["CHRIS_PREV_CUR"] > -10) & (all_schemes_ds["CHRIS_PREV_CUR"] < 10))
+
 
 argo_observations_ds = load_and_prepare_dataset(OBSERVATIONS_DATA_PATH)
 processed_observations_ds = xr.open_dataset(OBSERVATIONS_JJ_DATA_PATH, decode_times=False)
 if CONSIDER_OBSERVATIONS:
-    # observed_anomaly_before_processing = observations_ds["ARGO_TEMPERATURE_ANOMALY"].sel(PRESSURE=2.5)
-    # observed_anomaly_before_processing_monthly_mean = get_monthly_mean(observed_anomaly_before_processing)
-    # observations_ds = get_anomaly(observations_ds, "ARGO_TEMPERATURE_ANOMALY", observed_anomaly_before_processing_monthly_mean)
-    # observed_anomaly = observations_ds["ARGO_TEMPERATURE_ANOMALY_ANOMALY"].sel(PRESSURE=2.5)
-    observed_anomaly_before_processing = processed_observations_ds["__xarray_dataarray_variable__"]  # bad name...
-    observed_anomaly_before_processing_monthly_mean = get_monthly_mean(observed_anomaly_before_processing)
-    processed_observations_ds = get_anomaly(processed_observations_ds, "__xarray_dataarray_variable__",
-                                            observed_anomaly_before_processing_monthly_mean)
-    observed_anomaly = processed_observations_ds["__xarray_dataarray_variable___ANOMALY"]  # worse name...
+    if USE_REYNOLDS:
+        obs_ds = xr.open_dataset(REYNOLDS_OBS_DATA_PATH, decode_times=False)
+        observed_anomaly = obs_ds['anom']
+    else:
+        # observed_anomaly_before_processing = observations_ds["ARGO_TEMPERATURE_ANOMALY"].sel(PRESSURE=2.5)
+        # observed_anomaly_before_processing_monthly_mean = get_monthly_mean(observed_anomaly_before_processing)
+        # observations_ds = get_anomaly(observations_ds, "ARGO_TEMPERATURE_ANOMALY", observed_anomaly_before_processing_monthly_mean)
+        # observed_anomaly = observations_ds["ARGO_TEMPERATURE_ANOMALY_ANOMALY"].sel(PRESSURE=2.5)
+        observed_anomaly_before_processing = processed_observations_ds["__xarray_dataarray_variable__"]  # bad name...
+        observed_anomaly_before_processing_monthly_mean = get_monthly_mean(observed_anomaly_before_processing)
+        processed_observations_ds = get_anomaly(processed_observations_ds, "__xarray_dataarray_variable__",
+                                                observed_anomaly_before_processing_monthly_mean)
+        observed_anomaly = processed_observations_ds["__xarray_dataarray_variable___ANOMALY"]  # worse name...
 
     if MASK_TROPICS:
         observed_anomaly = observed_anomaly.where((observed_anomaly.LATITUDE > MASK_TROPICS_LATITUDE) | (
@@ -415,10 +429,10 @@ def plot_correlation():
 
 plot_full_model()
 # plot_enso()
-# eof_movie()
+eof_movie()
 # explained_variance_from_each_mode()
-# plot_spatial_pattern_EOFs()
-# plot_PCs_over_time()
+plot_spatial_pattern_EOFs()
+plot_PCs_over_time()
 # regression_map()
 # track_warming_effects()
 # track_anomaly_persistence(6, 9)
