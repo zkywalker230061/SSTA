@@ -98,6 +98,7 @@ sea_surface_monthlymean_ds = xr.open_dataset(SEA_SURFACE_MONTHLY_MEAN_DATA_PATH,
 
 ekman_mean_advection = xr.open_dataset(EKMAN_MEAN_ADVECTION_DATA_PATH, decode_times=False)
 
+
 def month_to_second(month):
     return month * 30.4375 * 24 * 60 * 60
 
@@ -108,7 +109,7 @@ model_anomalies = []
 entrainment_fluxes = []
 added_baseline = False
 for month in heat_flux_anomaly_ds.TIME.values:
-    if month % 25 == 0:
+    if (month-0.5) % 25 == 0:
         print("Month " + str(month) + " of " + str(heat_flux_anomaly_ds.TIME.max()))
     # find the previous and current month from 1 to 12 to access the monthly-averaged data (hbar, entrainment vel.)
     prev_month = month - 1
@@ -294,7 +295,7 @@ if INCLUDE_ENTRAINMENT:
     entrainment_fluxes = xr.concat(entrainment_fluxes, 'TIME')
     entrainment_fluxes = entrainment_fluxes.drop_vars(["MONTH", "PRESSURE"])
     entrainment_fluxes = entrainment_fluxes.transpose("TIME", "LATITUDE", "LONGITUDE")
-    entrainment_fluxes = entrainment_fluxes.rename("ENTRAINMENT_FLUX_ANOMALY")
+    entrainment_fluxes = entrainment_fluxes.rename("ENTRAINMENT_ANOMALY")
 
 # merge the relevant fluxes into a single dataset
 flux_components_to_merge = []
@@ -305,18 +306,18 @@ if INCLUDE_SURFACE:
     variable_names.append("SURFACE_FLUX_ANOMALY")
 
 if INCLUDE_EKMAN_ANOM_ADVECTION:
-    ekman_anomaly_da = ekman_anomaly_da.rename("EKMAN_FLUX_ANOMALY")
+    ekman_anomaly_da = ekman_anomaly_da.rename("EKMAN_ANOM_ADVECTION_ANOMALY")
     flux_components_to_merge.append(ekman_anomaly_da)
-    variable_names.append("EKMAN_FLUX_ANOMALY")
+    variable_names.append("EKMAN_ANOM_ADVECTION_ANOMALY")
 
 if INCLUDE_GEOSTROPHIC_ANOM_ADVECTION:
-    geostrophic_anomaly_da = geostrophic_anomaly_da.rename("GEOSTROPHIC_FLUX_ANOMALY")
+    geostrophic_anomaly_da = geostrophic_anomaly_da.rename("GEOSTROPHIC_ANOM_ADVECTION_ANOMALY")
     flux_components_to_merge.append(geostrophic_anomaly_da)
-    variable_names.append("GEOSTROPHIC_FLUX_ANOMALY")
+    variable_names.append("GEOSTROPHIC_ANOM_ADVECTION_ANOMALY")
 
 if INCLUDE_ENTRAINMENT:
     flux_components_to_merge.append(entrainment_fluxes)
-    variable_names.append("ENTRAINMENT_FLUX_ANOMALY")
+    variable_names.append("ENTRAINMENT_ANOMALY")
 
 flux_components_ds = xr.merge(flux_components_to_merge)
 
@@ -330,4 +331,4 @@ for variable_name in variable_names:
 flux_components_ds = remove_empty_attributes(flux_components_ds)
 flux_components_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/" + save_name + "_flux_components.nc")
 
-make_movie(model_anomalies_ds["IMPLICIT"], -3, 3)
+#make_movie(model_anomalies_ds["IMPLICIT"], -3, 3)
