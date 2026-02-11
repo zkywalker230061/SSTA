@@ -83,7 +83,7 @@ def _find_half_depth(density_anomaly_profile, pressure, density_anomaly_surface_
         [pressure[index1], pressure[index2]]
     )
     if mld <= MAX_DEPTH:
-        return pressure[index1]
+        return min(pressure[index1], pressure[index2])
     return MAX_DEPTH
 
 

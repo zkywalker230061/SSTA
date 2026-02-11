@@ -63,51 +63,47 @@ SECONDS_MONTH = 30 * 24 * 60 * 60  # seconds in a month
 #     plt.show()
 
 
-if SURFACE:
-    q_surface_ds = load_and_prepare_dataset(
-        "datasets/Simulation-Surface_Heat_Flux-(2004-2018).nc"
-    )
-    q_surface = (
-        q_surface_ds['ANOMALY_avg_slhtf']
-        + q_surface_ds['ANOMALY_avg_ishf']
-        + q_surface_ds['ANOMALY_avg_snswrf']
-        + q_surface_ds['ANOMALY_avg_snlwrf']
-    )
-    q_surface = q_surface.drop_vars('MONTH')
-    q_surface.name = 'ANOMALY_SURFACE_HEAT_FLUX'
-else:
-    q_surface = 0
+q_surface_ds = load_and_prepare_dataset(
+    "datasets/Simulation-Surface_Heat_Flux-(2004-2018).nc"
+)
+q_surface = (
+    q_surface_ds['ANOMALY_avg_slhtf']
+    + q_surface_ds['ANOMALY_avg_ishf']
+    + q_surface_ds['ANOMALY_avg_snswrf']
+    + q_surface_ds['ANOMALY_avg_snlwrf']
+)
+q_surface = q_surface.drop_vars('MONTH')
+q_surface.name = 'ANOMALY_SURFACE_HEAT_FLUX'
+if not SURFACE:
+    q_surface = q_surface - q_surface
 
-if EKMAN:
-    q_ekman = load_and_prepare_dataset(
-        "datasets/.test-Simulation-Ekman_Heat_Flux-(2004-2018).nc"
-    )['ANOMALY_EKMAN_HEAT_FLUX']
-    q_ekman = q_ekman.where(
-        (q_ekman['LATITUDE'] > 5) | (q_ekman['LATITUDE'] < -5), 0
-    )
-else:
-    q_ekman = 0
+q_ekman = load_and_prepare_dataset(
+    "datasets/.test-Simulation-Ekman_Heat_Flux-(2004-2018).nc"
+)['ANOMALY_EKMAN_HEAT_FLUX']
+q_ekman = q_ekman.where(
+    (q_ekman['LATITUDE'] > 5) | (q_ekman['LATITUDE'] < -5), 0
+)
+if not EKMAN:
+    q_ekman = q_ekman - q_ekman
 
-if GEOSTROPHIC:
-    q_geostrophic = load_and_prepare_dataset(
-        "datasets/Simulation-Geostrophic_Heat_Flux-(2004-2018).nc"
-    )['ANOMALY_GEOSTROPHIC_HEAT_FLUX']
-    q_geostrophic = q_geostrophic.where(
-        (q_geostrophic['LATITUDE'] > 5) | (q_geostrophic['LATITUDE'] < -5), 0
-    )
-else:
-    q_geostrophic = 0
+q_geostrophic = load_and_prepare_dataset(
+    "datasets/Simulation-Geostrophic_Heat_Flux-(2004-2018).nc"
+)['ANOMALY_GEOSTROPHIC_HEAT_FLUX']
+q_geostrophic = q_geostrophic.where(
+    (q_geostrophic['LATITUDE'] > 5) | (q_geostrophic['LATITUDE'] < -5), 0
+)
+if not GEOSTROPHIC:
+    q_geostrophic = q_geostrophic - q_geostrophic
 
-if ENTRAINMENT:
-    q_entrainment = load_and_prepare_dataset(
-        "datasets/Simulation-Entrainment_Heat_Flux-(2004-2018).nc"
-    )['ANOMALY_ENTRAINMENT_HEAT_FLUX']
-    w_e = load_and_prepare_dataset(
-        "datasets/Mixed_Layer_Entrainment_Velocity-(2004-2018).nc"
-    )['w_e']
-else:
-    q_entrainment = 0
-    w_e = 0
+q_entrainment = load_and_prepare_dataset(
+    "datasets/Simulation-Entrainment_Heat_Flux-(2004-2018).nc"
+)['ANOMALY_ENTRAINMENT_HEAT_FLUX']
+w_e_monthly_mean = load_and_prepare_dataset(
+    "datasets/Mixed_Layer_Entrainment_Velocity-Seasonal_Mean.nc"
+)['MONTHLY_MEAN_w_e']
+if not ENTRAINMENT:
+    q_entrainment = q_entrainment - q_entrainment
+    w_e_monthly_mean = w_e_monthly_mean - w_e_monthly_mean
 
 t_m = load_and_prepare_dataset(
     "datasets/.test-ml.nc"
@@ -136,13 +132,17 @@ h_monthly_mean = xr.concat([h_monthly_mean] * 15, dim='MONTH').reset_coords(drop
 h_monthly_mean = h_monthly_mean.rename({'MONTH': 'TIME'})
 h_monthly_mean['TIME'] = t_m_a.TIME
 
+w_e_monthly_mean = xr.concat([w_e_monthly_mean] * 15, dim='MONTH').reset_coords(drop=True)
+w_e_monthly_mean = w_e_monthly_mean.rename({'MONTH': 'TIME'})
+w_e_monthly_mean['TIME'] = t_m_a.TIME
+
 dt_m_a_dt = (
     q_surface
     + q_ekman
     + q_geostrophic
 ) / (RHO_O * C_O * h_monthly_mean)
 
-_lambda = LAMBDA_A / (RHO_O * C_O * h_monthly_mean) + w_e / h_monthly_mean
+_lambda = LAMBDA_A / (RHO_O * C_O * h_monthly_mean) + w_e_monthly_mean / h_monthly_mean
 
 t_m_a_simulated_list = []
 
@@ -216,7 +216,12 @@ plt.show()
 surface_fraction = []
 entrainment_fraction = []
 ekman_fraction = []
-total = abs(q_surface) + abs(q_entrainment) + abs(q_ekman)
+geo_fraction = []
+surface_contribution = []
+entrainment_contribution = []
+ekman_contribution = []
+geo_contribution = []
+total = abs(q_surface) + abs(q_entrainment) + abs(q_ekman) + abs(q_geostrophic)
 for month_num in t_m_a['TIME'].values:
     surface_fraction.append(
         (abs(q_surface.sel(TIME=month_num)) / total.sel(TIME=month_num)).mean().item()
@@ -227,9 +232,26 @@ for month_num in t_m_a['TIME'].values:
     ekman_fraction.append(
         (abs(q_ekman.sel(TIME=month_num)) / total.sel(TIME=month_num)).mean().item()
     )
+    geo_fraction.append(
+        (abs(q_geostrophic.sel(TIME=month_num)) / total.sel(TIME=month_num)).mean().item()
+    )
+    surface_contribution.append(q_surface.sel(TIME=month_num).mean().item())
+    entrainment_contribution.append(q_entrainment.sel(TIME=month_num).mean().item())
+    ekman_contribution.append(q_ekman.sel(TIME=month_num).mean().item())
+    geo_contribution.append(q_geostrophic.sel(TIME=month_num).mean().item())
+
 plt.plot(t_m_a['TIME'], surface_fraction, label='Surface')
 plt.plot(t_m_a['TIME'], entrainment_fraction, label='Entrainment')
 plt.plot(t_m_a['TIME'], ekman_fraction, label='Ekman')
+plt.plot(t_m_a['TIME'], geo_fraction, label='Geostrophic')
+# plt.plot(t_m_a['TIME'], surface_contribution, label='Surface')
+# plt.plot(t_m_a['TIME'], entrainment_contribution, label='Entrainment')
+# plt.plot(t_m_a['TIME'], ekman_contribution, label='Ekman')
+# plt.plot(t_m_a['TIME'], geo_contribution, label='Geostrophic')
 plt.legend()
-plt.ylim(0, 1)
+# plt.ylim(0, 1)
 plt.show()
+
+# t_m_a_simulated.name = 'TA_SIMULATED'
+# t_m_a_simulated.attrs['units'] = 'K'
+# t_m_a_simulated.to_netcdf("datasets/Simulation-TA.nc")

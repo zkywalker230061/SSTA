@@ -21,7 +21,7 @@ from utilities import get_monthly_mean, get_anomaly
 SURFACE = True
 ENTRAINMENT = True
 EKMAN = True
-GEOSTROPHIC = False
+GEOSTROPHIC = True
 
 RHO_O = 1025  # kg / m^3
 SECONDS_MONTH = 30 * 24 * 60 * 60  # seconds in a month
@@ -62,46 +62,45 @@ SECONDS_MONTH = 30 * 24 * 60 * 60  # seconds in a month
 #     plt.show()
 
 
-if SURFACE:
-    q_surface_ds = load_and_prepare_dataset(
-        "datasets/Simulation-Surface_Water_Rate-(2004-2018).nc"
-    )
-    q_surface = (
-        q_surface_ds['ANOMALY_avg_ie']
-        + q_surface_ds['ANOMALY_avg_tprate']
-    )
-    q_surface = q_surface.drop_vars('MONTH')
-    q_surface.name = 'ANOMALY_SURFACE_WATER_RATE'
-else:
-    q_surface = 0
-if EKMAN:
-    q_ekman = load_and_prepare_dataset(
-        "datasets/.test-Simulation-Ekman_Water_Rate-(2004-2018).nc"
-    )['ANOMALY_EKMAN_WATER_RATE']
-    q_ekman = q_ekman.where(
-        (q_ekman['LATITUDE'] > 5) | (q_ekman['LATITUDE'] < -5), 0
-    )
-else:
-    q_ekman = 0
-if GEOSTROPHIC:
-    q_geostrophic = load_and_prepare_dataset(
-        "datasets/Simulation-Geostrophic_Water_Rate-(2004-2018).nc"
-    )['ANOMALY_GEOSTROPHIC_WATER_RATE']
-    q_geostrophic = q_geostrophic.where(
-        (q_geostrophic['LATITUDE'] > 5) | (q_geostrophic['LATITUDE'] < -5), 0
-    )
-else:
-    q_geostrophic = 0
-if ENTRAINMENT:
-    q_entrainment = load_and_prepare_dataset(
-        "datasets/Simulation-Entrainment_Water_Rate-(2004-2018).nc"
-    )['ANOMALY_ENTRAINMENT_WATER_RATE']
-    w_e = load_and_prepare_dataset(
-        "datasets/Mixed_Layer_Entrainment_Velocity-(2004-2018).nc"
-    )['w_e']
-else:
-    q_entrainment = 0
-    w_e = 0
+q_surface_ds = load_and_prepare_dataset(
+    "datasets/Simulation-Surface_Water_Rate-(2004-2018).nc"
+)
+q_surface = (
+    q_surface_ds['ANOMALY_avg_ie']
+    + q_surface_ds['ANOMALY_avg_tprate']
+)
+q_surface = q_surface.drop_vars('MONTH')
+q_surface.name = 'ANOMALY_SURFACE_WATER_RATE'
+if not SURFACE:
+    q_surface = q_surface - q_surface
+
+q_ekman = load_and_prepare_dataset(
+    "datasets/.test-Simulation-Ekman_Water_Rate-(2004-2018).nc"
+)['ANOMALY_EKMAN_WATER_RATE']
+q_ekman = q_ekman.where(
+    (q_ekman['LATITUDE'] > 5) | (q_ekman['LATITUDE'] < -5), 0
+)
+if not EKMAN:
+    q_ekman = q_ekman - q_ekman
+
+q_geostrophic = load_and_prepare_dataset(
+    "datasets/Simulation-Geostrophic_Water_Rate-(2004-2018).nc"
+)['ANOMALY_GEOSTROPHIC_WATER_RATE']
+q_geostrophic = q_geostrophic.where(
+    (q_geostrophic['LATITUDE'] > 5) | (q_geostrophic['LATITUDE'] < -5), 0
+)
+if not GEOSTROPHIC:
+    q_geostrophic = q_geostrophic - q_geostrophic
+
+q_entrainment = load_and_prepare_dataset(
+    "datasets/Simulation-Entrainment_Water_Rate-(2004-2018).nc"
+)['ANOMALY_ENTRAINMENT_WATER_RATE']
+w_e_monthly_mean = load_and_prepare_dataset(
+    "datasets/Mixed_Layer_Entrainment_Velocity-Seasonal_Mean.nc"
+)['MONTHLY_MEAN_w_e']
+if not ENTRAINMENT:
+    q_entrainment = q_entrainment - q_entrainment
+    w_e_monthly_mean = w_e_monthly_mean - w_e_monthly_mean
 
 s_m = load_and_prepare_dataset(
     'datasets/.test-ml.nc'
@@ -126,13 +125,17 @@ h_monthly_mean = xr.concat([h_monthly_mean] * 15, dim='MONTH').reset_coords(drop
 h_monthly_mean = h_monthly_mean.rename({'MONTH': 'TIME'})
 h_monthly_mean['TIME'] = s_m_a.TIME
 
+w_e_monthly_mean = xr.concat([w_e_monthly_mean] * 15, dim='MONTH').reset_coords(drop=True)
+w_e_monthly_mean = w_e_monthly_mean.rename({'MONTH': 'TIME'})
+w_e_monthly_mean['TIME'] = s_m_a.TIME
+
 ds_m_a_dt = (
     q_surface
     + q_ekman
     + q_geostrophic
 ) / (RHO_O * h_monthly_mean)
 
-_lambda = w_e / h_monthly_mean + 1e-20
+_lambda = w_e_monthly_mean / h_monthly_mean + 1e-20
 
 s_m_a_simulated_list = []
 
@@ -207,7 +210,12 @@ plt.show()
 surface_fraction = []
 entrainment_fraction = []
 ekman_fraction = []
-total = abs(q_surface) + abs(q_entrainment) + abs(q_ekman)
+geo_fraction = []
+surface_contribution = []
+entrainment_contribution = []
+ekman_contribution = []
+geo_contribution = []
+total = abs(q_surface) + abs(q_entrainment) + abs(q_ekman) + abs(q_geostrophic)
 for month_num in s_m_a['TIME'].values:
     surface_fraction.append(
         (abs(q_surface.sel(TIME=month_num)) / total.sel(TIME=month_num)).mean().item()
@@ -218,9 +226,31 @@ for month_num in s_m_a['TIME'].values:
     ekman_fraction.append(
         (abs(q_ekman.sel(TIME=month_num)) / total.sel(TIME=month_num)).mean().item()
     )
+    geo_fraction.append(
+        (abs(q_geostrophic.sel(TIME=month_num)) / total.sel(TIME=month_num)).mean().item()
+    )
+    surface_contribution.append(q_surface.sel(TIME=month_num).mean().item())
+    entrainment_contribution.append(q_entrainment.sel(TIME=month_num).mean().item())
+    ekman_contribution.append(q_ekman.sel(TIME=month_num).mean().item())
+    geo_contribution.append(q_geostrophic.sel(TIME=month_num).mean().item())
+
 plt.plot(s_m_a['TIME'], surface_fraction, label='Surface')
 plt.plot(s_m_a['TIME'], entrainment_fraction, label='Entrainment')
 plt.plot(s_m_a['TIME'], ekman_fraction, label='Ekman')
+plt.plot(s_m_a['TIME'], geo_fraction, label='Geostrophic')
+# plt.plot(s_m_a['TIME'], surface_contribution, label='Surface')
+# plt.plot(s_m_a['TIME'], entrainment_contribution, label='Entrainment')
+# plt.plot(s_m_a['TIME'], ekman_contribution, label='Ekman')
+# plt.plot(s_m_a['TIME'], geo_contribution, label='Geostrophic')
 plt.legend()
-plt.ylim(0, 1)
+# plt.ylim(0, 1)
+plt.show()
+
+t_m_a_simulated = load_and_prepare_dataset(
+    "datasets/Simulation-TA.nc"
+)['TA_SIMULATED']
+
+corr_ssta_sssa = xr.corr(s_m_a_simulated, t_m_a_simulated, dim='TIME')
+print("corr ssta sssa", corr_ssta_sssa.mean().item())
+corr_ssta_sssa.plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=-1, vmax=1)
 plt.show()

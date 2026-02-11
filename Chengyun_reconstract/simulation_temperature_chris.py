@@ -20,8 +20,8 @@ matplotlib.use('TkAgg')
 
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN = True
-INCLUDE_ENTRAINMENT = False
-INCLUDE_GEOSTROPHIC = True
+INCLUDE_ENTRAINMENT = True
+INCLUDE_GEOSTROPHIC = False
 
 # first method for geostrophic: https://egusphere.copernicus.org/preprints/2025/egusphere-2025-3039/egusphere-2025-3039.pdf
 CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turned on
@@ -638,8 +638,8 @@ observed = xr.open_dataset(
     "datasets/Mixed_Layer_Temperature_Anomalies-(2004-2018).nc", decode_times=False
 )['ANOMALY_ML_TEMPERATURE']
 observed = xr.open_dataset(
-    "datasets/Temperature_Anomalies-(2004-2018).nc", decode_times=False
-)['ANOMALY_TEMPERATURE'].sel(PRESSURE=2.5)
+    "datasets/Reynolds/sst_anomalies-(2004-2018).nc", decode_times=False
+)['anom']
 make_movie(observed, -2, 2)
 
 print(all_anomalies_ds["IMPLICIT"].max().item(), all_anomalies_ds["IMPLICIT"].min().item())
@@ -652,14 +652,14 @@ print(abs(observed).mean().item())
 print('-----')
 
 rmse_difference = np.sqrt(((observed - all_anomalies_ds["IMPLICIT"]) ** 2).mean(dim=['TIME']))
-rmse_observed = np.sqrt((observed ** 2).mean(dim=['TIME']))
+rms_observed = np.sqrt((observed ** 2).mean(dim=['TIME']))
 
 print(rmse_difference.mean().item())
-print(rmse_observed.mean().item())
+print(rms_observed.mean().item())
 rmse_difference.plot(x='LONGITUDE', y='LATITUDE', cmap='viridis', vmin=0, vmax=3)
 plt.show()
 
-rmse = rmse_difference / rmse_observed
+rmse = rmse_difference / rms_observed
 print(rmse.mean().item())
 rmse.plot(x='LONGITUDE', y='LATITUDE', cmap='viridis', vmin=0, vmax=3)
 plt.show()
