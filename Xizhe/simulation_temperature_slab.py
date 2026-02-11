@@ -47,7 +47,7 @@ SEA_SURFACE_GRAD_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/sea_surface_int
 # --- Model Constants ------------------------------------------------------
 rho_0 = 1025.0
 c_0 = 4100.0
-gamma_0 = 15
+gamma_0 = 30
 g = 9.81
 
 if USE_NEW_H_BAR_NEW_T_SUB:

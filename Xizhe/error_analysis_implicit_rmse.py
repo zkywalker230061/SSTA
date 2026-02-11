@@ -42,7 +42,11 @@ g = 9.81
 f = 1 
 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
+
 observed_temp_ds = xr.open_dataset(observed_path, decode_times=False)
+observed_temperature_monthly_average = get_monthly_mean(observed_temp_ds['__xarray_dataarray_variable__'])
+observed_temperature_anomaly = get_anomaly(observed_temp_ds, '__xarray_dataarray_variable__', observed_temperature_monthly_average)
+observed_temperature_anomaly = observed_temperature_anomaly['__xarray_dataarray_variable___ANOMALY']
 
 heat_flux_ds = xr.open_dataset(HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH, decode_times=False)
 heat_flux_ds['NET_HEAT_FLUX'] = heat_flux_ds['avg_slhtf'] + heat_flux_ds['avg_snlwrf'] + heat_flux_ds['avg_snswrf'] + \
@@ -383,11 +387,6 @@ def calculate_RMSE_norm(obs, model, dim = 'TIME'):
 
     rmse = rmse_error / rmse_obs
     return rmse
-
-
-observed_temperature_monthly_average = get_monthly_mean(observed_temp_ds['__xarray_dataarray_variable__'])
-observed_temperature_anomaly = get_anomaly(observed_temp_ds, '__xarray_dataarray_variable__', observed_temperature_monthly_average)
-observed_temperature_anomaly = observed_temperature_anomaly['__xarray_dataarray_variable___ANOMALY']
 
 implicit_model_anomaly_ds = all_anomalies_ds["IMPLICIT"]
 # ----- To check if the observed temperature anomaly dataset is going wrong...

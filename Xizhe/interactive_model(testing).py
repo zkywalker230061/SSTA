@@ -6,13 +6,15 @@ from chris_utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset,
 from scipy.stats import t
 
 
-# observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Datasets.nc"
-observed_path = "/Users/julia/Desktop/SSTA/datasets/Reynold_sst_anomalies-(2004-2018).nc"
+observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Datasets.nc"
+observed_path_Reynold = "/Users/julia/Desktop/SSTA/datasets/Reynold_sst_anomalies-(2004-2018).nc"
+
 HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/heat_flux_interpolated_all_contributions.nc"
 EKMAN_ANOMALY_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Ekman_Anomaly_Full_Datasets.nc"
 TEMP_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
 ENTRAINMENT_VEL_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Entrainment_Velocity-(2004-2018).nc"
 # ENTRAINMENT_VEL_DENOISED_DATA_PATH = "../datasets/entrainment_vel_denoised.nc"
+
 # H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
 H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/New MLD & T_sub/hbar.nc"
 NEW_H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/New MLD & T_sub/new_hbar.nc"
@@ -23,10 +25,13 @@ NEW_T_SUB_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/New MLD & T_sub/new_T_
 GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/geostrophic_anomaly_downloaded.nc"
 GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/geostrophic_anomaly_calculated_2.nc"
 SEA_SURFACE_GRAD_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/sea_surface_interpolated_grad.nc"
+
 USE_DOWNLOADED_SSH = False
-USE_NEW_H_BAR_NEW_T_SUB = False
+USE_NEW_H_BAR_NEW_T_SUB = True
 
 
+observed_temp_ds_reynold = xr.open_dataset(observed_path_Reynold, decode_times=False)
+observed_temperature_anomaly_reynold = observed_temp_ds_reynold['anom']
 
 if USE_NEW_H_BAR_NEW_T_SUB:
     # New h bar
@@ -36,15 +41,12 @@ if USE_NEW_H_BAR_NEW_T_SUB:
     # New t sub
     t_sub_ds = xr.open_dataset(NEW_T_SUB_DATA_PATH, decode_times=False)
     t_sub_da = t_sub_ds["ANOMALY_SUB_TEMPERATURE"]
-        
-    # Observed Data (Tm) using new h
-    observed_temp_ds_full = xr.open_dataset(observed_path, decode_times=False)
-    # observed_temp_ds = observed_temp_ds_full["UPDATED_MIXED_LAYER_TEMP"]
-    # obs_temp_mean = get_monthly_mean(observed_temp_ds)
-    # observed_temperature_anomaly = get_anomaly(observed_temp_ds_full, "UPDATED_MIXED_LAYER_TEMP", obs_temp_mean)
-    # observed_temperature_anomaly = observed_temperature_anomaly["UPDATED_MIXED_LAYER_TEMP_ANOMALY"]
 
-    observed_temperature_anomaly = observed_temp_ds_full['anom']
+    observed_temp_ds_argo = xr.open_dataset(observed_path, decode_times=False)
+    observed_temp_ds = observed_temp_ds_argo["UPDATED_MIXED_LAYER_TEMP"]
+    obs_temp_mean = get_monthly_mean(observed_temp_ds)
+    observed_temperature_anomaly = get_anomaly(observed_temp_ds_argo, "UPDATED_MIXED_LAYER_TEMP", obs_temp_mean)
+    observed_temperature_anomaly_argo = observed_temperature_anomaly["UPDATED_MIXED_LAYER_TEMP_ANOMALY"]
 
     # Ekman Anomaly using new h
     ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
@@ -67,15 +69,11 @@ else:
 
     t_sub_da = t_sub_anom
 
-    # Observed Data (Tm) using new "old" h
-    observed_temp_ds_full = xr.open_dataset(observed_path, decode_times=False)
-    # observed_temp_ds = observed_temp_ds_full["MIXED_LAYER_TEMP"]
-    # obs_temp_mean = get_monthly_mean(observed_temp_ds)
-    # observed_temperature_anomaly = get_anomaly(observed_temp_ds_full, "MIXED_LAYER_TEMP", obs_temp_mean)
-    # observed_temperature_anomaly = observed_temperature_anomaly["MIXED_LAYER_TEMP_ANOMALY"]
-
-    observed_temperature_anomaly = observed_temp_ds_full['anom']
-
+    observed_temp_ds_argo = xr.open_dataset(observed_path, decode_times=False)
+    observed_temp_ds = observed_temp_ds_argo["MIXED_LAYER_TEMP"]
+    obs_temp_mean = get_monthly_mean(observed_temp_ds)
+    observed_temperature_anomaly = get_anomaly(observed_temp_ds_argo, "MIXED_LAYER_TEMP", obs_temp_mean)
+    observed_temperature_anomaly_argo = observed_temperature_anomaly["MIXED_LAYER_TEMP_ANOMALY"]
 
     # Ekman Anomaly using new "old" h
     ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
@@ -114,9 +112,12 @@ sea_surface_grad_ds = xr.open_dataset(SEA_SURFACE_GRAD_DATA_PATH, decode_times=F
 
 # --- 1. The Interactive Class ------------------------------------------------
 class InteractiveSSTModel:
-    def __init__(self, obs_anom, heat_flux, ekman, entrain_vel, t_sub, hbar, geo_anom, sea_surf_grad, ssh_var):
+    def __init__(self, obs_anom_argo, obs_anom_reynolds, heat_flux, ekman, entrain_vel, t_sub, hbar, geo_anom, sea_surf_grad, ssh_var):
         # Store Datasets
-        self.obs_anom = obs_anom
+        self.obs_argo = obs_anom_argo
+        self.obs_reynolds = obs_anom_reynolds
+        self.obs_anom = self.obs_argo # Default to Argo
+        
         self.heat_flux = heat_flux
         self.ekman = ekman
         self.entrain_vel = entrain_vel
@@ -131,22 +132,26 @@ class InteractiveSSTModel:
             'INCLUDE_SURFACE', 
             'INCLUDE_EKMAN', 
             'INCLUDE_ENTRAINMENT', 
+            'INCLUDE_GEO_ANOM', 
             'INCLUDE_GEO_MEAN', 
-            'INCLUDE_GEO_ANOM'
+            'USE_OBS_REYNOLD',
+            'USE_INITIAL_ANOM' # <--- NEW KEY
             ]
         self.params = {
             'INCLUDE_SURFACE': True, 
             'INCLUDE_EKMAN': True, 
             'INCLUDE_ENTRAINMENT': True,
-            'INCLUDE_GEO_MEAN': False, 
             'INCLUDE_GEO_ANOM': False, 
-            'gamma': 15
+            'INCLUDE_GEO_MEAN': False, 
+            'USE_OBS_REYNOLD': False,
+            'USE_INITIAL_ANOM': False, # <--- NEW PARAM DEFAULT
+            'gamma': 15,
             }
         
         # Storage for calculated data
         self.model_anom = None
         
-        # Corr Data (Standard)
+        # Corr Data
         self.da_corr = None
         self.da_corr_max_val = None
         self.da_corr_best_lag = None
@@ -164,15 +169,12 @@ class InteractiveSSTModel:
         self.mesh = None
         
         # --- Figure Setup ---
-        self.fig = plt.figure(figsize=(15, 9)) # Slightly wider for extra controls
+        self.fig = plt.figure(figsize=(15, 9)) 
         
-        # Layout positions [left, bottom, width, height]
         self.ax_map         = self.fig.add_axes([0.1, 0.35, 0.8, 0.6]) 
-        
-        # Controls Row
-        self.ax_check       = self.fig.add_axes([0.05, 0.05, 0.12, 0.2]) # Physics Toggles
-        self.ax_radio_main  = self.fig.add_axes([0.18, 0.05, 0.15, 0.2]) # Main Mode
-        self.ax_radio_sub   = self.fig.add_axes([0.34, 0.05, 0.10, 0.2]) # SUB MODE (New)
+        self.ax_check       = self.fig.add_axes([0.05, 0.05, 0.12, 0.25]) # Increased height slightly
+        self.ax_radio_main  = self.fig.add_axes([0.18, 0.05, 0.15, 0.2]) 
+        self.ax_radio_sub   = self.fig.add_axes([0.34, 0.05, 0.10, 0.2]) 
         
         self.ax_gamma       = self.fig.add_axes([0.48, 0.05, 0.35, 0.03])
         self.ax_lag         = self.fig.add_axes([0.48, 0.15, 0.35, 0.03])
@@ -182,37 +184,25 @@ class InteractiveSSTModel:
         self.run_simulation(None)
 
     def create_widgets(self):
-        # 1. Physics Toggles
         self.ax_check.set_title("Modelling Physics", loc='left', fontsize=11, fontweight='bold')
-        labels = list(self.params.keys())[:-1] 
+        labels = list(self.params.keys())[:-1] # Exclude 'gamma'
         actives = [self.params[k] for k in labels]
         self.check = CheckButtons(self.ax_check, labels, actives)
         for lbl in self.check.labels: lbl.set_fontsize(8)
         
-        # 2. Main Display Mode (RadioButtons)
-        # Note: We removed the explicit "Max" options from here
-        self.display_options_main = (
-            'Correlation', 
-            'Correlation (95% Sig)', 
-            'RMSE (Norm)', 
-            'RMSE (Abs)', 
-            'RMSE (Seasonal)'
-        )
+        self.display_options_main = ('Correlation', 'Correlation (95% Sig)', 'RMSE (Norm)', 'RMSE (Abs)', 'RMSE (Seasonal)')
         self.radio_main = RadioButtons(self.ax_radio_main, self.display_options_main, active=0)
         self.radio_main.on_clicked(self.update_display_mode)
 
-        # 3. SUB Display Mode (New - only for correlations)
         self.display_options_sub = ('Specific Lag', 'Max Value', 'Lag of Max')
         self.radio_sub = RadioButtons(self.ax_radio_sub, self.display_options_sub, active=0)
         self.radio_sub.on_clicked(self.update_display_mode)
         self.ax_radio_sub.set_title("Corr View", fontsize=10)
 
-        # 4. Sliders & Run
         self.s_gamma = Slider(self.ax_gamma, 'Gamma', 0, 100, valinit=self.params['gamma'], valstep=1)
         self.s_lag = Slider(self.ax_lag, 'Lag (Months)', -12, 12, valinit=0, valstep=1)
         self.b_run = Button(self.ax_run, 'Recalculate', color='lightblue', hovercolor='0.975')
         
-        # Connect events
         self.b_run.on_clicked(self.run_simulation)
         self.s_lag.on_changed(self.update_map_visuals) 
 
@@ -222,10 +212,14 @@ class InteractiveSSTModel:
         status = self.check.get_status()
         for k, s in zip(self.keys, status):
             self.params[k] = s
+
         self.params['gamma'] = self.s_gamma.val
         
-        # --- Physics Loop (Standard) ---
-        rho_0 = 1025.0; c_0 = 4100.0; g = 9.81; gamma_0 = self.params['gamma']
+        # --- Physics Loop ---
+        rho_0 = 1025.0
+        c_0 = 4100.0
+        g = 9.81
+        gamma_0 = self.params['gamma']
         delta_t = 30.4375 * 24 * 3600
         
         implicit_model_anomalies = []
@@ -236,14 +230,22 @@ class InteractiveSSTModel:
             if month_in_year == 0: month_in_year = 12
             
             if not added_baseline:
-                base = self.obs_anom.sel(TIME=month) * 0 
+                # --- NEW LOGIC: USE_INITIAL_ANOM ---
+                if self.params['USE_INITIAL_ANOM']:
+                    # Start simulation with the first anomaly.
+                    base = self.obs_argo.sel(TIME=month, method='nearest')
+                    base = base.fillna(0)                     # Safety: fill NaNs with 0 (land/mask mismatches)
+                else:
+                    # Default: Start simulation with 0
+                    base = self.heat_flux.sel(TIME=month) * 0 
+                
                 base = base.expand_dims(TIME=[month])
                 implicit_model_anomalies.append(base)
                 added_baseline = True
             else:
                 prev_implicit_k_tm_anom_at_cur_loc = implicit_model_anomalies[-1].isel(TIME=-1)
                 
-                if self.params['INCLUDE_GEO_ANOM']:
+                if self.params['INCLUDE_GEO_MEAN']:
                     f = coriolis_parameter(self.sea_surf_grad['LATITUDE'])
                     grad_long = self.sea_surf_grad[self.ssh_var + '_anomaly_grad_long'].sel(TIME=month)
                     grad_lat = self.sea_surf_grad[self.ssh_var + '_anomaly_grad_lat'].sel(TIME=month)
@@ -271,7 +273,7 @@ class InteractiveSSTModel:
                 elif self.params['INCLUDE_EKMAN']: cur_surf_ek = cur_ekman_anom
                 else: cur_surf_ek = cur_ekman_anom * 0
 
-                if self.params['INCLUDE_GEO_MEAN']: cur_surf_ek = cur_surf_ek + cur_geo_anom
+                if self.params['INCLUDE_GEO_ANOM']: cur_surf_ek = cur_surf_ek + cur_geo_anom
 
                 if self.params['INCLUDE_ENTRAINMENT']:
                     cur_b = cur_surf_ek / (rho_0 * c_0 * cur_hbar) + cur_entrainment_vel / cur_hbar * cur_tsub_anom
@@ -294,17 +296,24 @@ class InteractiveSSTModel:
         self.model_anom = self.model_anom.groupby("month_idx") - monthly_mean
         self.model_anom = self.model_anom.drop_vars("month_idx")
 
+        # --- SELECT OBSERVATION DATASET FOR COMPARISON ---
+        if self.params['USE_OBS_REYNOLD']:
+            print("Comparison: Reynolds Dataset")
+            self.obs_anom = self.obs_reynolds.interp_like(self.model_anom, method='linear')
+        else:
+            print("Comparison: Argo Dataset")
+            self.obs_anom = self.obs_argo
+
         # --- Statistics ---
         print("Calculating Statistics...")
-        self.calc_correlations_and_max()     # Standard
-        self.calc_significance_and_max()     # Significant
+        self.calc_correlations()     
+        self.calc_significance()     
         self.calc_rmse_all()
         
         self.update_map_visuals(None)
         print("Done.")
 
-    def calc_correlations_and_max(self):
-        """Calculates lag correlations AND Max/Best Lag for standard correlation."""
+    def calc_correlations(self):
         lags = np.arange(-12, 13)
         corrs = []
         for k in lags:
@@ -314,7 +323,6 @@ class InteractiveSSTModel:
             corrs.append(r)
         self.da_corr = xr.concat(corrs, dim='lag')
 
-        # Calculate Max/Best
         mask_obs = self.da_corr.notnull().all(dim="lag")
         abs_run = np.abs(self.da_corr)
         abs_filled = abs_run.where(np.isfinite(abs_run), -np.inf)
@@ -323,8 +331,7 @@ class InteractiveSSTModel:
         self.da_corr_best_lag = self.da_corr["lag"].isel(lag=best_idx).where(mask_obs)
         self.da_corr_max_val = self.da_corr.isel(lag=best_idx).where(mask_obs)
 
-    def calc_significance_and_max(self):
-        """Calculates 95% Significant Correlation AND Max/Best Lag for that subset."""
+    def calc_significance(self):
         lags = np.arange(-12, 13)
         sig_corr_list = []
         
@@ -349,13 +356,8 @@ class InteractiveSSTModel:
 
         self.da_corr_sig = xr.concat(sig_corr_list, dim='lag')
         
-        # Calculate Max/Best for SIGNIFICANT only
-        # Note: If no lags are significant for a pixel, it will be NaN
         abs_run = np.abs(self.da_corr_sig)
-        # We fill NaNs with -inf so argmax ignores non-significant lags
         abs_filled = abs_run.where(np.isfinite(abs_run), -np.inf)
-        
-        # Check if there is at least one finite value (significant)
         has_sig = np.isfinite(abs_run).any(dim="lag")
         
         best_idx = abs_filled.argmax(dim="lag")
@@ -364,7 +366,6 @@ class InteractiveSSTModel:
         self.da_sig_max_val = self.da_corr_sig.isel(lag=best_idx).where(has_sig)
 
     def calc_rmse_all(self):
-        # (Same RMSE logic as before)
         error = (self.model_anom - self.obs_anom)
         rmse_val = np.sqrt((error ** 2).mean(dim="TIME"))
         rmse_obs_norm = np.sqrt((self.obs_anom ** 2).mean(dim="TIME"))
@@ -390,7 +391,6 @@ class InteractiveSSTModel:
         self.da_rmse_seasonal = xr.concat([rmse_s, rmse_n], dim="LATITUDE")
 
     def update_display_mode(self, label):
-        """Called when ANY Radio Button is clicked."""
         self.update_map_visuals(None)
 
     def update_map_visuals(self, event):
@@ -405,44 +405,33 @@ class InteractiveSSTModel:
         title = ""
         cbar_unit = ""
 
-        # Logic Branching
         if 'Correlation' in main_mode:
-            # Enable Sub-Radio
             self.ax_radio_sub.set_visible(True)
-            self.radio_sub.active = self.radio_sub.active # refresh
+            self.radio_sub.active = self.radio_sub.active 
 
-            # Are we in Significance mode?
             use_sig = '(95% Sig)' in main_mode
             
             if sub_mode == 'Specific Lag':
-                # Show Slider
                 self.ax_lag.set_visible(True); self.s_lag.ax.set_visible(True)
                 lag_val = int(self.s_lag.val)
-                
                 ds_source = self.da_corr_sig if use_sig else self.da_corr
                 data_to_plot = ds_source.sel(lag=lag_val)
                 title = f"{main_mode}\nLag: {lag_val}"
                 cbar_unit = "Correlation Coefficient"
 
             elif sub_mode == 'Max Value':
-                # Hide Slider
                 self.ax_lag.set_visible(False); self.s_lag.ax.set_visible(False)
-                
                 data_to_plot = self.da_sig_max_val if use_sig else self.da_corr_max_val
                 title = f"{main_mode}\nMax Correlation Value"
                 cbar_unit = "Correlation Coefficient"
 
             elif sub_mode == 'Lag of Max':
-                # Hide Slider
                 self.ax_lag.set_visible(False); self.s_lag.ax.set_visible(False)
-                
                 data_to_plot = self.da_sig_best_lag if use_sig else self.da_corr_best_lag
                 vmin, vmax = -12, 12
                 title = f"{main_mode}\nLag (months) at Max Correlation"
                 cbar_unit = "Lag (Months)"  
         else:
-            # RMSE MODES
-            # Disable Sub-Radio and Lag Slider
             self.ax_radio_sub.set_visible(False)
             self.ax_lag.set_visible(False); self.s_lag.ax.set_visible(False)
             
@@ -461,10 +450,10 @@ class InteractiveSSTModel:
                 vmin, vmax = 0, 3.0
                 title = "Seasonal RMSE (Summer)"
                 cbar_unit = "RMSE [°C]"
-        # Append Gamma to title
-        title += f"\nGamma: {self.params['gamma']:.1f}"
+        
+        dataset_name = "Reynolds" if self.params['USE_OBS_REYNOLD'] else "Argo"
+        title += f"\nGamma: {self.params['gamma']:.1f} | Obs: {dataset_name}"
 
-        # Draw
         if self.mesh is None:
             self.mesh = data_to_plot.plot(
                 ax=self.ax_map, cmap=cmap, vmin=vmin, vmax=vmax,
@@ -482,7 +471,8 @@ class InteractiveSSTModel:
 
 # --- Initialize and Run ---------------------------------------------------
 dashboard = InteractiveSSTModel(
-    obs_anom=observed_temperature_anomaly,
+    obs_anom_argo=observed_temperature_anomaly_argo,
+    obs_anom_reynolds=observed_temperature_anomaly_reynold,
     heat_flux=surface_flux_da,
     ekman=ekman_anomaly_da,
     entrain_vel=entrainment_vel_da,
@@ -494,6 +484,3 @@ dashboard = InteractiveSSTModel(
 )
 
 plt.show()
-
-
-
