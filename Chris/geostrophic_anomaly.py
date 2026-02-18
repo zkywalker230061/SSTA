@@ -53,3 +53,5 @@ if DOWNLOADED_SSH:
     geostrophic_anomaly.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly_downloaded.nc")
 else:
     geostrophic_anomaly.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly_calculated.nc")
+
+# f.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/coriolis_parameter.nc")

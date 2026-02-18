@@ -387,14 +387,14 @@ def get_eof(dataset, modes, mask=None, clean_nan=False):
     return components, explained_variance, scores
 
 
-def make_movie(dataset, vmin, vmax, colorbar_label=None, ENSO_ds=None, savepath=None):
+def make_movie(dataset, vmin, vmax, colorbar_label=None, ENSO_ds=None, savepath=None, cmap='RdBu_r'):
     times = dataset.TIME.values
 
     fig, ax = plt.subplots()
     # ax = plt.axes(projection=ccrs.PlateCarree())
     # ax.coastlines()
     pcolormesh = ax.pcolormesh(dataset.LONGITUDE.values, dataset.LATITUDE.values,
-                               dataset.isel(TIME=0), cmap='RdBu_r')
+                               dataset.isel(TIME=0), cmap=cmap)
     title = ax.set_title(f'Time = {times[0]}')
 
     cbar = plt.colorbar(pcolormesh, ax=ax, label=colorbar_label)
@@ -555,7 +555,7 @@ def compute_gradient_lon(
     return grad
 
 
-def get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH=False, gamma0=10, INCLUDE_GEOSTROPHIC_DISPLACEMENT=False, OTHER_MLD=False):
+def get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH=False, gamma0=10, INCLUDE_GEOSTROPHIC_DISPLACEMENT=False, INCLUDE_EKMAN_MEAN_ADVECTION=False, OTHER_MLD=False, MAX_GRAD_TSUB=False, ENTRAINMENT_VEL_ANOM_FORC=False, LOG_ENTRAINMENT_VELOCITY=False):
     save_name = ""
     if INCLUDE_SURFACE:
         save_name = save_name + "1"
@@ -577,8 +577,16 @@ def get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_G
             save_name = save_name + "_downloadedSSH"
     else:
         save_name = save_name + "0"
+    if INCLUDE_EKMAN_MEAN_ADVECTION:
+        save_name = save_name + "_ekmanmeanadv"
     if OTHER_MLD:
         save_name = save_name + "_otherMLD"
+    if MAX_GRAD_TSUB:
+        save_name = save_name + "_maxgrad"
+    if ENTRAINMENT_VEL_ANOM_FORC:
+        save_name = save_name + "_entrainvelanomforcing"
+    if LOG_ENTRAINMENT_VELOCITY:
+        save_name = save_name + "_logentrainmentvelocity"
     if gamma0 != 10.0:
         save_name += "_gamma" + str(gamma0)
     return save_name
