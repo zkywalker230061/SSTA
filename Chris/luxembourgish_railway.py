@@ -46,8 +46,14 @@ print(CFL_x.sel(MONTH=6).mean().values)
 print(CFL_x.mean().values)
 print(CFL_x.max().values)
 
-CFL_x.sel(MONTH=6).plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=25)
+CFL_x.sel(MONTH=1).plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=25)
 plt.show()
 
-CFL_y.sel(MONTH=6).plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=25)
+CFL_y.sel(MONTH=1).plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=25)
+plt.show()
+
+CFL_x.sel(MONTH=7).plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=25)
+plt.show()
+
+CFL_y.sel(MONTH=7).plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=25)
 plt.show()

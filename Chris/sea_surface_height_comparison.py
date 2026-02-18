@@ -36,12 +36,15 @@ ssh_grad_lat_download_da = sea_surface_grad_download_ds['sla_anomaly_grad_lat']
 ssh_grad_long_da = sea_surface_grad_ds['ssh_anomaly_grad_long']
 ssh_grad_lat_da = sea_surface_grad_ds['ssh_anomaly_grad_lat']
 
-# fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-# ssh_da.mean('TIME').plot(ax=axes[0], vmin=-3, vmax=3, cmap='RdBu_r')
-# axes[0].set_title('Calculated SSH')
-# ssh_download_da.mean('TIME').plot(ax=axes[1], vmin=-0.5, vmax=0.5, cmap='RdBu_r')
-# axes[1].set_title('Downloaded SSH')
-# plt.show()
+plt.figure()
+ssh_da.mean("TIME").plot(x='LONGITUDE', y='LATITUDE', vmin=-3, vmax=3, cmap='RdBu_r')
+plt.title("")
+plt.xlabel("Longitude (º)")
+plt.ylabel("Latitude (º)")
+cbar = plt.gcf().axes[-1]
+cbar.set_ylabel('Sea Surface Height (m)', rotation=270, labelpad=15)
+plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_poster/ssh.png", dpi=400)
+plt.show()
 
 print((ssh_anomaly_da).mean().values)
 print((ssh_download_da).mean().values)
@@ -52,10 +55,10 @@ print((ssh_download_da).mean().values)
 # print((ssh_da).mean().item())
 #
 # make_movie(ssh_download_da, -0.5, 0.5)#, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/ssh_videos/ssh_download.mp4")
-make_movie(ssh_da, -4, 4, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/ssh_videos/ssh_calculated.mp4")
-#
-make_movie(ssh_grad_long_download_da, -5e-6, 5e-6, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/ssh_videos/ssh_grad_long_download.mp4")
-make_movie(ssh_grad_long_da, -5e-6, 5e-6, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/ssh_videos/ssh_grad_long_calculated.mp4")
+# make_movie(ssh_da, -4, 4, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/ssh_videos/ssh_calculated.mp4")
+# #
+# make_movie(ssh_grad_long_download_da, -5e-6, 5e-6, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/ssh_videos/ssh_grad_long_download.mp4")
+# make_movie(ssh_grad_long_da, -5e-6, 5e-6, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/ssh_videos/ssh_grad_long_calculated.mp4")
 
 # make_movie(ssh_grad_lat_download_da, -1e-6, 1e-6)#, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/ssh_videos/ssh_grad_lat_download.mp4")
 # make_movie(ssh_grad_lat_da, -1e-6, 1e-6)#, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/ssh_videos/ssh_grad_lat_calculated.mp4")

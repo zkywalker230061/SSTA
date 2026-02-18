@@ -555,7 +555,7 @@ def compute_gradient_lon(
     return grad
 
 
-def get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH=False, gamma0=10, INCLUDE_GEOSTROPHIC_DISPLACEMENT=False, INCLUDE_EKMAN_MEAN_ADVECTION=False, OTHER_MLD=False):
+def get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH=False, gamma0=10, INCLUDE_GEOSTROPHIC_DISPLACEMENT=False, INCLUDE_EKMAN_MEAN_ADVECTION=False, OTHER_MLD=False, MAX_GRAD_TSUB=False, ENTRAINMENT_VEL_ANOM_FORC=False, LOG_ENTRAINMENT_VELOCITY=False):
     save_name = ""
     if INCLUDE_SURFACE:
         save_name = save_name + "1"
@@ -581,6 +581,12 @@ def get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_G
         save_name = save_name + "_ekmanmeanadv"
     if OTHER_MLD:
         save_name = save_name + "_otherMLD"
+    if MAX_GRAD_TSUB:
+        save_name = save_name + "_maxgrad"
+    if ENTRAINMENT_VEL_ANOM_FORC:
+        save_name = save_name + "_entrainvelanomforcing"
+    if LOG_ENTRAINMENT_VELOCITY:
+        save_name = save_name + "_logentrainmentvelocity"
     if gamma0 != 10.0:
         save_name += "_gamma" + str(gamma0)
     return save_name

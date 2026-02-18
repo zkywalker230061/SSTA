@@ -87,18 +87,21 @@ if INCLUDE_GEOSTROPHIC_MEAN_ADVECTION:
     all_components["TOTAL_FLUX_ANOMALY"] += abs(all_components["GEOSTROPHIC_MEAN_ADVECTION_ANOMALY"])
 
 
-def get_flux_proportion(component):
+def get_flux_proportion(component, save_file=False):
     flux_proportion = abs(all_components[component]) / all_components["TOTAL_FLUX_ANOMALY"]
     print(all_components[component])
     print(all_components["TOTAL_FLUX_ANOMALY"])
-    make_movie(flux_proportion, 0, 1, "Proportion of total flux due to " + component, cmap='Reds')#, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/all_anomalies/videos/" + save_name + "_geostrophic_component.mp4")
+    if save_name is not None:
+        make_movie(flux_proportion, 0, 1, "Proportion of total flux due to " + component, cmap='Reds', savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/" + component + "flux_proportion" + save_name + ".mp4")
+    else:
+        make_movie(flux_proportion, 0, 1, "Proportion of total flux due to " + component, cmap='Reds')
 
-#get_flux_proportion("SURFACE_FLUX_ANOMALY")
-get_flux_proportion("EKMAN_ANOM_ADVECTION_ANOMALY")
-# get_flux_proportion("ENTRAINMENT_ANOMALY")
-# get_flux_proportion("GEOSTROPHIC_ANOM_ADVECTION_ANOMALY")
-# get_flux_proportion("EKMAN_MEAN_ADVECTION_ANOMALY")
-# get_flux_proportion("GEOSTROPHIC_MEAN_ADVECTION_ANOMALY")
+get_flux_proportion("SURFACE_FLUX_ANOMALY", save_file=True)
+get_flux_proportion("EKMAN_ANOM_ADVECTION_ANOMALY", save_file=True)
+get_flux_proportion("ENTRAINMENT_ANOMALY", save_file=True)
+get_flux_proportion("GEOSTROPHIC_ANOM_ADVECTION_ANOMALY", save_file=True)
+get_flux_proportion("EKMAN_MEAN_ADVECTION_ANOMALY", save_file=True)
+get_flux_proportion("GEOSTROPHIC_MEAN_ADVECTION_ANOMALY", save_file=True)
 
 
 # all_components["TOTAL_FLUX_ANOMALY"] = abs(all_components["SURFACE_FLUX_ANOMALY"]) + abs(all_components["EKMAN_ANOM_ADVECTION_ANOMALY"]) + abs(all_components["ENTRAINMENT_FLUX_IMPLICIT_ANOMALY"]) + abs(all_components["GEOSTROPHIC_FLUX_ANOMALY"])

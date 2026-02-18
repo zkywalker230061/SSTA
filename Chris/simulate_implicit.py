@@ -2,6 +2,7 @@ import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 
+from SSTA.Chris.entrainment_vel_anomaly_forcing import entrainment_vel_anomaly_forcing
 from SSTA.Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, get_save_name, \
     coriolis_parameter, get_month_from_time
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
@@ -22,17 +23,20 @@ INCLUDE_SURFACE = True
 INCLUDE_EKMAN_ANOM_ADVECTION = True
 INCLUDE_EKMAN_MEAN_ADVECTION = True
 INCLUDE_ENTRAINMENT = True
+INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING = False
 INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
 INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
 # geostrophic displacement integral: https://egusphere.copernicus.org/preprints/2025/egusphere-2025-3039/egusphere-2025-3039.pdf
 USE_DOWNLOADED_SSH = False
 USE_OTHER_MLD = False
+USE_MAX_GRADIENT_METHOD = False
+USE_LOG_FOR_ENTRAINMENT = False
 rho_0 = 1025.0
 c_0 = 4100.0
 gamma_0 = 15.0
 g = 9.81
 
-save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION, USE_DOWNLOADED_SSH, gamma0=gamma_0, INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION=INCLUDE_EKMAN_MEAN_ADVECTION, OTHER_MLD=USE_OTHER_MLD)
+save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION, USE_DOWNLOADED_SSH, gamma0=gamma_0, INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION=INCLUDE_EKMAN_MEAN_ADVECTION, OTHER_MLD=USE_OTHER_MLD, MAX_GRAD_TSUB=USE_MAX_GRADIENT_METHOD, ENTRAINMENT_VEL_ANOM_FORC=INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, LOG_ENTRAINMENT_VELOCITY=USE_LOG_FOR_ENTRAINMENT)
 
 """Open all required datasets"""
 
@@ -43,17 +47,25 @@ ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Entrai
 GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly_downloaded.nc"
 GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly_calculated.nc"
 EKMAN_MEAN_ADVECTION_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/ekman_mean_advection.nc"
+ENTRAINMENT_VEL_ANOMALY_FORCING_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment_velocity_anomaly_forcing.nc"
 
 if USE_OTHER_MLD:
     MLD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_h.nc"
     H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_h_bar.nc"
     T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_t_sub_anomaly.nc"
+
 else:
     # H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
     # H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
     H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/hbar.nc"
     MLD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
     T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub.nc"
+
+if USE_MAX_GRADIENT_METHOD:
+    T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/Tsub_Max_Gradient_Method_h.nc"
+    ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/Entrainment_Vel_h.nc"
+else:
+    ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Entrainment_Velocity-(2004-2018).nc"
 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
 
@@ -71,11 +83,14 @@ ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
 hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
 hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
 
+entrainment_vel_anomaly_forcing_ds = xr.open_dataset(ENTRAINMENT_VEL_ANOMALY_FORCING_DATA_PATH, decode_times=False)
+entrainment_vel_anomaly_forcing = entrainment_vel_anomaly_forcing_ds["ENTRAINMENT_VEL_ANOMALY_FORCING"]
+
 t_sub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
 if USE_OTHER_MLD:
     t_sub_da = t_sub_ds["ANOMALY_SUB_TEMPERATURE"]
 else:
-    t_sub_da = t_sub_ds["T_sub_ANOMALY"]
+    t_sub_da = t_sub_ds["SUB_TEMPERATURE"]
 
 entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
 entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
@@ -109,8 +124,8 @@ model_anomalies = []
 entrainment_fluxes = []
 added_baseline = False
 for month in heat_flux_anomaly_ds.TIME.values:
-    if (month-0.5) % 25 == 0:
-        print("Month " + str(month) + " of " + str(heat_flux_anomaly_ds.TIME.max()))
+    if int(month) % 10 == 0:
+        print("Month " + str(int(month)) + " of 180")
     # find the previous and current month from 1 to 12 to access the monthly-averaged data (hbar, entrainment vel.)
     prev_month = month - 1
     month_in_year = get_month_from_time(month)
@@ -156,8 +171,8 @@ for month in heat_flux_anomaly_ds.TIME.values:
 
             tm_div_total = xr.zeros_like(prev_anomaly)
             for step in range(substeps):
-                if step % 25 == 0:
-                    print("Step " + str(step) + " of " + str(substeps))
+                # if step % 25 == 0:
+                #     print("Step " + str(step) + " of " + str(substeps))
                 # get upwind flux
                 prev_anom_east = prev_anomaly.shift(LONGITUDE=-1)
                 prev_anom_west = prev_anomaly.shift(LONGITUDE=1)
@@ -208,12 +223,13 @@ for month in heat_flux_anomaly_ds.TIME.values:
         prev_anomaly = model_anomalies[-1].isel(TIME=-1)
 
         # get previous data
-        prev_tsub_anom = t_sub_da.sel(TIME=prev_month)
-        prev_heat_flux_anom = surface_flux_da.sel(TIME=prev_month)
-        prev_ekman_anom = ekman_anomaly_da.sel(TIME=prev_month)
-        prev_entrainment_vel = entrainment_vel_da.sel(MONTH=prev_month_in_year)
-        prev_geo_anom = geostrophic_anomaly_da.sel(TIME=prev_month)
+        # prev_tsub_anom = t_sub_da.sel(TIME=prev_month)
+        # prev_heat_flux_anom = surface_flux_da.sel(TIME=prev_month)
+        # prev_ekman_anom = ekman_anomaly_da.sel(TIME=prev_month)
+        # prev_entrainment_vel = entrainment_vel_da.sel(MONTH=prev_month_in_year)
+        # prev_geo_anom = geostrophic_anomaly_da.sel(TIME=prev_month)
         prev_hbar = hbar_da.sel(MONTH=prev_month_in_year)
+        # prev_entrainment_vel_anomaly_forcing = entrainment_vel_anomaly_forcing.sel(TIME=prev_month)
 
         # get current data
         cur_tsub_anom = t_sub_da.sel(TIME=month)
@@ -222,42 +238,51 @@ for month in heat_flux_anomaly_ds.TIME.values:
         cur_entrainment_vel = entrainment_vel_da.sel(MONTH=month_in_year)
         cur_geo_anom = geostrophic_anomaly_da.sel(TIME=month)
         cur_hbar = hbar_da.sel(MONTH=month_in_year)
+        cur_entrainment_vel_anomaly_forcing = entrainment_vel_anomaly_forcing.sel(TIME=month)
 
         # static forcings = surface flux + Ekman anomolous advection + part of entrainment
         cur_static_forcings = xr.zeros_like(cur_ekman_anom)
-        prev_static_forcings = xr.zeros_like(prev_ekman_anom)
+        #prev_static_forcings = xr.zeros_like(prev_ekman_anom)
 
         if INCLUDE_SURFACE:
             cur_static_forcings += cur_heat_flux_anom
-            prev_static_forcings += prev_heat_flux_anom
+            #prev_static_forcings += prev_heat_flux_anom
 
         if INCLUDE_EKMAN_ANOM_ADVECTION:
             cur_static_forcings += cur_ekman_anom
-            prev_static_forcings += prev_ekman_anom
+            #prev_static_forcings += prev_ekman_anom
 
         if INCLUDE_ENTRAINMENT:
-            cur_static_forcings += cur_entrainment_vel * cur_tsub_anom * rho_0 * c_0
-            prev_static_forcings += prev_entrainment_vel * prev_tsub_anom * rho_0 * c_0
+            if USE_LOG_FOR_ENTRAINMENT:
+                cur_static_forcings += cur_hbar / delta_t * np.log(cur_hbar / prev_hbar) * cur_tsub_anom * rho_0 * c_0
+                #prev_static_forcings += #to think about
+            else:
+                cur_static_forcings += cur_entrainment_vel * cur_tsub_anom * rho_0 * c_0
+                #prev_static_forcings += prev_entrainment_vel * prev_tsub_anom * rho_0 * c_0
+
+        if INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING:
+            cur_static_forcings += cur_entrainment_vel_anomaly_forcing
+            #prev_static_forcings += prev_entrainment_vel_anomaly_forcing
 
         if INCLUDE_GEOSTROPHIC_ANOM_ADVECTION:
             cur_static_forcings += cur_geo_anom
-            prev_static_forcings += prev_geo_anom
+            #prev_static_forcings += prev_geo_anom
 
         # build model components
         cur_b = cur_static_forcings / (rho_0 * c_0 * cur_hbar)
-        prev_b = prev_static_forcings / (rho_0 * c_0 * prev_hbar)
+        #prev_b = prev_static_forcings / (rho_0 * c_0 * prev_hbar)
 
         cur_a = gamma_0 / (rho_0 * c_0 * cur_hbar)
-        prev_a = gamma_0 / (rho_0 * c_0 * prev_hbar)
+        #prev_a = gamma_0 / (rho_0 * c_0 * prev_hbar)
         if INCLUDE_ENTRAINMENT:
             cur_a += cur_entrainment_vel / cur_hbar
-            prev_a += prev_entrainment_vel / prev_hbar
+            #prev_a += prev_entrainment_vel / prev_hbar
         if INCLUDE_GEOSTROPHIC_MEAN_ADVECTION:
             cur_a += (- sea_surface_monthlymean_ds["alpha_grad_long"].sel(MONTH=month_in_year) + sea_surface_monthlymean_ds["beta_grad_lat"].sel(MONTH=month_in_year)).clip(-1e-7, 1e-7)
-            prev_a += (- sea_surface_monthlymean_ds["alpha_grad_long"].sel(MONTH=prev_month_in_year) + sea_surface_monthlymean_ds["beta_grad_lat"].sel(MONTH=prev_month_in_year)).clip(-1e-7, 1e-7)
+            #prev_a += (- sea_surface_monthlymean_ds["alpha_grad_long"].sel(MONTH=prev_month_in_year) + sea_surface_monthlymean_ds["beta_grad_lat"].sel(MONTH=prev_month_in_year)).clip(-1e-7, 1e-7)
         if INCLUDE_EKMAN_MEAN_ADVECTION:
             cur_a += (- ekman_mean_advection["ekman_alpha_grad_long"].sel(MONTH=month_in_year) + ekman_mean_advection["ekman_beta_grad_lat"].sel(MONTH=month_in_year)).clip(-1e-7, 1e-7)
-            prev_a += (- ekman_mean_advection["ekman_alpha_grad_long"].sel(MONTH=prev_month_in_year) + ekman_mean_advection["ekman_beta_grad_lat"].sel(MONTH=prev_month_in_year)).clip(-1e-7, 1e-7)
+            #prev_a += (- ekman_mean_advection["ekman_alpha_grad_long"].sel(MONTH=prev_month_in_year) + ekman_mean_advection["ekman_beta_grad_lat"].sel(MONTH=prev_month_in_year)).clip(-1e-7, 1e-7)
 
         # update anomaly
         cur_anomaly = (prev_anomaly + delta_t * cur_b) / (1 + delta_t * cur_a)

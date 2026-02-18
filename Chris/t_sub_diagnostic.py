@@ -126,16 +126,21 @@ def correlate_tsub(observations_ds, tm_observed, hbar_ds, month_to_check, nh=Tru
             tsub = observed_temps.sel(PRESSURE=depth)
             mean_temperatures.append(tsub.where(tsub.MONTH == month).mean())
             correlation = xr.corr(tm_observed.where(tm_observed.MONTH == month), tsub.where(tsub.MONTH == month), dim='TIME')
-            if depth > 50:
-                correlation.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
-                plt.show()
+            # if depth > 50:
+            #     correlation.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
+            #     plt.show()
             mean_correlation = correlation.mean()
             mean_correlations.append(mean_correlation)
+
+        depths_of_tsub = xr.open_dataset("/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/depths_of_tsub.nc", decode_times=False)
+        max_grad_depth_monthly_mean = get_monthly_mean(depths_of_tsub["MAX_GRAD_DEPTH"])
+        mean_max_grad_depth = np.nanmean(max_grad_depth_monthly_mean.sel(MONTH=month).values[np.isfinite(max_grad_depth_monthly_mean.sel(MONTH=month).values)])
 
         fig, ax1 = plt.subplots()
         ax1.plot(depths, mean_correlations, label="Mean correlation of Argo Temperature with Tm")
         ax1.axvline(mean_hbar, color='red', label="Mean hbar")
         ax1.axvline(mean_other_hbar, color='green', label="Mean `other` hbar")
+        ax1.axvline(mean_max_grad_depth, color='orange', label="Depth of Max. Gradient Tsub")
         ax1.set_ylabel("Mean correlation of Argo Temperature with Tm")
         ax1.set_ylim([0, 1])
         ax1.grid()
@@ -179,11 +184,13 @@ def compare_tsub():
             if len(temperatures_below_target) == 0:  # indicates a continent
                 return np.nan
             below_target_index = temperatures_below_target[0]
+            if below_target_index == 0:
+                return float(pressure[0])
             above_target_index = below_target_index - 1
             return np.interp(target, [argo[below_target_index], argo[above_target_index]], [pressure[below_target_index], pressure[above_target_index]])
 
         max_grad_depth = xr.apply_ufunc(get_depth_of_temperature, argo_ds['TEMPERATURE'], max_grad_t_sub_ds['SUB_TEMPERATURE'], argo_ds['PRESSURE'], input_core_dims=[['PRESSURE'], [], ['PRESSURE']], vectorize=True)
-        t_sub_depth = xr.apply_ufunc(get_depth_of_temperature, argo_ds['TEMPERATURE'], t_sub_ds['T_sub'], argo_ds['PRESSURE'], input_core_dims=[['PRESSURE'], [], ['PRESSURE']], vectorize=True)
+        t_sub_depth = xr.apply_ufunc(get_depth_of_temperature, argo_ds['TEMPERATURE'], t_sub_ds['SUB_TEMPERATURE'], argo_ds['PRESSURE'], input_core_dims=[['PRESSURE'], [], ['PRESSURE']], vectorize=True)
         depths_of_tsub = xr.Dataset({'MAX_GRAD_DEPTH': max_grad_depth, 'T_SUB_DEPTH': t_sub_depth})
         depths_of_tsub.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/depths_of_tsub.nc")
     else:
@@ -191,12 +198,11 @@ def compare_tsub():
 
     max_grad_mean_depth = depths_of_tsub["MAX_GRAD_DEPTH"].mean(dim=['LATITUDE', 'LONGITUDE'])
     t_sub_mean_depth = depths_of_tsub["T_SUB_DEPTH"].mean(dim=['LATITUDE', 'LONGITUDE'])
-    # print(mld.values)
     mld = mld.where(np.isfinite(mld))
     mld_mean = mld.mean(dim=['LATITUDE', 'LONGITUDE'])
     plt.grid()
     plt.plot((max_grad_mean_depth['TIME'] - 0.5) / 12 + 2004, max_grad_mean_depth, label="Max Gradient Tsub depth")
-    plt.plot((t_sub_mean_depth['TIME'] - 0.5) / 12 + 2004, t_sub_mean_depth, label="Regular Tsub depth")
+    #plt.plot((t_sub_mean_depth['TIME'] - 0.5) / 12 + 2004, t_sub_mean_depth, label="Regular Tsub depth")
     plt.plot((mld_mean['TIME'] - 0.5) / 12 + 2004, mld_mean, label="Actual MLD")
     plt.xlabel('Time (year)')
     plt.ylabel('Mean Depth of Tsub')

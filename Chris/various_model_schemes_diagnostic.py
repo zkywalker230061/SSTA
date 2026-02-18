@@ -2,6 +2,7 @@ import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
+from copernicusmarine.core_functions.sessions import TRUST_ENV
 from eofs.tools.standard import correlation_map
 from scipy import stats
 
@@ -13,10 +14,13 @@ INCLUDE_SURFACE = True
 INCLUDE_EKMAN_ANOM_ADVECTION = True
 INCLUDE_EKMAN_MEAN_ADVECTION = True
 INCLUDE_ENTRAINMENT = True
+INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING = False
 INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
 INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
 USE_DOWNLOADED_SSH = False
 USE_OTHER_MLD = False
+USE_MAX_GRADIENT_METHOD = False
+USE_LOG_FOR_ENTRAINMENT = False
 gamma_0 = 15.0
 
 IMPLICIT_MODEL = True
@@ -37,7 +41,7 @@ USE_REYNOLDS = True
 
 save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION,
                           USE_DOWNLOADED_SSH=USE_DOWNLOADED_SSH, gamma0=gamma_0,
-                          INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, OTHER_MLD=USE_OTHER_MLD)
+                          INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION=INCLUDE_EKMAN_MEAN_ADVECTION ,OTHER_MLD=USE_OTHER_MLD, MAX_GRAD_TSUB=USE_MAX_GRADIENT_METHOD, ENTRAINMENT_VEL_ANOM_FORC=INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, LOG_ENTRAINMENT_VELOCITY=USE_LOG_FOR_ENTRAINMENT)
 ALL_SCHEMES_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/all_anomalies/" + save_name + ".nc"
 IMPLICIT_SCHEME_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/" + save_name + ".nc"
 DENOISED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/cur_prev_denoised.nc"
@@ -85,12 +89,14 @@ enso_indices_ds = enso_indices_ds.assign_coords(time=np.arange(len(enso_indices_
 """Plot results"""
 
 
-def plot_full_model(to_plot="IMPLICIT", obs=False):
+def plot_full_model(to_plot="IMPLICIT", obs=False, save_path=None):
     if obs:
-        make_movie(observed_anomaly, -3, 3, colorbar_label="Argo Anomaly", ENSO_ds=enso_indices_ds,
-                   savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/all_anomalies/videos/observations.mp4")
+        make_movie(observed_anomaly, -3, 3, colorbar_label="Argo Anomaly", ENSO_ds=enso_indices_ds, savepath=save_path)
     else:
-        make_movie(all_schemes_ds[to_plot], -3, 3, colorbar_label=(to_plot + " Scheme"), ENSO_ds=enso_indices_ds)
+        if save_path is not None:
+            make_movie(all_schemes_ds[to_plot], -3, 3, colorbar_label=(to_plot + " Scheme"), ENSO_ds=enso_indices_ds, savepath=save_path)
+        else:
+            make_movie(all_schemes_ds[to_plot], -3, 3, colorbar_label=(to_plot + " Scheme"), ENSO_ds=enso_indices_ds)
 
     # make_movie(all_schemes_ds["CHRIS_PREV_CUR"], -10, 10, colorbar_label="Chris Prev-Cur Scheme", ENSO_ds=enso_indices_ds)
     # make_movie(all_schemes_ds["CHRIS_MEAN_K"], -10, 10, colorbar_label="Chris Mean-k Scheme", ENSO_ds=enso_indices_ds)
@@ -421,19 +427,27 @@ def plot_correlation():
         correlation = xr.corr(to_plot, observed_anomaly, dim='TIME')
         print(correlation.mean().values)
         correlation.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
-        plt.title("Correlation between model and Tm observation")
-        plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/correlations/" + save_name + "_correlation.jpg")
+        plt.title("")
+        plt.xlabel("Longitude (º)")
+        plt.ylabel("Latitude (º)")
+        cbar = plt.gcf().axes[-1]
+        cbar.set_ylabel('Pearson Correlation Coefficient', rotation=270, labelpad=15)
+        plt.title("Correlation between model and SST observation")
+        #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/correlations/" + save_name + "_correlation.jpg")
+        #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_poster/full_model_correlation.png", dpi=400)
         plt.show()
     else:
         print("PLOT_CORRELATION requires CONSIDER_OBSERVATIONS=True")
 
-plot_full_model()
+# plot_full_model(save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/" + save_name + ".mp4")
+# plot_full_model(obs=True, save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/Reynolds_observations.mp4")
+
 # plot_enso()
-eof_movie()
-# explained_variance_from_each_mode()
-plot_spatial_pattern_EOFs()
-plot_PCs_over_time()
+# eof_movie()
+explained_variance_from_each_mode()
+# plot_spatial_pattern_EOFs()
+# plot_PCs_over_time()
 # regression_map()
 # track_warming_effects()
 # track_anomaly_persistence(6, 9)
-plot_correlation()
+# plot_correlation()
