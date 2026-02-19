@@ -19,14 +19,14 @@ INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
 INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
 USE_DOWNLOADED_SSH = False
 USE_OTHER_MLD = False
-USE_MAX_GRADIENT_METHOD = False
+USE_MAX_GRADIENT_METHOD = True
 USE_LOG_FOR_ENTRAINMENT = False
 gamma_0 = 15.0
 
 IMPLICIT_MODEL = True
 
-MASK_TROPICS = False
-MASK_TROPICS_LATITUDE = 10
+MASK_TROPICS = True
+MASK_TROPICS_LATITUDE = 15
 
 CONSIDER_OBSERVATIONS = True
 USE_REYNOLDS = True
@@ -112,7 +112,7 @@ def plot_full_model(to_plot="IMPLICIT", obs=False, save_path=None):
 """EOF analysis"""
 # get EOF modes and PCs for a given model
 start_mode = 0
-end_mode = 3
+end_mode = 1
 to_plot_name = "IMPLICIT"
 to_plot = all_schemes_ds[to_plot_name]
 if MASK_TROPICS:
@@ -122,6 +122,8 @@ monthly_mean = get_monthly_mean(to_plot)
 eof_modes, explained_variance, PCs, EOFs = get_eof_with_nan_consideration(to_plot, modes=end_mode, mask=map_mask,
                                                                           tolerance=1e-15, monthly_mean_ds=monthly_mean,
                                                                           start_mode=start_mode, max_iterations=4)
+EOFs = EOFs * -1    # invert sign to match obs
+PCs = PCs * -1
 #eof_modes.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/all_anomalies/implicit_" + save_name + "_" + str(end_mode) + "eofs.nc")
 PCs_standard = (PCs - PCs.mean(axis=0)) / PCs.std(axis=0)  # standardise
 
@@ -196,41 +198,56 @@ def explained_variance_from_each_mode():  # plot explained variance from each mo
 
 
 def plot_spatial_pattern_EOFs():  # plot EOFs (spatial patterns) for the first k modes
-    k_range = 3
+    k_range = end_mode - start_mode
     fig, axs = plt.subplots(k_range, 1)
     fig.suptitle("EOF of " + to_plot_name + " scheme")
     fig.tight_layout()
-    norm = colors.TwoSlopeNorm(vmin=-5, vcenter=0, vmax=5)
-    for k in range(k_range):
-        axs[k].grid()
-        EOF_standard = (EOFs.isel(MODE=k) - EOFs.isel(MODE=k).mean(dim=["LATITUDE", "LONGITUDE"])) / EOFs.isel(
-            MODE=k).std(dim=["LATITUDE", "LONGITUDE"])
-        pcolormesh = axs[k].pcolormesh(EOFs.LONGITUDE.values, EOFs.LATITUDE.values, EOF_standard, cmap='RdBu_r',
-                                       norm=norm)
-        if k == k_range - 1:
-            axs[k].set_xlabel("Longitude")
-        axs[k].set_ylabel("Latitude")
+    norm = colors.TwoSlopeNorm(vmin=-2, vcenter=0, vmax=2)
+    if k_range > 1:
+        for k in range(k_range):
+            axs[k].grid()
+            EOF_standard = (EOFs.isel(MODE=k) - EOFs.isel(MODE=k).mean(dim=["LATITUDE", "LONGITUDE"])) / EOFs.isel(
+                MODE=k).std(dim=["LATITUDE", "LONGITUDE"])
+            pcolormesh = axs[k].pcolormesh(EOFs.LONGITUDE.values, EOFs.LATITUDE.values, EOF_standard, cmap='RdBu_r',
+                                           norm=norm)
+            if k == k_range - 1:
+                axs[k].set_xlabel("Longitude")
+            axs[k].set_ylabel("Latitude")
+    else:
+        EOF_standard = (EOFs.isel(MODE=k_range-1) - EOFs.isel(MODE=k_range-1).mean(dim=["LATITUDE", "LONGITUDE"])) / EOFs.isel(MODE=k_range-1).std(dim=["LATITUDE", "LONGITUDE"])
+        pcolormesh = axs.pcolormesh(EOFs.LONGITUDE.values, EOFs.LATITUDE.values, EOF_standard, cmap='RdBu_r', norm=norm)
+        axs.set_xlabel("Longitude")
+        axs.set_ylabel("Latitude")
     cbar = fig.colorbar(pcolormesh, ax=axs, label="EOF spatial pattern (standardised)")
-    #pcolormesh.set_clim(vmin=-10, vmax=10)
-    plt.savefig("../results/eof_spatial_" + to_plot_name + ".jpg", dpi=400)
+    # pcolormesh.set_clim(vmin=-2, vmax=2)
+    #plt.savefig("../results/eof_spatial_" + to_plot_name + ".jpg", dpi=400)
+    EOF_standard.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_poster/eof_first_mode_model.nc")
+    plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_poster/first_eof.png", dpi=400)
     plt.show()
     if CONSIDER_OBSERVATIONS:
         fig, axs = plt.subplots(k_range, 1)
         fig.suptitle("EOF of observations")
         fig.tight_layout()
-        norm = colors.TwoSlopeNorm(vmin=-5, vcenter=0, vmax=5)
-        for k in range(k_range):
-            axs[k].grid()
-            EOF_obs_standard = (EOFs_obs.isel(MODE=k) - EOFs_obs.isel(MODE=k).mean(
-                dim=["LATITUDE", "LONGITUDE"])) / EOFs_obs.isel(MODE=k).std(dim=["LATITUDE", "LONGITUDE"])
-            pcolormesh = axs[k].pcolormesh(EOFs_obs.LONGITUDE.values, EOFs_obs.LATITUDE.values, EOF_obs_standard,
-                                           cmap='RdBu_r', norm=norm)
-            if k == k_range - 1:
-                axs[k].set_xlabel("Longitude")
-            axs[k].set_ylabel("Latitude")
+        norm = colors.TwoSlopeNorm(vmin=-2, vcenter=0, vmax=2)
+        if k_range > 1:
+            for k in range(k_range):
+                axs[k].grid()
+                EOF_obs_standard = (EOFs_obs.isel(MODE=k) - EOFs_obs.isel(MODE=k).mean(dim=["LATITUDE", "LONGITUDE"])) / EOFs_obs.isel(MODE=k).std(dim=["LATITUDE", "LONGITUDE"])
+                pcolormesh = axs[k].pcolormesh(EOFs_obs.LONGITUDE.values, EOFs_obs.LATITUDE.values, EOF_obs_standard,
+                                               cmap='RdBu_r', norm=norm)
+                if k == k_range - 1:
+                    axs[k].set_xlabel("Longitude")
+                axs[k].set_ylabel("Latitude")
+        else:
+            EOF_obs_standard = (EOFs_obs.isel(MODE=k_range-1) - EOFs_obs.isel(MODE=k_range-1).mean(dim=["LATITUDE", "LONGITUDE"])) / EOFs_obs.isel(MODE=k_range-1).std(dim=["LATITUDE", "LONGITUDE"])
+            pcolormesh = axs.pcolormesh(EOFs_obs.LONGITUDE.values, EOFs_obs.LATITUDE.values, EOF_obs_standard,cmap='RdBu_r', norm=norm)
+            axs.set_xlabel("Longitude")
+            axs.set_ylabel("Latitude")
         cbar = fig.colorbar(pcolormesh, ax=axs, label="EOF spatial pattern (standardised)")
-        #pcolormesh.set_clim(vmin=-10, vmax=10)
-        plt.savefig("../results/eof_spatial_obs.jpg", dpi=400)
+        # pcolormesh.set_clim(vmin=-2, vmax=2)
+        # plt.savefig("../results/eof_spatial_obs.jpg", dpi=400)
+        EOF_obs_standard.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_poster/eof_first_mode_obs.nc")
+        plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_poster/first_eof_obs.png", dpi=400)
         plt.show()
 
 # plot PCs over time
@@ -323,7 +340,7 @@ def regression_map():
         plt.show()
 
 """Plot mean anomaly over time to see if there are warming effects"""
-def track_warming_effects():
+def track_warming_effects(lat_min=-90, lat_max=90, long_min=-180, long_max=180):
     if CONSIDER_OBSERVATIONS:
         times = []
         mean_anomalies = []
@@ -331,22 +348,22 @@ def track_warming_effects():
         abs_mean_anomalies = []
         abs_mean_obs_anomalies = []
         for time in to_plot.TIME.values:
-            mean_anomalies.append(to_plot.sel(TIME=time).mean(skipna=True).item())
-            abs_mean_anomalies.append(abs(to_plot.sel(TIME=time)).mean(skipna=True).item())
-            mean_obs_anomalies.append(observed_anomaly.sel(TIME=time).mean(skipna=True).item())
-            abs_mean_obs_anomalies.append(abs(observed_anomaly.sel(TIME=time)).mean(skipna=True).item())
+            mean_anomalies.append(to_plot.sel(LATITUDE=slice(lat_min, lat_max)).sel(LONGITUDE=slice(long_min, long_max)).sel(TIME=time).mean(skipna=True).item())
+            abs_mean_anomalies.append(abs(to_plot.sel(LATITUDE=slice(lat_min, lat_max)).sel(LONGITUDE=slice(long_min, long_max)).sel(TIME=time)).mean(skipna=True).item())
+            mean_obs_anomalies.append(observed_anomaly.sel(LATITUDE=slice(lat_min, lat_max)).sel(LONGITUDE=slice(long_min, long_max)).sel(TIME=time).mean(skipna=True).item())
+            abs_mean_obs_anomalies.append(abs(observed_anomaly.sel(LATITUDE=slice(lat_min, lat_max)).sel(LONGITUDE=slice(long_min, long_max)).sel(TIME=time)).mean(skipna=True).item())
             times.append((time - 0.5) / 12 + 2004)
         plt.grid()
-        plt.scatter(times, mean_anomalies, marker='x', label="Modelled mean anomaly")
-        plt.scatter(times, mean_obs_anomalies, marker='x', label="Observed mean anomaly")
+        plt.plot(times, mean_anomalies, marker='x', label="Modelled mean anomaly")
+        plt.plot(times, mean_obs_anomalies, marker='x', label="Observed mean anomaly")
         plt.xlabel("Year")
         plt.ylabel("Mean anomaly (ºC)")
         plt.title("Mean anomaly over time")
         plt.legend()
         plt.show()
         plt.grid()
-        plt.scatter(times, abs_mean_anomalies, marker='x', label="Modelled mean absolute anomaly")
-        plt.scatter(times, abs_mean_obs_anomalies, marker='x', label="Observed mean absolute anomaly")
+        plt.plot(times, abs_mean_anomalies, marker='x', label="Modelled mean absolute anomaly")
+        plt.plot(times, abs_mean_obs_anomalies, marker='x', label="Observed mean absolute anomaly")
         plt.xlabel("Year")
         plt.ylabel("Mean absolute anomaly (ºC)")
         plt.title("Mean absolute anomaly over time")
@@ -431,7 +448,7 @@ def plot_correlation():
         plt.xlabel("Longitude (º)")
         plt.ylabel("Latitude (º)")
         cbar = plt.gcf().axes[-1]
-        cbar.set_ylabel('Pearson Correlation Coefficient', rotation=270, labelpad=15)
+        cbar.set_ylabel('Pearson Correlation Coefficient', rotation=90)
         plt.title("Correlation between model and SST observation")
         #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/correlations/" + save_name + "_correlation.jpg")
         #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_poster/full_model_correlation.png", dpi=400)
@@ -442,12 +459,15 @@ def plot_correlation():
 # plot_full_model(save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/" + save_name + ".mp4")
 # plot_full_model(obs=True, save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/Reynolds_observations.mp4")
 
+plot_full_model()
 # plot_enso()
 # eof_movie()
-explained_variance_from_each_mode()
-# plot_spatial_pattern_EOFs()
+# explained_variance_from_each_mode()
+plot_spatial_pattern_EOFs()
 # plot_PCs_over_time()
 # regression_map()
 # track_warming_effects()
-# track_anomaly_persistence(6, 9)
-# plot_correlation()
+# track_warming_effects(lat_min=20, lat_max=60, long_min=-60, long_max=0) # north Atlantic bounds
+# track_warming_effects(lat_min=-50, lat_max=-10, long_min=-180, long_max=-75) # south Pacific bounds
+track_anomaly_persistence(6, 9)
+plot_correlation()
