@@ -12,7 +12,9 @@ observed_path_Reynold = "/Users/julia/Desktop/SSTA/datasets/Reynold_sst_anomalie
 HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/heat_flux_interpolated_all_contributions.nc"
 EKMAN_ANOMALY_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Ekman_Anomaly_Full_Datasets.nc"
 TEMP_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
-ENTRAINMENT_VEL_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Entrainment_Velocity-(2004-2018).nc"
+
+ENTRAINMENT_VEL_DATA_PATH = "datasets/New_Entrainment/Entrainment_Vel_h.nc"
+NEW_ENTRAINMENT_VEL_DATA_PATH = "datasets/New_Entrainment/Entrainment_Vel_New_h.nc"
 # ENTRAINMENT_VEL_DENOISED_DATA_PATH = "../datasets/entrainment_vel_denoised.nc"
 
 # H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
@@ -21,6 +23,8 @@ NEW_H_BAR_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/New MLD & T_sub/new_hb
 
 T_SUB_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/New MLD & T_sub/t_sub.nc"
 NEW_T_SUB_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/New MLD & T_sub/new_T_sub_prime.nc"
+T_SUB_GRADMETHOD_DATA_PATH="datasets/New_Entrainment/Tsub_Max_Gradient_Method_h.nc"
+NEW_T_SUB_GRADMETHOD_DATA_PATH = "datasets/New_Entrainment/Tsub_Max_Gradient_Method_New_h.nc"
 
 GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/geostrophic_anomaly_downloaded.nc"
 GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/geostrophic_anomaly_calculated_2.nc"
@@ -30,58 +34,77 @@ USE_DOWNLOADED_SSH = False
 USE_NEW_H_BAR_NEW_T_SUB = True
 
 
-observed_temp_ds_reynold = xr.open_dataset(observed_path_Reynold, decode_times=False)
-observed_temperature_anomaly_reynold = observed_temp_ds_reynold['anom']
+
+USE_DOWNLOADED_SSH = False
+USE_NEW_H_BAR_NEW_T_SUB = True
+# T_SUB_USE_GRAD_METHOD is removed (handled dynamically now)
 
 if USE_NEW_H_BAR_NEW_T_SUB:
     # New h bar
     hbar_ds = xr.open_dataset(NEW_H_BAR_DATA_PATH, decode_times=False)
     hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
 
-    # New t sub
-    t_sub_ds = xr.open_dataset(NEW_T_SUB_DATA_PATH, decode_times=False)
-    t_sub_da = t_sub_ds["ANOMALY_SUB_TEMPERATURE"]
+    # --- 1. T_sub (Gradient Method) - NEEDS ANOMALY CALCULATION ---
+    t_sub_grad_ds = xr.open_dataset(NEW_T_SUB_GRADMETHOD_DATA_PATH, decode_times=False)
+    t_sub_grad_mean = get_monthly_mean(t_sub_grad_ds["SUB_TEMPERATURE"])
+    t_sub_grad_anom_struct = get_anomaly(t_sub_grad_ds, "SUB_TEMPERATURE", t_sub_grad_mean)
+    t_sub_grad_da = t_sub_grad_anom_struct["SUB_TEMPERATURE_ANOMALY"]
+    
+    # --- 2. T_sub (Anomaly Method) - ALREADY ANOMALY ---
+    t_sub_anom_ds = xr.open_dataset(NEW_T_SUB_DATA_PATH, decode_times=False)
+    t_sub_anom_da = t_sub_anom_ds["ANOMALY_SUB_TEMPERATURE"]
 
+    # --- Observed Temp ---
     observed_temp_ds_argo = xr.open_dataset(observed_path, decode_times=False)
     observed_temp_ds = observed_temp_ds_argo["UPDATED_MIXED_LAYER_TEMP"]
     obs_temp_mean = get_monthly_mean(observed_temp_ds)
     observed_temperature_anomaly = get_anomaly(observed_temp_ds_argo, "UPDATED_MIXED_LAYER_TEMP", obs_temp_mean)
     observed_temperature_anomaly_argo = observed_temperature_anomaly["UPDATED_MIXED_LAYER_TEMP_ANOMALY"]
 
-    # Ekman Anomaly using new h
+    # --- Ekman & Entrainment ---
     ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
     ekman_anomaly_da = ekman_anomaly_ds['UPDATED_TEMP_EKMAN_ANOM']
     ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
 
+    entrainment_vel_ds = xr.open_dataset(NEW_ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
+    entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
+    entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
 
 else:
     # New "old" h bar
     hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
     hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
 
-    # New "old" t sub
-    t_sub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
-    t_sub_da = t_sub_ds["SUB_TEMPERATURE"]
+    # --- 1. T_sub (Gradient Method) - NEEDS ANOMALY CALCULATION ---
+    t_sub_grad_ds = xr.open_dataset(T_SUB_GRADMETHOD_DATA_PATH, decode_times=False)
+    t_sub_grad_mean = get_monthly_mean(t_sub_grad_ds["SUB_TEMPERATURE"])
+    t_sub_grad_anom_struct = get_anomaly(t_sub_grad_ds, "SUB_TEMPERATURE", t_sub_grad_mean)
+    t_sub_grad_da = t_sub_grad_anom_struct["SUB_TEMPERATURE_ANOMALY"]
+    
+    # --- 2. T_sub (Anomaly Method) - ALREADY ANOMALY ---
+    t_sub_anom_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
+    t_sub_anom_da = t_sub_anom_ds["ANOMALY_SUB_TEMPERATURE"]
 
-    t_sub_mean = get_monthly_mean(t_sub_da)
-    t_sub_anom = get_anomaly(t_sub_ds, "SUB_TEMPERATURE", t_sub_mean)
-    t_sub_anom = t_sub_anom["SUB_TEMPERATURE_ANOMALY"]
-
-    t_sub_da = t_sub_anom
-
+    # --- Observed Temp ---
     observed_temp_ds_argo = xr.open_dataset(observed_path, decode_times=False)
     observed_temp_ds = observed_temp_ds_argo["MIXED_LAYER_TEMP"]
     obs_temp_mean = get_monthly_mean(observed_temp_ds)
     observed_temperature_anomaly = get_anomaly(observed_temp_ds_argo, "MIXED_LAYER_TEMP", obs_temp_mean)
     observed_temperature_anomaly_argo = observed_temperature_anomaly["MIXED_LAYER_TEMP_ANOMALY"]
 
-    # Ekman Anomaly using new "old" h
+    # --- Ekman & Entrainment ---
     ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
     ekman_anomaly_da = ekman_anomaly_ds["TEMP_EKMAN_ANOM"]
     ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
 
+    entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
+    entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
+    entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
+
+observed_temp_ds_reynold = xr.open_dataset(observed_path_Reynold, decode_times=False)
+observed_temperature_anomaly_reynold = observed_temp_ds_reynold['anom']
 
 heat_flux_ds = xr.open_dataset(HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH, decode_times=False)
 heat_flux_ds['NET_HEAT_FLUX'] = heat_flux_ds['avg_slhtf'] + heat_flux_ds['avg_snlwrf'] + heat_flux_ds['avg_snswrf'] + \
@@ -90,9 +113,6 @@ heat_flux_monthly_mean = get_monthly_mean(heat_flux_ds['NET_HEAT_FLUX'])
 heat_flux_anomaly_ds = get_anomaly(heat_flux_ds, 'NET_HEAT_FLUX', heat_flux_monthly_mean)
 surface_flux_da = heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY']
 
-entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
-entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
-entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
 
 geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH, decode_times=False)
 geostrophic_anomaly_da = geostrophic_anomaly_ds["GEOSTROPHIC_ANOMALY"]
@@ -110,9 +130,8 @@ geostrophic_anomaly_da = geostrophic_anomaly_ds["GEOSTROPHIC_ANOMALY"]
 sea_surface_grad_ds = xr.open_dataset(SEA_SURFACE_GRAD_DATA_PATH, decode_times=False)
 
 
-# --- 1. The Interactive Class ------------------------------------------------
 class InteractiveSSTModel:
-    def __init__(self, obs_anom_argo, obs_anom_reynolds, heat_flux, ekman, entrain_vel, t_sub, hbar, geo_anom, sea_surf_grad, ssh_var):
+    def __init__(self, obs_anom_argo, obs_anom_reynolds, heat_flux, ekman, entrain_vel, t_sub_grad, t_sub_anom, hbar, geo_anom, sea_surf_grad, ssh_var):
         # Store Datasets
         self.obs_argo = obs_anom_argo
         self.obs_reynolds = obs_anom_reynolds
@@ -121,7 +140,11 @@ class InteractiveSSTModel:
         self.heat_flux = heat_flux
         self.ekman = ekman
         self.entrain_vel = entrain_vel
-        self.t_sub = t_sub
+        
+        # Store BOTH T_sub datasets (both are now anomalies)
+        self.t_sub_grad = t_sub_grad
+        self.t_sub_anom = t_sub_anom
+        
         self.hbar = hbar
         self.geo_anom = geo_anom
         self.sea_surf_grad = sea_surf_grad
@@ -135,7 +158,8 @@ class InteractiveSSTModel:
             'INCLUDE_GEO_ANOM', 
             'INCLUDE_GEO_MEAN', 
             'USE_OBS_REYNOLD',
-            'USE_INITIAL_ANOM' # <--- NEW KEY
+            'USE_INITIAL_ANOM',
+            'USE_TSUB_GRAD'  # <--- New Toggle Key
             ]
         self.params = {
             'INCLUDE_SURFACE': True, 
@@ -144,7 +168,8 @@ class InteractiveSSTModel:
             'INCLUDE_GEO_ANOM': False, 
             'INCLUDE_GEO_MEAN': False, 
             'USE_OBS_REYNOLD': False,
-            'USE_INITIAL_ANOM': False, # <--- NEW PARAM DEFAULT
+            'USE_INITIAL_ANOM': False,
+            'USE_TSUB_GRAD': True, # <--- Default to Gradient Method
             'gamma': 15,
             }
         
@@ -172,7 +197,7 @@ class InteractiveSSTModel:
         self.fig = plt.figure(figsize=(15, 9)) 
         
         self.ax_map         = self.fig.add_axes([0.1, 0.35, 0.8, 0.6]) 
-        self.ax_check       = self.fig.add_axes([0.05, 0.05, 0.12, 0.25]) # Increased height slightly
+        self.ax_check       = self.fig.add_axes([0.05, 0.05, 0.12, 0.28]) # Taller for extra button
         self.ax_radio_main  = self.fig.add_axes([0.18, 0.05, 0.15, 0.2]) 
         self.ax_radio_sub   = self.fig.add_axes([0.34, 0.05, 0.10, 0.2]) 
         
@@ -185,7 +210,7 @@ class InteractiveSSTModel:
 
     def create_widgets(self):
         self.ax_check.set_title("Modelling Physics", loc='left', fontsize=11, fontweight='bold')
-        labels = list(self.params.keys())[:-1] # Exclude 'gamma'
+        labels = list(self.params.keys())[:-1] 
         actives = [self.params[k] for k in labels]
         self.check = CheckButtons(self.ax_check, labels, actives)
         for lbl in self.check.labels: lbl.set_fontsize(8)
@@ -222,6 +247,15 @@ class InteractiveSSTModel:
         gamma_0 = self.params['gamma']
         delta_t = 30.4375 * 24 * 3600
         
+        # --- SELECT ACTIVE T_SUB (Both are now anomalies) ---
+        if self.params['USE_TSUB_GRAD']:
+            print("Using T_sub: Gradient Method Anomaly")
+            active_t_sub = self.t_sub_grad
+        else:
+            print("Using T_sub: Original Anomaly Method")
+            active_t_sub = self.t_sub_anom
+        # ---------------------------------------------------
+
         implicit_model_anomalies = []
         added_baseline = False
 
@@ -230,13 +264,10 @@ class InteractiveSSTModel:
             if month_in_year == 0: month_in_year = 12
             
             if not added_baseline:
-                # --- NEW LOGIC: USE_INITIAL_ANOM ---
                 if self.params['USE_INITIAL_ANOM']:
-                    # Start simulation with the first anomaly.
                     base = self.obs_argo.sel(TIME=month, method='nearest')
-                    base = base.fillna(0)                     # Safety: fill NaNs with 0 (land/mask mismatches)
+                    base = base.fillna(0) 
                 else:
-                    # Default: Start simulation with 0
                     base = self.heat_flux.sel(TIME=month) * 0 
                 
                 base = base.expand_dims(TIME=[month])
@@ -261,7 +292,7 @@ class InteractiveSSTModel:
                 else:
                     prev_implicit_k_tm_anom = implicit_model_anomalies[-1].isel(TIME=-1)
 
-                cur_tsub_anom = self.t_sub.sel(TIME=month)
+                cur_tsub_anom = active_t_sub.sel(TIME=month) # Uses the active dataset
                 cur_heat_flux_anom = self.heat_flux.sel(TIME=month)
                 cur_ekman_anom = self.ekman.sel(TIME=month)
                 cur_entrainment_vel = self.entrain_vel.sel(MONTH=month_in_year)
@@ -313,6 +344,7 @@ class InteractiveSSTModel:
         self.update_map_visuals(None)
         print("Done.")
 
+    # ... (Include helper methods: calc_correlations, calc_significance, calc_rmse_all, update_map_visuals here) ...
     def calc_correlations(self):
         lags = np.arange(-12, 13)
         corrs = []
@@ -476,7 +508,8 @@ dashboard = InteractiveSSTModel(
     heat_flux=surface_flux_da,
     ekman=ekman_anomaly_da,
     entrain_vel=entrainment_vel_da,
-    t_sub=t_sub_da,
+    t_sub_grad=t_sub_grad_da,
+    t_sub_anom=t_sub_anom_da,
     hbar=hbar_da,
     geo_anom=geostrophic_anomaly_da,
     sea_surf_grad=sea_surface_grad_ds,
@@ -484,3 +517,4 @@ dashboard = InteractiveSSTModel(
 )
 
 plt.show()
+
