@@ -55,6 +55,7 @@ sea_surface_grad_ds = xr.open_dataset(SEA_SURFACE_GRAD_DATA_PATH, decode_times=F
 sea_surface_monthlymean_ds = xr.open_dataset(SEA_SURFACE_MONTHLY_MEAN_DATA_PATH, decode_times=False)
 
 all_components["TOTAL_FLUX_ANOMALY"] = xr.zeros_like(all_components["EKMAN_ANOM_ADVECTION_ANOMALY"])
+all_components["SIGNED_TOTAL_FLUX_ANOMALY"] = xr.zeros_like(all_components["EKMAN_ANOM_ADVECTION_ANOMALY"])
 component_list = []
 component_list_separate_surface_flux = []
 readable_component_list = []
@@ -69,7 +70,7 @@ if INCLUDE_SURFACE:
     all_components["TURBULENT_FLUX_ANOMALY"] = (all_components["SURFACE_LATENT_HF_ANOMALY"]) + (all_components["SURFACE_SENSIBLE_HF_ANOMALY"])
 
     all_components["TOTAL_FLUX_ANOMALY"] += abs(all_components["RADIATIVE_FLUX_ANOMALY"]) + abs(all_components["TURBULENT_FLUX_ANOMALY"])
-
+    all_components["SIGNED_TOTAL_FLUX_ANOMALY"] = all_components["RADIATIVE_FLUX_ANOMALY"] + all_components["TURBULENT_FLUX_ANOMALY"]
 
     component_list.append("RADIATIVE_FLUX_ANOMALY")
     readable_component_list.append("Radiative Air-Sea Heat Flux")
@@ -79,16 +80,19 @@ if INCLUDE_SURFACE:
 
 if INCLUDE_EKMAN_ANOM_ADVECTION:
     all_components["TOTAL_FLUX_ANOMALY"] += abs(all_components["EKMAN_ANOM_ADVECTION_ANOMALY"])
+    all_components["SIGNED_TOTAL_FLUX_ANOMALY"] += all_components["EKMAN_ANOM_ADVECTION_ANOMALY"]
     component_list.append("EKMAN_ANOM_ADVECTION_ANOMALY")
     readable_component_list.append("Ekman Anomalous Advection")
 
 if INCLUDE_ENTRAINMENT:
     all_components["TOTAL_FLUX_ANOMALY"] += abs(all_components["ENTRAINMENT_ANOMALY"])
+    all_components["SIGNED_TOTAL_FLUX_ANOMALY"] += all_components["ENTRAINMENT_ANOMALY"]
     component_list.append("ENTRAINMENT_ANOMALY")
     readable_component_list.append("Entrainment")
 
 if INCLUDE_GEOSTROPHIC_ANOM_ADVECTION:
     all_components["TOTAL_FLUX_ANOMALY"] += abs(all_components["GEOSTROPHIC_ANOM_ADVECTION_ANOMALY"])
+    all_components["SIGNED_TOTAL_FLUX_ANOMALY"] += all_components["GEOSTROPHIC_ANOM_ADVECTION_ANOMALY"]
     component_list.append("GEOSTROPHIC_ANOM_ADVECTION_ANOMALY")
     readable_component_list.append("Geostrophic Anomalous Advection")
 
@@ -108,6 +112,7 @@ if INCLUDE_EKMAN_MEAN_ADVECTION:
     ekman_mean_advection_contributions_ds = xr.concat(ekman_mean_advection_contributions, 'TIME')
     all_components["EKMAN_MEAN_ADVECTION_ANOMALY"] = ekman_mean_advection_contributions_ds
     all_components["TOTAL_FLUX_ANOMALY"] += abs(all_components["EKMAN_MEAN_ADVECTION_ANOMALY"])
+    all_components["SIGNED_TOTAL_FLUX_ANOMALY"] += all_components["EKMAN_MEAN_ADVECTION_ANOMALY"]
     component_list.append("EKMAN_MEAN_ADVECTION_ANOMALY")
     readable_component_list.append("Ekman Mean Advection")
 
@@ -124,13 +129,17 @@ if INCLUDE_GEOSTROPHIC_MEAN_ADVECTION:
     geostrophic_mean_advection_contributions_ds = xr.concat(geostrophic_mean_advection_contributions, 'TIME')
     all_components["GEOSTROPHIC_MEAN_ADVECTION_ANOMALY"] = geostrophic_mean_advection_contributions_ds
     all_components["TOTAL_FLUX_ANOMALY"] += abs(all_components["GEOSTROPHIC_MEAN_ADVECTION_ANOMALY"])
+    all_components["SIGNED_TOTAL_FLUX_ANOMALY"] += all_components["GEOSTROPHIC_MEAN_ADVECTION_ANOMALY"]
     component_list.append("GEOSTROPHIC_MEAN_ADVECTION_ANOMALY")
     readable_component_list.append("Geostrophic Mean Advection")
 
 
 
-def get_flux_proportion(component, save_file=False):
-    flux_proportion = abs(all_components[component]) / all_components["TOTAL_FLUX_ANOMALY"]
+def get_flux_proportion(component, save_file=False, signed=False):
+    if signed:
+        flux_proportion = all_components[component] / all_components["SIGNED_TOTAL_FLUX_ANOMALY"]
+    else:
+        flux_proportion = abs(all_components[component]) / all_components["TOTAL_FLUX_ANOMALY"]
     if save_file:
         make_movie(flux_proportion, 0, 1, "Proportion of total flux due to " + component, cmap='Reds', savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/" + component + "flux_proportion_" + save_name + ".mp4")
     else:
@@ -145,12 +154,17 @@ def get_surface_flux_proportion(component, save_file=False):
         make_movie(flux_proportion, 0, 1, "Proportion of total flux due to " + component, cmap='Reds')
 
 
-def plot_over_time(plot_list, readable_list):
+def plot_over_time(plot_list, readable_list, signed=False):
     plt.grid()
     for i in range(len(plot_list)):
-        plt.plot(all_components[plot_list[i]].TIME / 12 + 2004, (abs(all_components[plot_list[i]]) / all_components['TOTAL_FLUX_ANOMALY']).mean(dim="LATITUDE").mean(dim="LONGITUDE"), label=readable_list[i])
+        if signed:
+            plt.plot(all_components[plot_list[i]].TIME / 12 + 2004, (all_components[plot_list[i]] / all_components['SIGNED_TOTAL_FLUX_ANOMALY']).mean(dim="LATITUDE").mean(dim="LONGITUDE"), label=readable_list[i])
+            plt.ylim([-5, 5])
+            plt.ylabel("Proportion of Each Contribution to Total Flux")
+        else:
+            plt.plot(all_components[plot_list[i]].TIME / 12 + 2004, (abs(all_components[plot_list[i]]) / all_components['TOTAL_FLUX_ANOMALY']).mean(dim="LATITUDE").mean(dim="LONGITUDE"), label=readable_list[i])
+            plt.ylabel("Proportion of Each Contribution to Total Flux Magnitude")
     plt.xlabel("Year")
-    plt.ylabel("Mean Flux proportion")
     plt.legend()
     plt.show()
 
@@ -183,6 +197,6 @@ def correlate_turbulent_ekman():
 # get_surface_flux_proportion("RADIATIVE_FLUX_ANOMALY", save_file=False)
 # get_surface_flux_proportion("TURBULENT_FLUX_ANOMALY", save_file=False)
 
-plot_over_time(component_list, readable_component_list)
+plot_over_time(component_list, readable_component_list, signed=True)
 
 # correlate_turbulent_ekman()

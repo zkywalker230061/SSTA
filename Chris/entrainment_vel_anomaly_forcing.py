@@ -1,7 +1,7 @@
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
-from SSTA.Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, coriolis_parameter, \
+from Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, coriolis_parameter, \
     get_month_from_time
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset, compute_gradient_lon, compute_gradient_lat
 import matplotlib

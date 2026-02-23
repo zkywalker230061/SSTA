@@ -2,7 +2,7 @@ import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 
-from SSTA.Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, get_save_name, \
+from Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, get_save_name, \
     coriolis_parameter, get_month_from_time
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
@@ -71,6 +71,7 @@ else:
 
 implicit_model = all_models_ds["IMPLICIT"]
 # implicit_model = test_model_ds["TA_SIMULATED"]
+
 
 def make_movies():
     make_movie(tm_anomaly, -3, 3, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment/obs_tm_anom.mp4")
