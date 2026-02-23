@@ -4,21 +4,29 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import matplotlib
 
-from SSTA.Chris.utils import compute_gradient_lat, compute_gradient_lon, get_month_from_time
+from Chris.utils import compute_gradient_lat, compute_gradient_lon, get_month_from_time, get_anomaly
 from utils import get_monthly_mean, make_movie, get_save_name
 
 matplotlib.use('TkAgg')
 
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN_ANOM_ADVECTION = True
-INCLUDE_EKMAN_MEAN_ADVECTION = True
+INCLUDE_EKMAN_MEAN_ADVECTION = False
 INCLUDE_ENTRAINMENT = True
+INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING = False
 INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
-INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
-USE_DOWNLOADED_SSH = False
-gamma_0 = 15.0
+INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = False
 
-save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION, USE_DOWNLOADED_SSH=USE_DOWNLOADED_SSH, gamma0=gamma_0, INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION=INCLUDE_EKMAN_MEAN_ADVECTION)
+USE_DOWNLOADED_SSH = False
+USE_OTHER_MLD = False
+USE_MAX_GRADIENT_METHOD = True
+USE_LOG_FOR_ENTRAINMENT = False
+rho_0 = 1025.0
+c_0 = 4100.0
+gamma_0 = 15.0
+g = 9.81
+
+save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION, USE_DOWNLOADED_SSH, gamma0=gamma_0, INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION=INCLUDE_EKMAN_MEAN_ADVECTION, OTHER_MLD=USE_OTHER_MLD, MAX_GRAD_TSUB=USE_MAX_GRADIENT_METHOD, ENTRAINMENT_VEL_ANOM_FORC=INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, LOG_ENTRAINMENT_VELOCITY=USE_LOG_FOR_ENTRAINMENT)
 
 FLUX_CONTRIBUTIONS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/" + save_name + "_flux_components.nc"
 T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub.nc"
@@ -46,16 +54,44 @@ ekman_mean_advection = xr.open_dataset(EKMAN_MEAN_ADVECTION_DATA_PATH, decode_ti
 sea_surface_grad_ds = xr.open_dataset(SEA_SURFACE_GRAD_DATA_PATH, decode_times=False)
 sea_surface_monthlymean_ds = xr.open_dataset(SEA_SURFACE_MONTHLY_MEAN_DATA_PATH, decode_times=False)
 
-all_components["TOTAL_FLUX_ANOMALY"] = xr.zeros_like(all_components["SURFACE_FLUX_ANOMALY"])
+all_components["TOTAL_FLUX_ANOMALY"] = xr.zeros_like(all_components["EKMAN_ANOM_ADVECTION_ANOMALY"])
+component_list = []
+component_list_separate_surface_flux = []
+readable_component_list = []
+readable_component_list_separate_surface_flux = []
+
 
 if INCLUDE_SURFACE:
-    all_components["TOTAL_FLUX_ANOMALY"] += abs(all_components["SURFACE_FLUX_ANOMALY"])
+    # all_components["TOTAL_FLUX_ANOMALY"] += abs(all_components["SURFACE_FLUX_ANOMALY"])
+    all_components["SURFACE_FLUX_ANOMALY_SUM"] = (all_components["SURFACE_LATENT_HF_ANOMALY"]) + (all_components["SURFACE_LW_RADIATION_FLUX_ANOMALY"]) + (all_components["SURFACE_SW_RADIATION_FLUX_ANOMALY"]) + (all_components["SURFACE_SENSIBLE_HF_ANOMALY"])
+
+    all_components["RADIATIVE_FLUX_ANOMALY"] = (all_components["SURFACE_LW_RADIATION_FLUX_ANOMALY"]) + (all_components["SURFACE_SW_RADIATION_FLUX_ANOMALY"])
+    all_components["TURBULENT_FLUX_ANOMALY"] = (all_components["SURFACE_LATENT_HF_ANOMALY"]) + (all_components["SURFACE_SENSIBLE_HF_ANOMALY"])
+
+    all_components["TOTAL_FLUX_ANOMALY"] += abs(all_components["RADIATIVE_FLUX_ANOMALY"]) + abs(all_components["TURBULENT_FLUX_ANOMALY"])
+
+
+    component_list.append("RADIATIVE_FLUX_ANOMALY")
+    readable_component_list.append("Radiative Air-Sea Heat Flux")
+    component_list.append("TURBULENT_FLUX_ANOMALY")
+    readable_component_list.append("Turbulent Air-Sea Heat Flux")
+
+
 if INCLUDE_EKMAN_ANOM_ADVECTION:
     all_components["TOTAL_FLUX_ANOMALY"] += abs(all_components["EKMAN_ANOM_ADVECTION_ANOMALY"])
+    component_list.append("EKMAN_ANOM_ADVECTION_ANOMALY")
+    readable_component_list.append("Ekman Anomalous Advection")
+
 if INCLUDE_ENTRAINMENT:
     all_components["TOTAL_FLUX_ANOMALY"] += abs(all_components["ENTRAINMENT_ANOMALY"])
+    component_list.append("ENTRAINMENT_ANOMALY")
+    readable_component_list.append("Entrainment")
+
 if INCLUDE_GEOSTROPHIC_ANOM_ADVECTION:
     all_components["TOTAL_FLUX_ANOMALY"] += abs(all_components["GEOSTROPHIC_ANOM_ADVECTION_ANOMALY"])
+    component_list.append("GEOSTROPHIC_ANOM_ADVECTION_ANOMALY")
+    readable_component_list.append("Geostrophic Anomalous Advection")
+
 
 if INCLUDE_EKMAN_MEAN_ADVECTION or INCLUDE_GEOSTROPHIC_MEAN_ADVECTION:
     tm_anomaly_grad_lat = compute_gradient_lat(tm_anomaly_ds["IMPLICIT"])
@@ -72,6 +108,9 @@ if INCLUDE_EKMAN_MEAN_ADVECTION:
     ekman_mean_advection_contributions_ds = xr.concat(ekman_mean_advection_contributions, 'TIME')
     all_components["EKMAN_MEAN_ADVECTION_ANOMALY"] = ekman_mean_advection_contributions_ds
     all_components["TOTAL_FLUX_ANOMALY"] += abs(all_components["EKMAN_MEAN_ADVECTION_ANOMALY"])
+    component_list.append("EKMAN_MEAN_ADVECTION_ANOMALY")
+    readable_component_list.append("Ekman Mean Advection")
+
 
 if INCLUDE_GEOSTROPHIC_MEAN_ADVECTION:
     alpha = sea_surface_monthlymean_ds['alpha']
@@ -85,72 +124,65 @@ if INCLUDE_GEOSTROPHIC_MEAN_ADVECTION:
     geostrophic_mean_advection_contributions_ds = xr.concat(geostrophic_mean_advection_contributions, 'TIME')
     all_components["GEOSTROPHIC_MEAN_ADVECTION_ANOMALY"] = geostrophic_mean_advection_contributions_ds
     all_components["TOTAL_FLUX_ANOMALY"] += abs(all_components["GEOSTROPHIC_MEAN_ADVECTION_ANOMALY"])
+    component_list.append("GEOSTROPHIC_MEAN_ADVECTION_ANOMALY")
+    readable_component_list.append("Geostrophic Mean Advection")
+
 
 
 def get_flux_proportion(component, save_file=False):
     flux_proportion = abs(all_components[component]) / all_components["TOTAL_FLUX_ANOMALY"]
-    print(all_components[component])
-    print(all_components["TOTAL_FLUX_ANOMALY"])
-    if save_name is not None:
-        make_movie(flux_proportion, 0, 1, "Proportion of total flux due to " + component, cmap='Reds', savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/" + component + "flux_proportion" + save_name + ".mp4")
+    if save_file:
+        make_movie(flux_proportion, 0, 1, "Proportion of total flux due to " + component, cmap='Reds', savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/" + component + "flux_proportion_" + save_name + ".mp4")
     else:
         make_movie(flux_proportion, 0, 1, "Proportion of total flux due to " + component, cmap='Reds')
 
-get_flux_proportion("SURFACE_FLUX_ANOMALY", save_file=True)
-get_flux_proportion("EKMAN_ANOM_ADVECTION_ANOMALY", save_file=True)
-get_flux_proportion("ENTRAINMENT_ANOMALY", save_file=True)
-get_flux_proportion("GEOSTROPHIC_ANOM_ADVECTION_ANOMALY", save_file=True)
-get_flux_proportion("EKMAN_MEAN_ADVECTION_ANOMALY", save_file=True)
-get_flux_proportion("GEOSTROPHIC_MEAN_ADVECTION_ANOMALY", save_file=True)
+
+def get_surface_flux_proportion(component, save_file=False):
+    flux_proportion = abs(all_components[component]) / all_components["SURFACE_FLUX_ANOMALY"]
+    if save_file:
+        make_movie(flux_proportion, 0, 1, "Proportion of total flux due to " + component, cmap='Reds', savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/" + component + "flux_proportion_of_surface_" + save_name + ".mp4")
+    else:
+        make_movie(flux_proportion, 0, 1, "Proportion of total flux due to " + component, cmap='Reds')
 
 
-# all_components["TOTAL_FLUX_ANOMALY"] = abs(all_components["SURFACE_FLUX_ANOMALY"]) + abs(all_components["EKMAN_ANOM_ADVECTION_ANOMALY"]) + abs(all_components["ENTRAINMENT_FLUX_IMPLICIT_ANOMALY"]) + abs(all_components["GEOSTROPHIC_FLUX_ANOMALY"])
-# all_components["SURFACE_FLUX_PROPORTION"] = abs(all_components["SURFACE_FLUX_ANOMALY"]) / all_components["TOTAL_FLUX_ANOMALY"]
-# all_components["EKMAN_FLUX_PROPORTION"] = abs(all_components["EKMAN_FLUX_ANOMALY"]) / all_components["TOTAL_FLUX_ANOMALY"]
-# all_components["ENTRAINMENT_FLUX_PROPORTION"] = abs(all_components["ENTRAINMENT_FLUX_IMPLICIT_ANOMALY"]) / all_components["TOTAL_FLUX_ANOMALY"]
-# all_components["GEOSTROPHIC_FLUX_PROPORTION"] = abs(all_components["GEOSTROPHIC_FLUX_ANOMALY"]) / all_components["TOTAL_FLUX_ANOMALY"]
-
-# print(all_components)
-# print((all_components["GEOSTROPHIC_FLUX_ANOMALY"]).max().item())
-# print((all_components["GEOSTROPHIC_FLUX_ANOMALY"]).min().item())
-# print(abs(all_components["GEOSTROPHIC_FLUX_ANOMALY"]).mean().item())
+def plot_over_time(plot_list, readable_list):
+    plt.grid()
+    for i in range(len(plot_list)):
+        plt.plot(all_components[plot_list[i]].TIME / 12 + 2004, (abs(all_components[plot_list[i]]) / all_components['TOTAL_FLUX_ANOMALY']).mean(dim="LATITUDE").mean(dim="LONGITUDE"), label=readable_list[i])
+    plt.xlabel("Year")
+    plt.ylabel("Mean Flux proportion")
+    plt.legend()
+    plt.show()
 
 
-# def make_movie(dataset, vmin, vmax, colorbar_label):
-#     times = dataset.TIME.values
-#
-#     fig, ax = plt.subplots()
-#     pcolormesh = ax.pcolormesh(dataset.LONGITUDE.values, dataset.LATITUDE.values, dataset.isel(TIME=0), cmap='Reds')
-#     title = ax.set_title(f'Time = {times[0]}')
-#
-#     cbar = plt.colorbar(pcolormesh, ax=ax, label=colorbar_label)
-#     ax.set_xlabel('Longitude')
-#     ax.set_ylabel('Latitude')
-#
-#
-#     def update(frame):
-#         month = int((times[frame] + 0.5) % 12)
-#         if month == 0:
-#             month = 12
-#         year = 2004 + int((times[frame]) / 12)
-#         pcolormesh.set_array(dataset.isel(TIME=frame).values.ravel())
-#         pcolormesh.set_clim(vmin=vmin, vmax=vmax)
-#         cbar.update_normal(pcolormesh)
-#         title.set_text(f'Year: {year}; Month: {month}')
-#         return [pcolormesh, title]
-#
-#     animation = FuncAnimation(fig, update, frames=len(times), interval=300, blit=False)
-#     plt.show()
+def correlate_turbulent_ekman():
+    correlation = xr.corr(all_components["TURBULENT_FLUX_ANOMALY"], all_components["EKMAN_ANOM_ADVECTION_ANOMALY"], dim='TIME')
+    correlation.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
+    plt.title("")
+    plt.xlabel("Longitude (º)")
+    plt.ylabel("Latitude (º)")
+    cbar = plt.gcf().axes[-1]
+    cbar.set_ylabel('Pearson Correlation Coefficient', rotation=90)
+    # plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/correlations/" + save_name + "_correlation.jpg")
+    # plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_poster/full_model_correlation.png", dpi=400)
+    plt.show()
 
 
-# make_movie(all_components["TOTAL_FLUX_ANOMALY"], -50, 50, "Total Heat Flux")
-# make_movie(all_components["SURFACE_FLUX_PROPORTION"], 0, 1, "Surface Flux Proportion of Total Flux")
-# make_movie(all_components["EKMAN_FLUX_PROPORTION"], 0, 1, "Ekman Flux Proportion of Total Flux")
-# make_movie(all_components["ENTRAINMENT_FLUX_PROPORTION"], 0, 1, "Entrainment Flux Proportion of Total Flux")
-# make_movie(all_components["GEOSTROPHIC_FLUX_PROPORTION"], 0, 1, "Geostrophic Flux Proportion of Total Flux", savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/all_anomalies/videos/" + save_name + "_geostrophic_component.mp4")
+# get_flux_proportion("SURFACE_FLUX_ANOMALY", save_file=True)
+# get_flux_proportion("EKMAN_ANOM_ADVECTION_ANOMALY", save_file=True)
+# get_flux_proportion("ENTRAINMENT_ANOMALY", save_file=True)
+# get_flux_proportion("GEOSTROPHIC_ANOM_ADVECTION_ANOMALY", save_file=True)
+# get_flux_proportion("EKMAN_MEAN_ADVECTION_ANOMALY", save_file=True)
+# get_flux_proportion("GEOSTROPHIC_MEAN_ADVECTION_ANOMALY", save_file=True)
 
+# get_surface_flux_proportion("SURFACE_LATENT_HF_ANOMALY", save_file=False)
+# get_surface_flux_proportion("SURFACE_LW_RADIATION_FLUX_ANOMALY", save_file=False)
+# get_surface_flux_proportion("SURFACE_SW_RADIATION_FLUX_ANOMALY", save_file=False)
+# get_surface_flux_proportion("SURFACE_SENSIBLE_HF_ANOMALY", save_file=False)
 
-# make_movie(t_sub['T_sub'], 0, 30, "T_sub Anomaly")
-# make_movie(t_sub['T_sub_ANOMALY'], 0, 3, "T_sub Anomaly")
-# make_movie(entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] * 26298000, 0, 1500, "Entrainment velocity")
-# print((entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] * 26298000).max().item())
+# get_surface_flux_proportion("RADIATIVE_FLUX_ANOMALY", save_file=False)
+# get_surface_flux_proportion("TURBULENT_FLUX_ANOMALY", save_file=False)
+
+plot_over_time(component_list, readable_component_list)
+
+# correlate_turbulent_ekman()

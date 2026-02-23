@@ -19,11 +19,11 @@ e.g.
 
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN_ANOM_ADVECTION = True
-INCLUDE_EKMAN_MEAN_ADVECTION = True
+INCLUDE_EKMAN_MEAN_ADVECTION = False
 INCLUDE_ENTRAINMENT = True
 INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING = False
 INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
-INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
+INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = False
 # geostrophic displacement integral: https://egusphere.copernicus.org/preprints/2025/egusphere-2025-3039/egusphere-2025-3039.pdf
 USE_DOWNLOADED_SSH = False
 USE_OTHER_MLD = False
@@ -88,7 +88,7 @@ t_sub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
 if USE_OTHER_MLD:
     t_sub_da = t_sub_ds["ANOMALY_SUB_TEMPERATURE"]
 else:
-    #t_sub_da = t_sub_ds["SUB_TEMPERATURE"]
+    # t_sub_da = t_sub_ds["SUB_TEMPERATURE"]
     t_sub_da = get_anomaly(t_sub_ds, "SUB_TEMPERATURE", get_monthly_mean(t_sub_ds["SUB_TEMPERATURE"]))["SUB_TEMPERATURE_ANOMALY"]
 
 entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
@@ -308,7 +308,7 @@ model_anomalies_ds = model_anomalies_ds.to_dataset(name="IMPLICIT")
 # print(model_anomalies_ds["IMPLICIT"].values)
 # make_movie(model_anomalies_ds["IMPLICIT"], -3, 3)
 # remove whatever seasonal cycle remains
-monthly_mean = get_monthly_mean(model_anomalies_ds["IMPLICIT"].sel(TIME=slice(24.5, 179.5)))
+monthly_mean = get_monthly_mean(model_anomalies_ds["IMPLICIT"])#.sel(TIME=slice(24.5, 179.5)))
 model_anomalies_ds["IMPLICIT"] = get_anomaly(model_anomalies_ds, "IMPLICIT", monthly_mean)["IMPLICIT_ANOMALY"]
 model_anomalies_ds = model_anomalies_ds.drop_vars("IMPLICIT_ANOMALY")
 # make_movie(model_anomalies_ds["IMPLICIT"], -3, 3)
@@ -327,15 +327,14 @@ if INCLUDE_ENTRAINMENT:
 flux_components_to_merge = []
 variable_names = []
 if INCLUDE_SURFACE:
-    heat_flux_ds['avg_slhtf'] + heat_flux_ds['avg_snlwrf'] + heat_flux_ds['avg_snswrf'] + heat_flux_ds['avg_ishf']
+    surface_flux_da = surface_flux_da.rename("SURFACE_FLUX_ANOMALY")
+    flux_components_to_merge.append(surface_flux_da)
+    variable_names.append("SURFACE_FLUX_ANOMALY")
+
     slhrf_heat_flux_anomaly = get_anomaly(heat_flux_ds, 'avg_slhtf', get_monthly_mean(heat_flux_ds['avg_slhtf']))['avg_slhtf_ANOMALY']
     snlwrf_heat_flux_anomaly = get_anomaly(heat_flux_ds, 'avg_snlwrf', get_monthly_mean(heat_flux_ds['avg_snlwrf']))['avg_snlwrf_ANOMALY']
     snswrf_heat_flux_anomaly = get_anomaly(heat_flux_ds, 'avg_snswrf', get_monthly_mean(heat_flux_ds['avg_snswrf']))['avg_snswrf_ANOMALY']
     ishf_heat_flux_anomaly = get_anomaly(heat_flux_ds, 'avg_ishf', get_monthly_mean(heat_flux_ds['avg_ishf']))['avg_ishf_ANOMALY']
-
-    # surface_flux_da = surface_flux_da.rename("SURFACE_FLUX_ANOMALY")
-    # flux_components_to_merge.append(surface_flux_da)
-    # variable_names.append("SURFACE_FLUX_ANOMALY")
 
     slhrf_heat_flux_anomaly = slhrf_heat_flux_anomaly.rename("SURFACE_LATENT_HF_ANOMALY")
     snlwrf_heat_flux_anomaly = snlwrf_heat_flux_anomaly.rename("SURFACE_LW_RADIATION_FLUX_ANOMALY")
@@ -377,6 +376,7 @@ for variable_name in variable_names:
 
 # save flux components
 flux_components_ds = remove_empty_attributes(flux_components_ds)
+print(flux_components_ds)
 flux_components_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/" + save_name + "_flux_components.nc")
 
 # mean_anomalies = []
@@ -386,5 +386,5 @@ flux_components_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/impli
 # plt.plot(model_anomalies_ds["IMPLICIT"].TIME, mean_anomalies)
 # plt.show()
 #
-print(model_anomalies_ds["IMPLICIT"].values)
-make_movie(model_anomalies_ds["IMPLICIT"], -3, 3)
+# print(model_anomalies_ds["IMPLICIT"].values)
+# make_movie(model_anomalies_ds["IMPLICIT"], -3, 3)
