@@ -1,9 +1,7 @@
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
-
-from SSTA.Chris.entrainment_vel_anomaly_forcing import entrainment_vel_anomaly_forcing
-from SSTA.Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, get_save_name, \
+from Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, get_save_name, \
     coriolis_parameter, get_month_from_time
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
@@ -29,7 +27,7 @@ INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
 # geostrophic displacement integral: https://egusphere.copernicus.org/preprints/2025/egusphere-2025-3039/egusphere-2025-3039.pdf
 USE_DOWNLOADED_SSH = False
 USE_OTHER_MLD = False
-USE_MAX_GRADIENT_METHOD = False
+USE_MAX_GRADIENT_METHOD = True
 USE_LOG_FOR_ENTRAINMENT = False
 rho_0 = 1025.0
 c_0 = 4100.0
@@ -90,7 +88,8 @@ t_sub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
 if USE_OTHER_MLD:
     t_sub_da = t_sub_ds["ANOMALY_SUB_TEMPERATURE"]
 else:
-    t_sub_da = t_sub_ds["SUB_TEMPERATURE"]
+    #t_sub_da = t_sub_ds["SUB_TEMPERATURE"]
+    t_sub_da = get_anomaly(t_sub_ds, "SUB_TEMPERATURE", get_monthly_mean(t_sub_ds["SUB_TEMPERATURE"]))["SUB_TEMPERATURE_ANOMALY"]
 
 entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
 entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
@@ -133,6 +132,7 @@ for month in heat_flux_anomaly_ds.TIME.values:
     if not added_baseline:  # just adds the baseline of a whole bunch of zero
         base = temperature_ds.sel(PRESSURE=2.5, TIME=month)['ARGO_TEMPERATURE_ANOMALY'] - \
                temperature_ds.sel(PRESSURE=2.5, TIME=month)['ARGO_TEMPERATURE_ANOMALY']
+        # base.loc[{'LATITUDE': slice(-50, -30)}].loc[{'LONGITUDE': slice(-25, 25)}] = 15
         base = base.expand_dims(TIME=[month])
         model_anomalies.append(base)
         added_baseline = True
@@ -174,16 +174,16 @@ for month in heat_flux_anomaly_ds.TIME.values:
                 # if step % 25 == 0:
                 #     print("Step " + str(step) + " of " + str(substeps))
                 # get upwind flux
-                prev_anom_east = prev_anomaly.shift(LONGITUDE=-1)
-                prev_anom_west = prev_anomaly.shift(LONGITUDE=1)
-                prev_anom_north = prev_anomaly.shift(LATITUDE=-1)
-                prev_anom_south = prev_anomaly.shift(LATITUDE=1)
+                prev_anom_east = prev_anomaly.roll(LONGITUDE=-1)
+                prev_anom_west = prev_anomaly.roll(LONGITUDE=1)
+                prev_anom_north = prev_anomaly.roll(LATITUDE=-1)
+                prev_anom_south = prev_anomaly.roll(LATITUDE=1)
 
                 # get alpha/beta at the edges of gridboxes
-                alpha_east = (alpha + alpha.shift(LONGITUDE=-1)) / 2
-                alpha_west = (alpha + alpha.shift(LONGITUDE=1)) / 2
-                beta_north = (beta + beta.shift(LATITUDE=-1)) / 2
-                beta_south = (beta + beta.shift(LATITUDE=1)) / 2
+                alpha_east = (alpha + alpha.roll(LONGITUDE=-1)) / 2
+                alpha_west = (alpha + alpha.roll(LONGITUDE=1)) / 2
+                beta_north = (beta + beta.roll(LATITUDE=-1)) / 2
+                beta_south = (beta + beta.roll(LATITUDE=1)) / 2
 
                 # check for nans in neighbouring cells
                 ocean_mask = ~prev_anomaly.isnull()
@@ -305,12 +305,13 @@ model_anomalies_ds = xr.concat(model_anomalies, 'TIME')
 model_anomalies_ds = model_anomalies_ds.rename("IMPLICIT")
 model_anomalies_ds = model_anomalies_ds.to_dataset(name="IMPLICIT")
 
-
+# print(model_anomalies_ds["IMPLICIT"].values)
+# make_movie(model_anomalies_ds["IMPLICIT"], -3, 3)
 # remove whatever seasonal cycle remains
-monthly_mean = get_monthly_mean(model_anomalies_ds["IMPLICIT"])
+monthly_mean = get_monthly_mean(model_anomalies_ds["IMPLICIT"].sel(TIME=slice(24.5, 179.5)))
 model_anomalies_ds["IMPLICIT"] = get_anomaly(model_anomalies_ds, "IMPLICIT", monthly_mean)["IMPLICIT_ANOMALY"]
 model_anomalies_ds = model_anomalies_ds.drop_vars("IMPLICIT_ANOMALY")
-
+# make_movie(model_anomalies_ds["IMPLICIT"], -3, 3)
 # save
 model_anomalies_ds = remove_empty_attributes(model_anomalies_ds) # when doing the seasonality removal, some units are None
 model_anomalies_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/" + save_name + ".nc")
@@ -326,9 +327,31 @@ if INCLUDE_ENTRAINMENT:
 flux_components_to_merge = []
 variable_names = []
 if INCLUDE_SURFACE:
-    surface_flux_da = surface_flux_da.rename("SURFACE_FLUX_ANOMALY")
-    flux_components_to_merge.append(surface_flux_da)
-    variable_names.append("SURFACE_FLUX_ANOMALY")
+    heat_flux_ds['avg_slhtf'] + heat_flux_ds['avg_snlwrf'] + heat_flux_ds['avg_snswrf'] + heat_flux_ds['avg_ishf']
+    slhrf_heat_flux_anomaly = get_anomaly(heat_flux_ds, 'avg_slhtf', get_monthly_mean(heat_flux_ds['avg_slhtf']))['avg_slhtf_ANOMALY']
+    snlwrf_heat_flux_anomaly = get_anomaly(heat_flux_ds, 'avg_snlwrf', get_monthly_mean(heat_flux_ds['avg_snlwrf']))['avg_snlwrf_ANOMALY']
+    snswrf_heat_flux_anomaly = get_anomaly(heat_flux_ds, 'avg_snswrf', get_monthly_mean(heat_flux_ds['avg_snswrf']))['avg_snswrf_ANOMALY']
+    ishf_heat_flux_anomaly = get_anomaly(heat_flux_ds, 'avg_ishf', get_monthly_mean(heat_flux_ds['avg_ishf']))['avg_ishf_ANOMALY']
+
+    # surface_flux_da = surface_flux_da.rename("SURFACE_FLUX_ANOMALY")
+    # flux_components_to_merge.append(surface_flux_da)
+    # variable_names.append("SURFACE_FLUX_ANOMALY")
+
+    slhrf_heat_flux_anomaly = slhrf_heat_flux_anomaly.rename("SURFACE_LATENT_HF_ANOMALY")
+    snlwrf_heat_flux_anomaly = snlwrf_heat_flux_anomaly.rename("SURFACE_LW_RADIATION_FLUX_ANOMALY")
+    snswrf_heat_flux_anomaly = snswrf_heat_flux_anomaly.rename("SURFACE_SW_RADIATION_FLUX_ANOMALY")
+    ishf_heat_flux_anomaly = ishf_heat_flux_anomaly.rename("SURFACE_SENSIBLE_HF_ANOMALY")
+
+    flux_components_to_merge.append(slhrf_heat_flux_anomaly)
+    flux_components_to_merge.append(snlwrf_heat_flux_anomaly)
+    flux_components_to_merge.append(snswrf_heat_flux_anomaly)
+    flux_components_to_merge.append(ishf_heat_flux_anomaly)
+
+    variable_names.append("SURFACE_LATENT_HF_ANOMALY")
+    variable_names.append("SURFACE_LW_RADIATION_FLUX_ANOMALY")
+    variable_names.append("SURFACE_SW_RADIATION_FLUX_ANOMALY")
+    variable_names.append("SURFACE_SENSIBLE_HF_ANOMALY")
+
 
 if INCLUDE_EKMAN_ANOM_ADVECTION:
     ekman_anomaly_da = ekman_anomaly_da.rename("EKMAN_ANOM_ADVECTION_ANOMALY")
@@ -356,4 +379,12 @@ for variable_name in variable_names:
 flux_components_ds = remove_empty_attributes(flux_components_ds)
 flux_components_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/" + save_name + "_flux_components.nc")
 
-#make_movie(model_anomalies_ds["IMPLICIT"], -3, 3)
+# mean_anomalies = []
+# for TIME in model_anomalies_ds["IMPLICIT"].TIME:
+#     mean_anomalies.append(model_anomalies_ds["IMPLICIT"].sel(TIME=TIME).mean(dim=["LATITUDE", "LONGITUDE"]))
+# plt.grid()
+# plt.plot(model_anomalies_ds["IMPLICIT"].TIME, mean_anomalies)
+# plt.show()
+#
+print(model_anomalies_ds["IMPLICIT"].values)
+make_movie(model_anomalies_ds["IMPLICIT"], -3, 3)
