@@ -11,14 +11,14 @@ from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN_ANOM_ADVECTION = True
-INCLUDE_EKMAN_MEAN_ADVECTION = True
-INCLUDE_ENTRAINMENT = True
+INCLUDE_EKMAN_MEAN_ADVECTION = False
+INCLUDE_ENTRAINMENT = False
 INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING = False
-INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
-INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
+INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = False
+INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = False
 
 SPLIT_SURFACE = True
-INCLUDE_RADIATIVE_SURFACE = False
+INCLUDE_RADIATIVE_SURFACE = True
 INCLUDE_TURBULENT_SURFACE = True
 
 USE_DOWNLOADED_SSH = False
@@ -56,7 +56,6 @@ ENSO_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/nina34.anom.nc"
 
 if IMPLICIT_MODEL:
     all_schemes_ds = xr.open_dataset(IMPLICIT_SCHEME_DATA_PATH, decode_times=False)
-    print(all_schemes_ds["IMPLICIT"].values)
 else:
     all_schemes_ds = xr.open_dataset(ALL_SCHEMES_DATA_PATH, decode_times=False)
     all_schemes_ds["CHRIS_PREV_CUR_NAN"] = all_schemes_ds["CHRIS_PREV_CUR"].where(
@@ -457,13 +456,13 @@ def plot_correlation():
 # plot_full_model(save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/" + save_name + ".mp4")
 # plot_full_model(obs=True, save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/Reynolds_observations.mp4")
 
-# plot_full_model()
+plot_full_model()
 # plot_enso()
 # eof_movie()
 # explained_variance_from_each_mode()
-plot_spatial_pattern_EOFs()
+# plot_spatial_pattern_EOFs()
 # plot_PCs_over_time()
 # regression_map()
 # track_warming_effects()
 # track_anomaly_persistence(6, 9)
-plot_correlation()
+# plot_correlation()

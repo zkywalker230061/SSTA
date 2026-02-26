@@ -18,14 +18,14 @@ e.g.
 """
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN_ANOM_ADVECTION = True
-INCLUDE_EKMAN_MEAN_ADVECTION = False
+INCLUDE_EKMAN_MEAN_ADVECTION = True
 INCLUDE_ENTRAINMENT = True
 INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING = False
-INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
+INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = False
 INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = False
 
 SPLIT_SURFACE = True
-INCLUDE_RADIATIVE_SURFACE = True
+INCLUDE_RADIATIVE_SURFACE = False
 INCLUDE_TURBULENT_SURFACE = True
 
 # geostrophic displacement integral: https://egusphere.copernicus.org/preprints/2025/egusphere-2025-3039/egusphere-2025-3039.pdf
@@ -147,7 +147,7 @@ def run_model(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_EKMAN_MEAN_
         if not added_baseline:  # just adds the baseline of a whole bunch of zero
             base = temperature_ds.sel(PRESSURE=2.5, TIME=month)['ARGO_TEMPERATURE_ANOMALY'] - \
                    temperature_ds.sel(PRESSURE=2.5, TIME=month)['ARGO_TEMPERATURE_ANOMALY']
-            # base.loc[{'LATITUDE': slice(-50, -30)}].loc[{'LONGITUDE': slice(-25, 25)}] = 15
+            # base.loc[{'LATITUDE': slice(-50, -30)}].loc[{'LONGITUDE': slice(50, 100)}] = 30
             base = base.expand_dims(TIME=[month])
             model_anomalies.append(base)
             added_baseline = True
@@ -408,11 +408,11 @@ def run_model(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_EKMAN_MEAN_
     # plt.show()
     #
     # print(model_anomalies_ds["IMPLICIT"].values)
-    # make_movie(model_anomalies_ds["IMPLICIT"], -3, 3)
+    make_movie(model_anomalies_ds["IMPLICIT"], -3, 3)
 
 
-# run_model(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION, INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, USE_DOWNLOADED_SSH, USE_OTHER_MLD, USE_MAX_GRADIENT_METHOD, USE_LOG_FOR_ENTRAINMENT, gamma_0, SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE, INCLUDE_TURBULENT_SURFACE)
+run_model(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION, INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, USE_DOWNLOADED_SSH, USE_OTHER_MLD, USE_MAX_GRADIENT_METHOD, USE_LOG_FOR_ENTRAINMENT, gamma_0, SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE, INCLUDE_TURBULENT_SURFACE)
 
-run_model(True, True, True, True, False, True, True, False, False, True, False, 15.0, True, True, True)
-run_model(True, True, True, True, False, True, True, False, False, True, False, 15.0, True, True, False)
-run_model(True, True, True, True, False, True, True, False, False, True, False, 15.0, True, False, True)
+# run_model(True, True, True, True, False, True, True, False, False, True, False, 15.0, True, True, True)
+# run_model(True, True, True, True, False, True, True, False, False, True, False, 15.0, True, True, False)
+# run_model(True, True, True, True, False, True, True, False, False, True, False, 15.0, True, False, True)
