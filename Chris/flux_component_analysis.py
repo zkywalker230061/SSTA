@@ -17,6 +17,10 @@ INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING = False
 INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
 INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = False
 
+SPLIT_SURFACE = True
+INCLUDE_RADIATIVE_SURFACE = True
+INCLUDE_TURBULENT_SURFACE = True
+
 USE_DOWNLOADED_SSH = False
 USE_OTHER_MLD = False
 USE_MAX_GRADIENT_METHOD = True
@@ -26,7 +30,7 @@ c_0 = 4100.0
 gamma_0 = 15.0
 g = 9.81
 
-save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION, USE_DOWNLOADED_SSH, gamma0=gamma_0, INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION=INCLUDE_EKMAN_MEAN_ADVECTION, OTHER_MLD=USE_OTHER_MLD, MAX_GRAD_TSUB=USE_MAX_GRADIENT_METHOD, ENTRAINMENT_VEL_ANOM_FORC=INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, LOG_ENTRAINMENT_VELOCITY=USE_LOG_FOR_ENTRAINMENT)
+save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION, USE_DOWNLOADED_SSH, gamma0=gamma_0, INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION=INCLUDE_EKMAN_MEAN_ADVECTION, OTHER_MLD=USE_OTHER_MLD, MAX_GRAD_TSUB=USE_MAX_GRADIENT_METHOD, ENTRAINMENT_VEL_ANOM_FORC=INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, LOG_ENTRAINMENT_VELOCITY=USE_LOG_FOR_ENTRAINMENT, SPLIT_SURFACE=SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE=INCLUDE_RADIATIVE_SURFACE, INCLUDE_TURBULENT_SURFACE=INCLUDE_TURBULENT_SURFACE)
 
 FLUX_CONTRIBUTIONS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/" + save_name + "_flux_components.nc"
 T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub.nc"
@@ -154,7 +158,7 @@ def get_surface_flux_proportion(component, save_file=False):
         make_movie(flux_proportion, 0, 1, "Proportion of total flux due to " + component, cmap='Reds')
 
 
-def plot_over_time(plot_list, readable_list, signed=False):
+def plot_proportions_over_time(plot_list, readable_list, signed=False):
     plt.grid()
     for i in range(len(plot_list)):
         if signed:
@@ -168,6 +172,15 @@ def plot_over_time(plot_list, readable_list, signed=False):
     plt.legend()
     plt.show()
 
+def plot_over_time(plot_list, readable_list):
+    plt.grid()
+    for i in range(len(plot_list)):
+        plt.plot(all_components[plot_list[i]].TIME / 12 + 2004, (all_components[plot_list[i]]).mean(dim="LATITUDE").mean(dim="LONGITUDE"), label=readable_list[i])
+    plt.ylabel("Contribution to Total Flux")
+    plt.xlabel("Year")
+    plt.legend()
+    plt.show()
+
 
 def correlate_turbulent_ekman():
     correlation = xr.corr(all_components["TURBULENT_FLUX_ANOMALY"], all_components["EKMAN_ANOM_ADVECTION_ANOMALY"], dim='TIME')
@@ -177,10 +190,13 @@ def correlate_turbulent_ekman():
     plt.ylabel("Latitude (º)")
     cbar = plt.gcf().axes[-1]
     cbar.set_ylabel('Pearson Correlation Coefficient', rotation=90)
-    # plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/correlations/" + save_name + "_correlation.jpg")
-    # plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_poster/full_model_correlation.png", dpi=400)
     plt.show()
 
+# all_components = all_components.where(((all_components.LATITUDE >= 20) & (all_components.LATITUDE <= 60)) | ((all_components.LATITUDE >= -60) & (all_components.LATITUDE <= -20)), drop=True)
+# all_components = all_components.sel(LATITUDE=slice(0, 90))      # NH
+# all_components = all_components.sel(LATITUDE=slice(-90, 0))     # SH
+# all_components = all_components.sel(LATITUDE=slice(20, 60))      # NH midlat
+# all_components = all_components.sel(LATITUDE=slice(-60, -20))     # SH  midlat
 
 # get_flux_proportion("SURFACE_FLUX_ANOMALY", save_file=True)
 # get_flux_proportion("EKMAN_ANOM_ADVECTION_ANOMALY", save_file=True)
@@ -197,6 +213,8 @@ def correlate_turbulent_ekman():
 # get_surface_flux_proportion("RADIATIVE_FLUX_ANOMALY", save_file=False)
 # get_surface_flux_proportion("TURBULENT_FLUX_ANOMALY", save_file=False)
 
-plot_over_time(component_list, readable_component_list, signed=True)
+plot_proportions_over_time(component_list, readable_component_list, signed=False)
+# plot_over_time(component_list, readable_component_list)
+
 
 # correlate_turbulent_ekman()

@@ -11,11 +11,16 @@ from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN_ANOM_ADVECTION = True
-INCLUDE_EKMAN_MEAN_ADVECTION = False
+INCLUDE_EKMAN_MEAN_ADVECTION = True
 INCLUDE_ENTRAINMENT = True
 INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING = False
 INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
-INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = False
+INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
+
+SPLIT_SURFACE = True
+INCLUDE_RADIATIVE_SURFACE = False
+INCLUDE_TURBULENT_SURFACE = True
+
 USE_DOWNLOADED_SSH = False
 USE_OTHER_MLD = False
 USE_MAX_GRADIENT_METHOD = True
@@ -24,8 +29,8 @@ gamma_0 = 15.0
 
 IMPLICIT_MODEL = True
 
-MASK_TROPICS = False
-MASK_TROPICS_LATITUDE = 10
+MASK_TROPICS = True
+MASK_TROPICS_LATITUDE = 15
 
 CONSIDER_OBSERVATIONS = True
 USE_REYNOLDS = True
@@ -40,7 +45,7 @@ USE_REYNOLDS = True
 
 save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION,
                           USE_DOWNLOADED_SSH=USE_DOWNLOADED_SSH, gamma0=gamma_0,
-                          INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION=INCLUDE_EKMAN_MEAN_ADVECTION ,OTHER_MLD=USE_OTHER_MLD, MAX_GRAD_TSUB=USE_MAX_GRADIENT_METHOD, ENTRAINMENT_VEL_ANOM_FORC=INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, LOG_ENTRAINMENT_VELOCITY=USE_LOG_FOR_ENTRAINMENT)
+                          INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION=INCLUDE_EKMAN_MEAN_ADVECTION ,OTHER_MLD=USE_OTHER_MLD, MAX_GRAD_TSUB=USE_MAX_GRADIENT_METHOD, ENTRAINMENT_VEL_ANOM_FORC=INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, LOG_ENTRAINMENT_VELOCITY=USE_LOG_FOR_ENTRAINMENT, SPLIT_SURFACE=SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE=INCLUDE_RADIATIVE_SURFACE, INCLUDE_TURBULENT_SURFACE=INCLUDE_TURBULENT_SURFACE)
 ALL_SCHEMES_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/all_anomalies/" + save_name + ".nc"
 IMPLICIT_SCHEME_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/" + save_name + ".nc"
 DENOISED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/cur_prev_denoised.nc"
@@ -123,6 +128,8 @@ eof_modes, explained_variance, PCs, EOFs = get_eof_with_nan_consideration(to_plo
                                                                           tolerance=1e-15, monthly_mean_ds=monthly_mean,
                                                                           start_mode=start_mode, max_iterations=4)
 #eof_modes.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/all_anomalies/implicit_" + save_name + "_" + str(end_mode) + "eofs.nc")
+PCs = PCs * -1
+EOFs = EOFs * -1
 PCs_standard = (PCs - PCs.mean(axis=0)) / PCs.std(axis=0)  # standardise
 
 if CONSIDER_OBSERVATIONS:  # get EOF modes and PCs for the observations
@@ -212,7 +219,7 @@ def plot_spatial_pattern_EOFs():  # plot EOFs (spatial patterns) for the first k
         axs[k].set_ylabel("Latitude")
     cbar = fig.colorbar(pcolormesh, ax=axs, label="EOF spatial pattern (standardised)")
     #pcolormesh.set_clim(vmin=-10, vmax=10)
-    plt.savefig("../results/eof_spatial_" + to_plot_name + ".jpg", dpi=400)
+    # plt.savefig("../results/eof_spatial_" + to_plot_name + ".jpg", dpi=400)
     plt.show()
     if CONSIDER_OBSERVATIONS:
         fig, axs = plt.subplots(k_range, 1)
@@ -230,7 +237,7 @@ def plot_spatial_pattern_EOFs():  # plot EOFs (spatial patterns) for the first k
             axs[k].set_ylabel("Latitude")
         cbar = fig.colorbar(pcolormesh, ax=axs, label="EOF spatial pattern (standardised)")
         #pcolormesh.set_clim(vmin=-10, vmax=10)
-        plt.savefig("../results/eof_spatial_obs.jpg", dpi=400)
+        # plt.savefig("../results/eof_spatial_obs.jpg", dpi=400)
         plt.show()
 
 # plot PCs over time
@@ -390,7 +397,7 @@ def track_anomaly_persistence(lag, start_month=None):
                 data_at_this_month.append(da.sel(TIME=time))
         return xr.concat(data_at_this_month, dim="TIME")
 
-    def plot_autocorrelation(acf, lag, model_name):
+    def plot_autocorrelation(acf, lag, model_name, acf_obs=None):
         plt.figure()
         acf.sel(LAG=lag).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=-1, vmax=1)
         plt.title("Autocorrelation with lag=" + str(lag) + " of " + str(model_name))
@@ -401,8 +408,14 @@ def track_anomaly_persistence(lag, start_month=None):
         print(mean_autocorrelation.sel(LAG=6).values)
         plt.figure()
         plt.grid()
-        plt.plot(mean_autocorrelation.LAG.values, mean_autocorrelation.values)
-        plt.title("Autocorrelation Mean of " + str(model_name))
+        plt.plot(mean_autocorrelation.LAG.values, mean_autocorrelation.values, label=model_name)
+        if acf_obs is not None:
+            mean_autocorrelation_obs = acf_obs.mean(("LATITUDE", "LONGITUDE"))
+            plt.plot(mean_autocorrelation_obs.LAG.values, mean_autocorrelation_obs.values, label="Observations")
+            plt.title("Autocorrelation Mean of " + str(model_name))
+            plt.legend()
+        else:
+            plt.title("Autocorrelation Mean of " + str(model_name))
         plt.xlabel("Lag (months)")
         plt.ylabel("Autocorrelation")
         plt.show()
@@ -411,7 +424,6 @@ def track_anomaly_persistence(lag, start_month=None):
         autocorrelation_functions_ds = get_autocorrelation(to_plot_no_unchanging_cells, max_lag=36)  # all time
     else:
         autocorrelation_functions_ds = get_autocorrelation(start_at_month(to_plot_no_unchanging_cells, start_month), lag_da=to_plot_no_unchanging_cells, max_lag=12)
-    plot_autocorrelation(autocorrelation_functions_ds, lag, "implicit model")
 
     if CONSIDER_OBSERVATIONS:
         obs_no_unchanging_cells = observed_anomaly.where(to_plot.std("TIME") != 0)
@@ -419,7 +431,10 @@ def track_anomaly_persistence(lag, start_month=None):
             obs_autocorrelation_functions_ds = get_autocorrelation(obs_no_unchanging_cells, max_lag=36)  # all time
         else:
             obs_autocorrelation_functions_ds = get_autocorrelation(start_at_month(obs_no_unchanging_cells, start_month), lag_da=obs_no_unchanging_cells, max_lag=12)
-        plot_autocorrelation(obs_autocorrelation_functions_ds, lag, "observations")
+        plot_autocorrelation(autocorrelation_functions_ds, lag, "Implicit Model", obs_autocorrelation_functions_ds)
+        #plot_autocorrelation(obs_autocorrelation_functions_ds, lag, "observations")
+    else:
+        plot_autocorrelation(autocorrelation_functions_ds, lag, "implicit model")
 
 
 def plot_correlation():
@@ -431,7 +446,7 @@ def plot_correlation():
         plt.xlabel("Longitude (º)")
         plt.ylabel("Latitude (º)")
         cbar = plt.gcf().axes[-1]
-        cbar.set_ylabel('Pearson Correlation Coefficient', rotation=270, labelpad=15)
+        cbar.set_ylabel('Pearson Correlation Coefficient', rotation=90)
         plt.title("Correlation between model and SST observation")
         #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/correlations/" + save_name + "_correlation.jpg")
         #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_poster/full_model_correlation.png", dpi=400)
@@ -442,13 +457,13 @@ def plot_correlation():
 # plot_full_model(save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/" + save_name + ".mp4")
 # plot_full_model(obs=True, save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/Reynolds_observations.mp4")
 
-plot_full_model()
+# plot_full_model()
 # plot_enso()
 # eof_movie()
 # explained_variance_from_each_mode()
-# plot_spatial_pattern_EOFs()
+plot_spatial_pattern_EOFs()
 # plot_PCs_over_time()
 # regression_map()
 # track_warming_effects()
 # track_anomaly_persistence(6, 9)
-# plot_correlation()
+plot_correlation()

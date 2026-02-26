@@ -555,7 +555,7 @@ def compute_gradient_lon(
     return grad
 
 
-def get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH=False, gamma0=10, INCLUDE_GEOSTROPHIC_DISPLACEMENT=False, INCLUDE_EKMAN_MEAN_ADVECTION=False, OTHER_MLD=False, MAX_GRAD_TSUB=False, ENTRAINMENT_VEL_ANOM_FORC=False, LOG_ENTRAINMENT_VELOCITY=False):
+def get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH=False, gamma0=10, INCLUDE_GEOSTROPHIC_DISPLACEMENT=False, INCLUDE_EKMAN_MEAN_ADVECTION=False, OTHER_MLD=False, MAX_GRAD_TSUB=False, ENTRAINMENT_VEL_ANOM_FORC=False, LOG_ENTRAINMENT_VELOCITY=False, SPLIT_SURFACE=False, INCLUDE_RADIATIVE_SURFACE=False, INCLUDE_TURBULENT_SURFACE=False):
     save_name = ""
     if INCLUDE_SURFACE:
         save_name = save_name + "1"
@@ -589,6 +589,11 @@ def get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_G
         save_name = save_name + "_logentrainmentvelocity"
     if gamma0 != 10.0:
         save_name += "_gamma" + str(gamma0)
+    if INCLUDE_SURFACE and SPLIT_SURFACE:
+        if INCLUDE_RADIATIVE_SURFACE:
+            save_name += "_radsurf"
+        if INCLUDE_TURBULENT_SURFACE:
+            save_name += "_turbsurf"
     return save_name
 
 
