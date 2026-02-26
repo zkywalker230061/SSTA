@@ -591,7 +591,7 @@ for ax, (scheme_name, model_da) in zip(axes.flat, schemes.items()):
     # Calculate RMSE over the 'TIME' dimension
     # new_data = model_da.isel(LATITUDE=slice(0,-90) and )
     # observed_temperature_anomaly_selected = observed_temperature_anomaly.isel(LATITUDE=slice(0,-90))
-    rmse_map = calculate_RMSE(obs_temp_anom, model_da, dim='TIME')
+    rmse_map = calculate_RMSE_normalised(obs_temp_anom, model_da, dim='TIME')
     
     # Plotting
     # ax = plt.subplot(3, 2, i + 1)
@@ -599,9 +599,13 @@ for ax, (scheme_name, model_da) in zip(axes.flat, schemes.items()):
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Lattitude")
     ax.set_title(f'{scheme_name} Scheme - Overall RMSE')
+
     max_rmse = rmse_map.max().item()
-    print(scheme_name, max_rmse)
+    
+    print(scheme_name, "maximum rmse", max_rmse)
+    print(scheme_name, "average rmse", rmse_map.mean(dim={"LATITUDE", "LONGITUDE"}))
 plt.tight_layout()
+print("RMS of Obs", (np.sqrt((obs_temp_anom**2).mean(dim = 'TIME'))).mean(dim = {"LATITUDE", "LONGITUDE"}))
 fig.delaxes(axes[2, 1]) # Removes the 8th subplot (row 2, column 1)
 fig.delaxes(axes[2, 2])
 fig.text(

@@ -2,8 +2,10 @@
 # --- 1. Running Implicit Scheme ---------------------------------- 
 import xarray as xr
 import numpy as np
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+import matplotlib.ticker as mticker
 import matplotlib.pyplot as plt
-import seaborn as sns
 import pandas as pd
 from chris_utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, get_save_name, coriolis_parameter
 from chris_utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
@@ -11,16 +13,18 @@ from matplotlib.animation import FuncAnimation
 import matplotlib
 from scipy.stats import kurtosis, skew, pearsonr, t
 
+
 matplotlib.use('TkAgg')
 
-INCLUDE_SURFACE = False
-INCLUDE_EKMAN = False
+INCLUDE_SURFACE = True
+INCLUDE_EKMAN = True
 INCLUDE_ENTRAINMENT = True
-INCLUDE_GEOSTROPHIC_MEAN = False
-INCLUDE_GEOSTROPHIC_ANOM = False
+INCLUDE_GEOSTROPHIC_MEAN = True
+INCLUDE_GEOSTROPHIC_ANOM = True
 CLEAN_CHRIS_PREV_CUR = False        # only really useful when entrainment is turned on
 
 observed_path = "/Users/julia/Desktop/SSTA/datasets/Mixed_Layer_Datasets.nc"
+observed_path_Reynolds = "/Users/julia/Desktop/SSTA/datasets/Reynold_sst_anomalies-(2004-2018).nc"
 HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/data_for_modelling/heat_flux_interpolated_all_contributions.nc"
 EKMAN_ANOMALY_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/Ekman_Anomaly_Full_Datasets.nc"
 TEMP_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/RG_ArgoClim_Temperature_2019.nc"
@@ -38,7 +42,7 @@ GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/g
 SEA_SURFACE_GRAD_DATA_PATH = "/Users/julia/Desktop/SSTA/datasets/sea_surface_interpolated_grad.nc"
 
 USE_DOWNLOADED_SSH = False
-USE_NEW_H_BAR_NEW_T_SUB = True 
+USE_NEW_H_BAR_NEW_T_SUB = False 
 
 rho_0 = 1025.0
 c_0 = 4100.0
@@ -103,6 +107,9 @@ else:
 
 # Unchanged Parameters for the simulation 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
+
+observed_temp_ds_reynold = xr.open_dataset(observed_path_Reynolds, decode_times=False)['anom']
+observed_temperature_anomaly_reynold = observed_temp_ds_reynold
 
 # Surface Heat Flux 
 heat_flux_ds = xr.open_dataset(HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH, decode_times=False)
@@ -474,16 +481,16 @@ def plot_map(data, title, label, cmap="nipy_spectral", vmin=None, vmax=None, lev
     ax.set_title(title)
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
-    fig.text(
-        0.99, 0.01,
-        f"Gamma = {gamma_0}\n"
-        f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
-        f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
-        f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
-        f"INCLUDE_GEOSTROPHIC = {INCLUDE_GEOSTROPHIC_MEAN}\n"
-        f"INCLUDE_GEOSTROPHIC_DISPLACEMENT = {INCLUDE_GEOSTROPHIC_ANOM}",
-        ha='right', va='bottom', fontsize=8
-        )
+    # fig.text(
+    #     0.99, 0.01,
+    #     f"Gamma = {gamma_0}\n"
+    #     f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
+    #     f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
+    #     f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
+    #     f"INCLUDE_GEOSTROPHIC = {INCLUDE_GEOSTROPHIC_MEAN}\n"
+    #     f"INCLUDE_GEOSTROPHIC_DISPLACEMENT = {INCLUDE_GEOSTROPHIC_ANOM}",
+    #     ha='right', va='bottom', fontsize=8
+    #     )
     plt.tight_layout()
     plt.show()
 
@@ -498,8 +505,8 @@ lon = observed_temperature_anomaly['LONGITUDE'].values
 
 # 3.2 Pre-calculate Autocorrelation (Persistence)
 # High autocorrelation reduces the Effective Degrees of Freedom (N_eff).
-r_x = xr.corr(observed_temperature_anomaly, 
-              observed_temperature_anomaly.shift(TIME=1), dim="TIME")
+r_x = xr.corr(observed_temperature_anomaly_reynold, 
+              observed_temperature_anomaly_reynold.shift(TIME=1), dim="TIME")
 r_y = xr.corr(implicit_model_anomaly_ds, 
               implicit_model_anomaly_ds.shift(TIME=1), dim="TIME")
 
@@ -526,7 +533,7 @@ def calculate_lag_stats(obs, model, lag, r_x_map, r_y_map):
 
 # 3.4 Execute Loop over Lags
 print("Calculating cross-correlations...")
-results = [calculate_lag_stats(observed_temperature_anomaly, 
+results = [calculate_lag_stats(observed_temperature_anomaly_reynold, 
                                implicit_model_anomaly_ds, 
                                k, r_x, r_y) for k in lags]
 
@@ -669,3 +676,126 @@ plot_map(
     cmap="nipy_spectral",
     levels=lag_levels
 )
+#%%
+#_-------------------
+
+# --- 0. Set Publication Plotting Parameters ---
+plt.rcParams.update({
+    'font.size': 12,
+    'axes.labelsize': 12,
+    'axes.titlesize': 14,
+    'xtick.labelsize': 10,
+    'ytick.labelsize': 10,
+    'legend.fontsize': 10,
+    'figure.dpi': 300, # High resolution for publications
+    'font.family': 'sans-serif'
+})
+
+# Extract significance mask (True where p < 0.05)
+# Assuming p_values_da was calculated previously
+significant_mask = p_values_da.isel(lag=best_idx) < 0.05
+
+def format_cartopy_axes(ax):
+    """Adds coastlines, land features, and gridlines to a Cartopy axis."""
+    ax.add_feature(cfeature.COASTLINE, linewidth=0.5)
+    ax.add_feature(cfeature.LAND, facecolor='lightgray', edgecolor='none', zorder=1)
+    
+    gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                      linewidth=0.5, color='gray', alpha=0.5, linestyle='--')
+    gl.top_labels = False
+    gl.right_labels = False
+    gl.xlabel_style = {'size': 10}
+    gl.ylabel_style = {'size': 10}
+    return ax
+
+def add_significance_stippling(ax, lon, lat, sig_mask):
+    """Adds dots to regions that are statistically significant."""
+    # We use contourf with hatches to overlay stippling where sig_mask is True
+    ax.contourf(lon, lat, sig_mask, levels=[0.5, 1.5], 
+                colors='none', hatches=['...', None], 
+                transform=ccrs.PlateCarree(), zorder=2)
+
+# ==============================================================================
+# --- FIGURE 1: Maximum Cross-Correlation with Significance Stippling ---
+# ==============================================================================
+fig1 = plt.figure(figsize=(10, 5))
+ax1 = plt.axes(projection=ccrs.Robinson(central_longitude=0)) # Great for global ocean
+format_cartopy_axes(ax1)
+
+# Plot correlation using a diverging colormap
+plot_corr = best_corr.plot(
+    ax=ax1, 
+    transform=ccrs.PlateCarree(),
+    cmap='RdBu_r',       # Standard for diverging data (red=positive, blue=negative)
+    vmin=-1, vmax=1, 
+    add_colorbar=False,  # We will add a custom one below
+    zorder=0
+)
+
+# Add significance stippling
+add_significance_stippling(ax1, best_corr['LONGITUDE'], best_corr['LATITUDE'], significant_mask)
+
+# Custom Colorbar
+cbar1 = plt.colorbar(plot_corr, ax=ax1, orientation='horizontal', pad=0.08, aspect=40, shrink=0.8)
+cbar1.set_label('Maximum Cross-Correlation (r)', fontsize=12)
+
+ax1.set_title(f"a) {scheme_name} Scheme: Maximum Cross-Correlation\n(Stippling indicates 95% significance)", loc='left', pad=15)
+plt.tight_layout()
+plt.savefig("Max_Correlation_Map.pdf", bbox_inches='tight', dpi=300)
+plt.show()
+
+# ==============================================================================
+# --- FIGURE 2: Lag of Maximum Correlation ---
+# ==============================================================================
+fig2 = plt.figure(figsize=(10, 5))
+ax2 = plt.axes(projection=ccrs.Robinson(central_longitude=0))
+format_cartopy_axes(ax2)
+
+# Define discrete levels and a cyclic/diverging colormap for lags
+lag_levels = np.arange(lags.min() - 0.5, lags.max() + 1.5, 1)
+cmap_lag = plt.get_cmap('PiYG', len(lag_levels)-1) # Pink to Green diverging
+
+# Only plot lag where correlation is significant (common practice in papers)
+best_lag_masked = best_lag.where(significant_mask)
+
+plot_lag = best_lag_masked.plot(
+    ax=ax2, 
+    transform=ccrs.PlateCarree(),
+    cmap=cmap_lag,
+    levels=lag_levels,
+    add_colorbar=False,
+    zorder=0
+)
+
+cbar2 = plt.colorbar(plot_lag, ax=ax2, orientation='horizontal', pad=0.08, aspect=40, shrink=0.8)
+cbar2.set_label('Lag (Months)', fontsize=12)
+cbar2.set_ticks(np.arange(lags.min(), lags.max() + 1, 2)) # Tick every 2 months
+
+ax2.set_title(f"b) {scheme_name} Scheme: Lag of Maximum Correlation\n(Masked to significant regions)", loc='left', pad=15)
+plt.tight_layout()
+plt.savefig("Max_Lag_Map.pdf", bbox_inches='tight', dpi=300)
+plt.show()
+
+# ==============================================================================
+# --- FIGURE 3: Zonal Mean Correlation (Very Common in Research Papers) ---
+# ==============================================================================
+# A plot showing how the correlation changes purely by latitude
+zonal_mean_corr = best_corr.mean(dim='LONGITUDE', skipna=True)
+
+fig3, ax3 = plt.subplots(figsize=(5, 6))
+ax3.plot(zonal_mean_corr, zonal_mean_corr['LATITUDE'], color='k', linewidth=2)
+ax3.fill_betweenx(zonal_mean_corr['LATITUDE'], 0, zonal_mean_corr, 
+                  where=(zonal_mean_corr > 0), color='red', alpha=0.3)
+ax3.fill_betweenx(zonal_mean_corr['LATITUDE'], 0, zonal_mean_corr, 
+                  where=(zonal_mean_corr < 0), color='blue', alpha=0.3)
+
+ax3.axvline(0, color='gray', linestyle='--')
+ax3.set_ylim(-80, 80) # Adjust based on your latitude bounds
+ax3.set_xlim(-1, 1)
+ax3.set_ylabel('Latitude')
+ax3.set_xlabel('Zonal Mean Correlation')
+ax3.set_title(f"{scheme_name}: Zonal Mean\nMax Correlation")
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.savefig("Zonal_Mean_Corr.pdf", bbox_inches='tight', dpi=300)
+plt.show()
