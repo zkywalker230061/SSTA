@@ -87,10 +87,6 @@ def save_reynolds_anomalies():
 def save_regridded_reynolds_anomalies():
     """Save the regridded reynolds anomalies dataset."""
 
-    with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Reynolds/sst_anomalies-(2004-2018).nc" in logs_datasets.read():
-            return
-
     reynolds_sst_anomalies = xr.open_dataset(
         "datasets/Reynolds/sst.mon.anom-(2004-2018).nc"
     )
@@ -106,15 +102,39 @@ def save_regridded_reynolds_anomalies():
     )
 
 
+def save_regridded_reynolds_ltm():
+    """Save the regridded reynolds long-term mean dataset."""
+
+    reynolds_sst_ltm = xr.open_dataset(
+        "datasets/Reynolds/sst.mon.ltm.1991-2020.nc", decode_times=False
+    )
+
+    reynolds_sst_ltm['time'] = list(range(1, 13))
+
+    argo_ds = load_and_prepare_dataset(
+        "datasets/Temperature-(2004-2018).nc"
+    )
+
+    regridder = xe.Regridder(reynolds_sst_ltm, argo_ds, "conservative")
+    reynolds_sst_ltm_regrided = regridder(reynolds_sst_ltm)
+
+    reynolds_sst_ltm_regrided = reynolds_sst_ltm_regrided.rename({'time': 'MONTH'})
+
+    reynolds_sst_ltm_regrided.attrs.update(reynolds_sst_ltm.attrs)
+
+    reynolds_sst_ltm_regrided.to_netcdf(
+        "datasets/Reynolds/sst_ltm.nc"
+    )
+
+
 def main():
     """Main function to prepare datasets from RGARGO."""
 
     # save_reynolds_anomalies()
     # save_regridded_reynolds_anomalies()
-    test = load_and_prepare_dataset('datasets/Reynolds/sst_anomalies-(2004-2018).nc')
+    # save_regridded_reynolds_ltm()
+    test = xr.open_dataset("datasets/Reynolds/sst_ltm.nc")
     print(test)
-    anom = test['anom']
-    anom.sel(TIME=0.5).plot()
 
 
 if __name__ == "__main__":

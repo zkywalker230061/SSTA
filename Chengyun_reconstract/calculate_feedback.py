@@ -1,5 +1,5 @@
 """
-File to calcuate feedback parameter.
+File to calcuate feedback parameter. Not correct.
 
 Chengyun Zhu
 2026-2-11
