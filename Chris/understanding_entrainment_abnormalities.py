@@ -2,7 +2,7 @@ import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 
-from SSTA.Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, get_save_name, \
+from Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, get_save_name, \
     coriolis_parameter, get_month_from_time
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
@@ -26,6 +26,8 @@ T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub.nc"
 H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
 OBSERVATIONS_JJ_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/observed_anomaly_JJ.nc"
 ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Entrainment_Velocity-(2004-2018).nc"
+REYNOLDS_OBS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sst_anomalies-(2004-2018).nc"
+TEST_MODEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Simulation-TA.nc"
 
 if USE_OTHER_MLD:
     MLD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_h.nc"
@@ -40,8 +42,9 @@ all_models_ds = xr.open_dataset(ALL_SCHEMES_DATA_PATH, decode_times=False)
 mld_ds = xr.open_dataset(MLD_DATA_PATH, decode_times=False)
 tsub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
 hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
-obs_ds = xr.open_dataset(OBSERVATIONS_JJ_DATA_PATH, decode_times=False)
+obs_ds = xr.open_dataset(OBSERVATIONS_JJ_DATA_PATH, decode_times=False) # Argo obs
 entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
+test_model_ds = xr.open_dataset(TEST_MODEL_DATA_PATH, decode_times=False)
 
 if USE_OTHER_MLD:
     hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
@@ -51,10 +54,15 @@ else:
 entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
 entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
 
-tm = obs_ds['__xarray_dataarray_variable__']
-tm_monthly_mean = get_monthly_mean(tm)
-obs_ds = get_anomaly(obs_ds, '__xarray_dataarray_variable__', tm_monthly_mean)
-tm_anomaly = obs_ds['__xarray_dataarray_variable___ANOMALY']
+# Argo obs
+# tm = obs_ds['__xarray_dataarray_variable__']
+# tm_monthly_mean = get_monthly_mean(tm)
+# obs_ds = get_anomaly(obs_ds, '__xarray_dataarray_variable__', tm_monthly_mean)
+# tm_anomaly = obs_ds['__xarray_dataarray_variable___ANOMALY']
+
+# Reynolds obs
+obs_ds = xr.open_dataset(REYNOLDS_OBS_DATA_PATH, decode_times=False)
+tm_anomaly = obs_ds['anom']
 
 if USE_OTHER_MLD:
     tsub_anomaly = tsub_ds["ANOMALY_SUB_TEMPERATURE"]
@@ -62,6 +70,8 @@ else:
     tsub_anomaly = tsub_ds["T_sub_ANOMALY"]
 
 implicit_model = all_models_ds["IMPLICIT"]
+# implicit_model = test_model_ds["TA_SIMULATED"]
+
 
 def make_movies():
     make_movie(tm_anomaly, -3, 3, savepath="/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment/obs_tm_anom.mp4")
@@ -90,12 +100,7 @@ def entrain_detrain_split(show_month_by_month=False):
     def get_nan_mask(month, da):
         da = da.sel(MONTH=month)
         entrain_mask = da > entrainment_threshold
-        # entrain_mask = da > ((da.mean() - da.std() * 1).values)
-        # print(da.mean().values)
-        # print((da.mean() - da.std() * 1).values)
-        # entrain_mask = entrain_mask > 0
         detrain_mask = ~entrain_mask
-        # detrain_mask = da == 0        # == no entrainment occurring
         return [entrain_mask, detrain_mask]
 
     monthly_entrainment_masks = []
@@ -252,7 +257,7 @@ def track_temperature_over_time():
     plt.legend()
     plt.show()
 
-show_correlation_over_all_time()
+# show_correlation_over_all_time()
 entrain_detrain_split()
 #track_temperature_over_time()
 

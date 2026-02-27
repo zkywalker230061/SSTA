@@ -16,6 +16,10 @@ sea_surface_ds = xr.open_dataset(SEA_SURFACE_DATA_PATH, decode_times=False)
 print(sea_surface_ds)
 temp_ds = load_and_prepare_dataset("/Volumes/G-DRIVE ArmorATD/Extension/datasets/RG_ArgoClim_Temperature_2019.nc")
 
+g = 9.81
+
+sea_surface_ds[var_name] = sea_surface_ds[var_name] * g     # mistaken divide by g in calculate
+
 monthly_mean_sla = get_monthly_mean(sea_surface_ds[var_name])
 sea_surface_ds[var_name + '_ANOMALY'] = get_anomaly(sea_surface_ds, var_name, monthly_mean_sla)[var_name + "_ANOMALY"]
 sea_surface_ds[var_name + '_ANOMALY'].attrs['units'] = ''
@@ -34,8 +38,8 @@ monthly_mean_ssh_ds[var_name + '_monthlymean_grad_long'].attrs["units"] = ""
 
 g = 9.81
 f = coriolis_parameter(sea_surface_ds['LATITUDE']).broadcast_like(sea_surface_ds[var_name]).broadcast_like(sea_surface_ds[var_name + '_anomaly_grad_long']).sel(TIME=0.5)  # broadcasting based on Jason/Julia's usage; take any time because they're always the same
-alpha = g / f * monthly_mean_ssh_ds[var_name + '_monthlymean_grad_long']
-beta = g / f * monthly_mean_ssh_ds[var_name + '_monthlymean_grad_lat']
+alpha = g / f * monthly_mean_ssh_ds[var_name + '_monthlymean_grad_lat']
+beta = g / f * monthly_mean_ssh_ds[var_name + '_monthlymean_grad_long']
 alpha_grad_lon = compute_gradient_lon(alpha)
 beta_grad_lat = compute_gradient_lat(beta)
 

@@ -2,7 +2,7 @@ import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 
-from SSTA.Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, get_save_name, \
+from Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, get_save_name, \
     coriolis_parameter
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
@@ -18,11 +18,11 @@ e.g.
 => surface and geostrophic on, Ekman and entrainment off
 """
 
-INCLUDE_SURFACE = True
-INCLUDE_EKMAN = True
+INCLUDE_SURFACE = False
+INCLUDE_EKMAN = False
 INCLUDE_ENTRAINMENT = True
-INCLUDE_GEOSTROPHIC = True
-INCLUDE_GEOSTROPHIC_DISPLACEMENT = True
+INCLUDE_GEOSTROPHIC = False
+INCLUDE_GEOSTROPHIC_DISPLACEMENT = False
 # geostrophic displacement integral: https://egusphere.copernicus.org/preprints/2025/egusphere-2025-3039/egusphere-2025-3039.pdf
 CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turned on
 USE_DOWNLOADED_SSH = False
@@ -75,7 +75,7 @@ t_sub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
 if USE_OTHER_MLD:
     t_sub_da = t_sub_ds["ANOMALY_SUB_TEMPERATURE"]
 else:
-    t_sub_da = t_sub_ds["T_sub_ANOMALY"]
+    t_sub_da = t_sub_ds["SUB_TEMPERATURE"]
 
 entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
 entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
@@ -739,6 +739,5 @@ flux_components_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/all_a
 # make_movie(all_anomalies_ds["IMPLICIT"], -2, 2)
 # make_movie(all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"], -5, 5)
 # make_movie(all_anomalies_ds["CHRIS_MEAN_K"], -5, 5)
-
 
 
