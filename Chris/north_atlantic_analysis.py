@@ -6,6 +6,7 @@ from scipy.stats import pearsonr
 from scipy.signal import correlate, correlation_lags
 import pandas as pd
 
+from Chris.correlation_significance import get_significance
 from Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, get_save_name, \
     coriolis_parameter, get_month_from_time
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
@@ -56,13 +57,21 @@ seasons = []
 for time in times:
     month = get_month_from_time(time)
     months.append(month)
-    if month == 3 or month == 1 or month == 2:
+    # if month == 11 or month == 12 or month == 1:
+    #     seasons.append(0)
+    # if month == 2 or month == 3 or month == 4:
+    #     seasons.append(1)
+    # if month == 5 or month == 6 or month == 7:
+    #     seasons.append(2)
+    # if month == 8 or month == 9 or month == 10:
+    #     seasons.append(3)
+    if month == 2 or month == 12 or month == 1:
         seasons.append(0)
-    if month == 6 or month == 4 or month == 5:
+    if month == 5 or month == 3 or month == 4:
         seasons.append(1)
-    if month == 9 or month == 7 or month == 8:
+    if month == 8 or month == 6 or month == 7:
         seasons.append(2)
-    if month == 12 or month == 10 or month == 11:
+    if month == 11 or month == 9 or month == 10:
         seasons.append(3)
 model_da = model_da.assign_coords(MONTH=("TIME", months))
 model_da = model_da.assign_coords(SEASON=("TIME", seasons))
@@ -221,5 +230,15 @@ nao_list = read_nao(NAO_DATA_PATH)
 # get_seasonal_eof(model_da)
 nat_list = get_nat_index(model_da)
 nat_list_obs = get_nat_index(obs_da, is_obs=True)
-compare_nat((model_da.TIME.values / 12) + 2004, nat_list, nat_list_obs)
-compare_nat_nao((model_da.TIME.values / 12) + 2004, nat_list, nao_list)
+# compare_nat((model_da.TIME.values / 12) + 2004, nat_list, nat_list_obs)
+# compare_nat_nao((model_da.TIME.values / 12) + 2004, nat_list_obs, nao_list)
+
+correlation, significant_correlation = get_significance(model_da, obs_da, resamples=100, test_statistic="MI")
+
+fig, ax = plt.subplots()
+correlation.plot(cmap='nipy_spectral', vmin=-1, vmax=1)
+lons = significant_correlation.LONGITUDE.values
+lats = significant_correlation.LATITUDE.values
+lon_grid, lat_grid = np.meshgrid(lons, lats)
+ax.contourf(lon_grid, lat_grid, significant_correlation.values.astype(float), levels=[0.5, 1.5], hatches=['///'], colors='none')
+plt.show()

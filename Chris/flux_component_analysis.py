@@ -11,11 +11,11 @@ matplotlib.use('TkAgg')
 
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN_ANOM_ADVECTION = True
-INCLUDE_EKMAN_MEAN_ADVECTION = False
+INCLUDE_EKMAN_MEAN_ADVECTION = True
 INCLUDE_ENTRAINMENT = True
 INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING = False
 INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
-INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = False
+INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
 
 SPLIT_SURFACE = True
 INCLUDE_RADIATIVE_SURFACE = True
@@ -199,7 +199,7 @@ def correlate_turbulent_ekman():
 # all_components = all_components.sel(LATITUDE=slice(-60, -20))     # SH  midlat
 
 # get_flux_proportion("SURFACE_FLUX_ANOMALY", save_file=True)
-# get_flux_proportion("EKMAN_ANOM_ADVECTION_ANOMALY", save_file=True)
+get_flux_proportion("EKMAN_ANOM_ADVECTION_ANOMALY", save_file=False)
 # get_flux_proportion("ENTRAINMENT_ANOMALY", save_file=True)
 # get_flux_proportion("GEOSTROPHIC_ANOM_ADVECTION_ANOMALY", save_file=True)
 # get_flux_proportion("EKMAN_MEAN_ADVECTION_ANOMALY", save_file=True)
@@ -213,7 +213,7 @@ def correlate_turbulent_ekman():
 # get_surface_flux_proportion("RADIATIVE_FLUX_ANOMALY", save_file=False)
 # get_surface_flux_proportion("TURBULENT_FLUX_ANOMALY", save_file=False)
 
-plot_proportions_over_time(component_list, readable_component_list, signed=False)
+# plot_proportions_over_time(component_list, readable_component_list, signed=False)
 # plot_over_time(component_list, readable_component_list)
 
 
