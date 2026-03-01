@@ -8,7 +8,7 @@ Chris O.S., tweaked by Chengyun.
 from IPython.display import display
 
 import xarray as xr
-# import numpy as np
+import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import matplotlib
@@ -26,6 +26,8 @@ matplotlib.use('TkAgg')
 
 TEMP_DATA_PATH = "../datasets/Mixed_Layer_Temperature-(2004-2018).nc"
 MLD_DATA_PATH = "../datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
+T_SUB_DATA_PATH = "../datasets/Sub_Layer_Temperature-(2004-2018).nc"
+ENT_VELOC_DATA_PATH = "../datasets/Entrainment_Velocity-(2004-2018).nc"
 
 HEAT_FLUX_DATA_PATH = "../datasets/ERA5-ARGO_Mean_Surface_Heat_Flux.nc"
 ENT_FLUX_DATA_PATH = "../datasets/Entrainment_Heat_Flux_Anomaly-(2004-2018).nc"
@@ -35,6 +37,7 @@ EK_DATA_PATH = "../datasets/Ekman_Current_Anomaly.nc"
 RHO_O = 1025  # kg / m^3
 C_O = 4100  # J / (kg K)
 SECONDS_MONTH = 30.4375 * 24 * 60 * 60  # average seconds in a month
+GAMMA = 10
 
 temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
 # display(temperature_ds)
@@ -45,8 +48,23 @@ temperature_anomaly = get_anomaly(temperature, temperature_monthly_mean)
 # display(temperature_anomaly)
 
 mld_ds = load_and_prepare_dataset(MLD_DATA_PATH)
-mld_ds = mld_ds.rename({'MONTH': 'TIME'})
+# mld_ds = mld_ds.rename({'MONTH': 'TIME'})
 # display(mld_ds)
+mld = mld_ds['MONTHLY_MEAN_MLD_PRESSURE']
+
+t_sub_ds = load_and_prepare_dataset(T_SUB_DATA_PATH)
+# display(t_sub_ds)
+t_sub = t_sub_ds['SUB_TEMPERATURE']
+t_sub_monthly_mean = get_monthly_mean(t_sub)
+# display(t_sub_monthly_mean)
+t_sub_anomaly = get_anomaly(t_sub, t_sub_monthly_mean)
+# display(t_sub_anomaly)
+
+w_e_ds = load_and_prepare_dataset(ENT_VELOC_DATA_PATH)
+# display(w_e_ds)
+w_e = w_e_ds['ENTRAINMENT_VELOCITY']
+w_e_monthly_mean = get_monthly_mean(w_e)
+# display(w_e_monthly_mean)
 
 heat_flux_ds = load_and_prepare_dataset(HEAT_FLUX_DATA_PATH)
 heat_flux = (
@@ -73,9 +91,15 @@ ent_anomaly = ent['ENTRAINMENT_ANOMALY']
 ekman = load_and_prepare_dataset(EK_DATA_PATH)
 # display(ekman)
 ekman_anomaly = ekman['Q_Ek_anom']
+ekman_anomaly = ekman_anomaly.where(~np.isnan(ekman_anomaly), 0)
 
 
 MONTH = 0.5
+MONTH_END = 179.5
+# Chris Scheme
+# ============================================================================
+# model_list = []
+# ============================================================================
 for month in temperature.TIME.values:
     if month == MONTH:
         model_anomaly_ds = (
@@ -83,20 +107,60 @@ for month in temperature.TIME.values:
             - temperature_anomaly.sel(TIME=MONTH)
         )
         model_anomaly_ds = model_anomaly_ds.expand_dims(TIME=[MONTH])
+    # Non-Chris Schemes
+    # ========================================================================
+    # Non-Explicit Schemes
+    # ------------------------------------------------------------------------
+    elif month == MONTH_END:
+        pass
+    # ------------------------------------------------------------------------
     else:
         prev = model_anomaly_ds.sel(TIME=month-1)
+        # Explicit Scheme
+        # --------------------------------------------------------------------
+        # cur = (
+        #     prev
+        #     + SECONDS_MONTH * (
+        #         heat_flux_anomaly.sel(TIME=month)
+        #         + ent_anomaly.sel(TIME=month)
+        #         # + GEO
+        #         + ekman_anomaly.sel(TIME=month)
+        #         - GAMMA * prev
+        #     ) / (RHO_O * C_O * mld.sel(MONTH=(month % 12 + 0.5)))
+        # )
+        # Implicit Scheme
+        # --------------------------------------------------------------------
         cur = (
-            prev
-            + SECONDS_MONTH * (
-                heat_flux_anomaly.sel(TIME=month)
-                + ent_anomaly.sel(TIME=month)
-                # + GEO
-                + ekman_anomaly.sel(TIME=month)
-            ) / (RHO_O * C_O * mld_ds.sel(TIME=(month % 12 + 0.5))['MONTHLY_MEAN_MLD_PRESSURE'])
+            (
+                prev +
+                SECONDS_MONTH / (RHO_O * C_O * mld.sel(MONTH=((month+1) % 12 + 0.5))) * (
+                    heat_flux_anomaly.sel(TIME=month+1)
+                    + ent_anomaly.sel(TIME=month+1)
+                    # + GEO
+                    + ekman_anomaly.sel(TIME=month)
+                )
+            ) / (1 + SECONDS_MONTH / (RHO_O * C_O * mld.sel(MONTH=((month+1) % 12 + 0.5))) * GAMMA)
         )
+        # --------------------------------------------------------------------
         cur = cur.expand_dims(TIME=[month])
         model_anomaly_ds = xr.concat([model_anomaly_ds, cur], dim='TIME')
+    # ========================================================================
+#     temp = (
+#         (t_sub_anomaly.sel(TIME=month) + (heat_flux_anomaly.sel(TIME=month) + ekman_anomaly.sel(TIME=month))/(RHO_O * C_O * w_e_monthly_mean.sel(MONTH=(month % 12 + 0.5))))
+#         * (1 - np.exp(- (w_e_monthly_mean.sel(MONTH=(month % 12 + 0.5))*SECONDS_MONTH*month)/mld.sel(MONTH=(month % 12 + 0.5))))
+#     )
+#     model_list.append(temp.expand_dims(TIME=[month]))
+# model_anomaly_ds = xr.concat(model_list, dim='TIME')
+# ============================================================================
+
 display(model_anomaly_ds)
+
+# model_anomaly_ds.to_netcdf("../datasets/Simulated_SSTA-Implicit.nc")
+print(model_anomaly_ds.max().item(), model_anomaly_ds.min().item())
+
+# difference_from_obs = model_anomaly_ds - temperature_anomaly
+# display(difference_from_obs)
+# model_anomaly_ds = difference_from_obs  # to visualize the difference
 
 # model_anomaly_ds.sel(TIME=100.5).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r')
 # plt.show()
@@ -113,7 +177,7 @@ pcolormesh = ax.pcolormesh(
     model_anomaly_ds.LATITUDE.values,
     model_anomaly_ds.isel(TIME=0),
     cmap='RdBu_r',
-    vmin=-20, vmax=20
+    vmin=-2, vmax=2
 )
 # contourf = ax.contourf(
 #     model_anomaly_ds.LONGITUDE.values,
@@ -121,7 +185,7 @@ pcolormesh = ax.pcolormesh(
 #     model_anomaly_ds.isel(TIME=0),
 #     cmap='RdBu_r',
 #     levels=200,
-#     vmin=-20, vmax=20
+#     vmin=-2, vmax=2
 # )
 ax.coastlines()
 ax.set_xlim(-180, 180)
@@ -164,7 +228,7 @@ def update(frame):
     #     model_anomaly_ds.isel(TIME=frame),
     #     cmap='RdBu_r',
     #     levels=200,
-    #     vmin=-20, vmax=20
+    #     vmin=-2, vmax=2
     # )
     # title.set_text(
     #     f'Months since January 2004: {times[frame]}; month in year: {(times[frame] + 0.5) % 12}'
@@ -172,5 +236,5 @@ def update(frame):
     # return [contourf, title]
 
 
-animation = FuncAnimation(fig, update, frames=len(times), interval=300, blit=False)
+animation = FuncAnimation(fig, update, frames=len(times), interval=1000, blit=False)
 plt.show()
