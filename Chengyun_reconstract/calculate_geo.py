@@ -20,37 +20,35 @@ C_O = 4100  # J / (kg K)
 R = 6.371e6  # m
 
 
-def _get_alpha(
-    salinity, temperature, pressure, longitude, latitude
+def _get_alpha_beta(
+    sa, ct, pressure
 ):
     """
-    Calculate the thermal expansion coefficient alpha.
+    Calculate the thermal expansion coefficient alpha and haline contraction coefficient beta.
 
     Parameters
     ----------
-    salinity: xarray.DataArray
-        Salinity in PSU.
-    temperature: xarray.DataArray
-        Temperature in degrees Celsius.
+    sa: xarray.DataArray
+        Absolute Salinity in g/kg.
+    ct: xarray.DataArray
+        Conservative Temperature in degrees Celsius.
     pressure: xarray.DataArray
         Pressure in dbar.
-    longitude: xarray.DataArray
-        Longitude in degrees.
-    latitude: xarray.DataArray
-        Latitude in degrees.
 
     Returns
     -------
-    xarray.DataArray
-        Thermal expansion coefficient alpha (1/°C).
+    tuple of xarray.DataArray
+        Thermal expansion coefficient alpha (1/°C) and haline contraction coefficient beta (1/PSU).
     """
-    sa = gsw.SA_from_SP(salinity, pressure, longitude, latitude)
-    ct = gsw.CT_from_t(sa, temperature, pressure)
-    return gsw.alpha(sa, ct, pressure)
+    return gsw.alpha(sa, ct, pressure), gsw.beta(sa, ct, pressure)
 
 
-def save_alpha():
-    """Calculate and save thermal expansion coefficient alpha dataset."""
+def save_alpha_beta():
+    """
+    Calculate and save:
+    -thermal expansion coefficient alpha dataset;
+    -haline contraction coefficient beta dataset.
+    """
 
     with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
         if "datasets/alpha.nc" in logs_datasets.read():
@@ -58,12 +56,35 @@ def save_alpha():
 
     t = load_and_prepare_dataset("datasets/Temperature-(2004-2018).nc")
     s = load_and_prepare_dataset("datasets/Salinity-(2004-2018).nc")
+    sa = gsw.SA_from_SP(s.SALINITY, s.PRESSURE, s.LONGITUDE, s.LATITUDE)
+    ct = gsw.CT_from_t(sa, t.TEMPERATURE, s.PRESSURE)
 
-    alpha = xr.apply_ufunc(
-        _get_alpha,
-        s.SALINITY, t.TEMPERATURE, s.PRESSURE, s.LONGITUDE, s.LATITUDE,
+    sa.attrs['units'] = 'g/kg'
+    sa.attrs['long_name'] = (
+        'Absolute Salinity Jan 2004 - Dec 2018 (15.0 year)'
+    )
+    sa.name = 'SA'
+
+    ct.attrs['units'] = '°C'
+    ct.attrs['long_name'] = (
+        'Conservative Temperature Jan 2004 - Dec 2018 (15.0 year)'
+    )
+    ct.name = 'CT'
+
+    save_file(
+        sa,
+        "datasets/SA.nc"
+    )
+    save_file(
+        ct,
+        "datasets/CT.nc"
+    )
+
+    alpha, beta = xr.apply_ufunc(
+        _get_alpha_beta,
+        sa, ct, s.PRESSURE,
         input_core_dims=[["PRESSURE"], ["PRESSURE"], ["PRESSURE"], [], []],
-        output_core_dims=[["PRESSURE"]], vectorize=True
+        output_core_dims=[["PRESSURE"], ["PRESSURE"]], vectorize=True
     )
 
     alpha.attrs['units'] = '1/K'
@@ -72,9 +93,19 @@ def save_alpha():
     )
     alpha.name = 'alpha'
 
+    beta.attrs['units'] = '1/PSU'
+    beta.attrs['long_name'] = (
+        'Haline Contraction Coefficient Jan 2004 - Dec 2018 (15.0 year)'
+    )
+    beta.name = 'beta'
+
     save_file(
         alpha,
         "datasets/alpha.nc"
+    )
+    save_file(
+        beta,
+        "datasets/beta.nc"
     )
 
 
@@ -86,10 +117,20 @@ def save_sea_surface_height():
             return
 
     alpha = load_and_prepare_dataset("datasets/alpha.nc")['alpha']
+    beta = load_and_prepare_dataset("datasets/beta.nc")['beta']
+    sa = load_and_prepare_dataset("datasets/SA.nc")['SA']
+    ct = load_and_prepare_dataset("datasets/CT.nc")['CT']
 
-    alpha_integrate = alpha.sel(PRESSURE=slice(0, REF_PRESSURE)).integrate("PRESSURE")
+    ref_sa = sa.sel(PRESSURE=REF_PRESSURE).mean(['TIME', 'LATITUDE', 'LONGITUDE'])
+    ref_ct = ct.sel(PRESSURE=REF_PRESSURE).mean(['TIME', 'LATITUDE', 'LONGITUDE'])
 
-    ssh = (G * REF_PRESSURE + alpha_integrate) / G
+    delta_s = sa - ref_sa
+    delta_t = ct - ref_ct
+
+    ssh = (
+        (alpha * delta_t).sel(PRESSURE=slice(0, REF_PRESSURE)).integrate('PRESSURE')
+        - (beta * delta_s).sel(PRESSURE=slice(0, REF_PRESSURE)).integrate('PRESSURE')
+    )
 
     ssh.attrs['units'] = 'dbar'
     ssh.attrs['long_name'] = (
@@ -151,12 +192,18 @@ def save_geostrophic_anomaly_temperature():
         if "datasets/Simulation-Geostrophic_Heat_Flux-(2004-2018).nc" in logs_datasets.read():
             return
 
-    t_m_monthly_mean = load_and_prepare_dataset(
-        "datasets/Mixed_Layer_Temperature-Seasonal_Mean.nc"
-    )['MONTHLY_MEAN_ML_TEMPERATURE']
-    t_m_a = load_and_prepare_dataset(
-        "datasets/Mixed_Layer_Temperature_Anomalies-(2004-2018).nc"
-    )['ANOMALY_ML_TEMPERATURE']
+    # t_m_monthly_mean = load_and_prepare_dataset(
+    #     "datasets/Mixed_Layer_Temperature-Seasonal_Mean.nc"
+    # )['MONTHLY_MEAN_ML_TEMPERATURE']
+    # t_m_a = load_and_prepare_dataset(
+    #     "datasets/Mixed_Layer_Temperature_Anomalies-(2004-2018).nc"
+    # )['ANOMALY_ML_TEMPERATURE']
+    t_m = load_and_prepare_dataset(
+        "datasets/.test-ml.nc"
+    )['MIXED_LAYER_TEMP']
+    t_m_monthly_mean = get_monthly_mean(t_m)
+    t_m_a = get_anomaly(t_m, t_m_monthly_mean)
+
     ssh_monthly_mean = load_and_prepare_dataset(
         "datasets/Sea_Surface_Height-Seasonal_Mean.nc"
     )['MONTHLY_MEAN_ssh']
@@ -289,8 +336,8 @@ def save_geostrophic_anomaly_temperature():
     q_geostrophic_a = RHO_O * C_O * G / f * h_monthly_mean * (
         (dssh_a_dy_da * dt_m_monthly_mean_dx_da)
         - (dssh_a_dx_da * dt_m_monthly_mean_dy_da)
-        + (dssh_monthly_mean_dy_da * dt_m_a_dx_da)
-        - (dssh_monthly_mean_dx_da * dt_m_a_dy_da)
+        # + (dssh_monthly_mean_dy_da * dt_m_a_dx_da)
+        # - (dssh_monthly_mean_dx_da * dt_m_a_dy_da)
     )
 
     q_geostrophic_a = q_geostrophic_a.drop_vars('MONTH')
@@ -314,12 +361,18 @@ def save_geostrophic_anomaly_salinity():
         if "datasets/Simulation-Geostrophic_Water_Rate-(2004-2018).nc" in logs_datasets.read():
             return
 
-    s_m_monthly_mean = load_and_prepare_dataset(
-        "datasets/Mixed_Layer_Salinity-Seasonal_Mean.nc"
-    )['MONTHLY_MEAN_ML_SALINITY']
-    s_m_a = load_and_prepare_dataset(
-        "datasets/Mixed_Layer_Salinity_Anomalies-(2004-2018).nc"
-    )['ANOMALY_ML_SALINITY']
+    # s_m_monthly_mean = load_and_prepare_dataset(
+    #     "datasets/Mixed_Layer_Salinity-Seasonal_Mean.nc"
+    # )['MONTHLY_MEAN_ML_SALINITY']
+    # s_m_a = load_and_prepare_dataset(
+    #     "datasets/Mixed_Layer_Salinity_Anomalies-(2004-2018).nc"
+    # )['ANOMALY_ML_SALINITY']
+    s_m = load_and_prepare_dataset(
+        "datasets/.test-ml.nc"
+    )['MIXED_LAYER_SALINITY']
+    s_m_monthly_mean = get_monthly_mean(s_m)
+    s_m_a = get_anomaly(s_m, s_m_monthly_mean)
+
     ssh_monthly_mean = load_and_prepare_dataset(
         "datasets/Sea_Surface_Height-Seasonal_Mean.nc"
     )['MONTHLY_MEAN_ssh']
@@ -452,8 +505,8 @@ def save_geostrophic_anomaly_salinity():
     q_geostrophic_a = RHO_O * G / f * h_monthly_mean * (
         (dssh_a_dy_da * ds_m_monthly_mean_dx_da)
         - (dssh_a_dx_da * ds_m_monthly_mean_dy_da)
-        + (dssh_monthly_mean_dy_da * ds_m_a_dx_da)
-        - (dssh_monthly_mean_dx_da * ds_m_a_dy_da)
+        # + (dssh_monthly_mean_dy_da * ds_m_a_dx_da)
+        #  (dssh_monthly_mean_dx_da * ds_m_a_dy_da)
     )
 
     q_geostrophic_a = q_geostrophic_a.drop_vars('MONTH')
@@ -473,7 +526,7 @@ def save_geostrophic_anomaly_salinity():
 def main():
     """Main function to calculate geostrophic term."""
 
-    save_alpha()
+    save_alpha_beta()
 
     save_sea_surface_height()
     save_monthly_mean_sea_surface_height()

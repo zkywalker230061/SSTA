@@ -667,3 +667,17 @@ plt.show()
 corr = xr.corr(observed, all_anomalies_ds["IMPLICIT"], dim='TIME')
 corr.plot(x='LONGITUDE', y='LATITUDE', cmap='viridis', vmin=-1, vmax=1)
 plt.show()
+
+
+t_m_a_simulated = all_anomalies_ds["IMPLICIT"].where(
+    (all_anomalies_ds["IMPLICIT"]['LATITUDE'] > 20) | (all_anomalies_ds["IMPLICIT"]['LATITUDE'] < -20), 0
+)
+t_m_a_simulated_spatial_mean = t_m_a_simulated.mean(dim=['LONGITUDE', 'LATITUDE'])
+t_m_a_reynolds = observed.where(
+    (observed['LATITUDE'] > 20) | (observed['LATITUDE'] < -20), 0
+)
+t_m_a_reynolds_spatial_mean = t_m_a_reynolds.mean(dim=['LONGITUDE', 'LATITUDE'])
+plt.plot(t_m_a_simulated_spatial_mean['TIME'], t_m_a_simulated_spatial_mean, label='Simulated')
+plt.plot(t_m_a_reynolds_spatial_mean['TIME'], t_m_a_reynolds_spatial_mean, label='Observed')
+plt.legend()
+plt.show()

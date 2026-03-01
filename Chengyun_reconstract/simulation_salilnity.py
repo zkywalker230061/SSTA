@@ -8,12 +8,11 @@ Chengyun Zhu
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
-# import matplotlib
-# from matplotlib.animation import FuncAnimation
 
 from utilities import load_and_prepare_dataset
 from utilities import get_monthly_mean, get_anomaly
 # from utilities import save_file
+# from utilities_plot import make_movie_2, make_movie
 
 # matplotlib.use('TkAgg')
 
@@ -21,45 +20,10 @@ from utilities import get_monthly_mean, get_anomaly
 SURFACE = True
 ENTRAINMENT = True
 EKMAN = True
-GEOSTROPHIC = True
+GEOSTROPHIC = False
 
 RHO_O = 1025  # kg / m^3
 SECONDS_MONTH = 30 * 24 * 60 * 60  # seconds in a month
-
-
-# def make_movie(dataset, vmin, vmax, colorbar_label=None, ENSO_ds=None):
-#     times = dataset.TIME.values
-
-#     fig, ax = plt.subplots()
-#     # ax = plt.axes(projection=ccrs.PlateCarree())
-#     # ax.coastlines()
-#     pcolormesh = ax.pcolormesh(dataset.LONGITUDE.values, dataset.LATITUDE.values,
-#                                dataset.isel(TIME=0), cmap='RdBu_r')
-#     pcolormesh.set_clim(vmin=vmin, vmax=vmax)
-#     title = ax.set_title(f'Time = {times[0]}')
-
-#     cbar = plt.colorbar(pcolormesh, ax=ax, label=colorbar_label)
-#     ax.set_xlabel('Longitude')
-#     ax.set_ylabel('Latitude')
-
-#     def update(frame):
-#         month = int((times[frame] + 0.5) % 12)
-#         if month == 0:
-#             month = 12
-#         year = 2004 + int((times[frame]) / 12)
-#         pcolormesh.set_array(dataset.isel(TIME=frame).values.ravel())
-#         # pcolormesh.set_clim(vmin=float(model_anomaly_ds.isel(TIME=frame).min()), vmax=float(model_anomaly_ds.isel(TIME=frame).max()))
-#         pcolormesh.set_clim(vmin=vmin, vmax=vmax)
-#         cbar.update_normal(pcolormesh)
-#         if (ENSO_ds is not None):
-#             enso_index = ENSO_ds.isel(time=frame).value.values.item()
-#             title.set_text(f'Year: {year}; Month: {month}; ENSO index: {round(enso_index, 4)}')
-#         else:
-#             title.set_text(f'Year: {year}; Month: {month}')
-#         return [pcolormesh, title]
-
-#     animation = FuncAnimation(fig, update, frames=len(times), interval=500, blit=False)
-#     plt.show()
 
 
 q_surface_ds = load_and_prepare_dataset(
@@ -150,7 +114,8 @@ for month_num in s_m_a['TIME'].values:
             temp * np.exp(-_lambda.sel(TIME=month_num-1) * SECONDS_MONTH)
             + (
                 (
-                    s_sub_a.sel(TIME=month_num-1) * np.log(h_monthly_mean.sel(TIME=month_num)/h_monthly_mean.sel(TIME=month_num-1)) / SECONDS_MONTH
+                    # s_sub_a.sel(TIME=month_num-1) * np.log(h_monthly_mean.sel(TIME=month_num)/h_monthly_mean.sel(TIME=month_num-1)) / SECONDS_MONTH
+                    s_sub_a.sel(TIME=month_num-1) * w_e_monthly_mean.sel(TIME=month_num) / h_monthly_mean.sel(TIME=month_num)
                     + ds_m_a_dt.sel(TIME=month_num-1)
                 )
                 / _lambda.sel(TIME=month_num-1) * (1 - np.exp(-_lambda.sel(TIME=month_num-1) * SECONDS_MONTH))
@@ -170,6 +135,10 @@ s_m_a_simulated_monthly_mean = get_monthly_mean(s_m_a_simulated)
 s_m_a_simulated = get_anomaly(s_m_a_simulated, s_m_a_simulated_monthly_mean)
 s_m_a_simulated = s_m_a_simulated.drop_vars('MONTH')
 
+# make_movie(s_m_a_simulated, -0.5, 0.5)
+# make_movie(s_m_a, -0.5, 0.5)
+
+# ----------------------------------------------------------------------------
 print("simulated (max, min, mean, abs mean):")
 print(s_m_a_simulated.max().item(), s_m_a_simulated.min().item())
 print(s_m_a_simulated.mean().item())
@@ -184,37 +153,39 @@ print('-----')
 rms_difference = np.sqrt(((s_m_a - s_m_a_simulated) ** 2).mean(dim=['TIME']))
 rms_simulated = np.sqrt((s_m_a_simulated ** 2).mean(dim=['TIME']))
 rms_observed = np.sqrt((s_m_a ** 2).mean(dim=['TIME']))
+rmse = rms_difference / rms_observed
+
+normalised_simulated = s_m_a_simulated / rms_simulated
+normalised_observed = s_m_a / rms_observed
+normalised_rms_difference = np.sqrt(
+    ((normalised_observed - normalised_simulated) ** 2).mean(dim=['TIME'])
+)
 
 print("rms simulated", rms_simulated.mean().item())
 rms_simulated.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=0.5)
 plt.show()
-
 print("rms observed", rms_observed.mean().item())
 rms_observed.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=0.5)
 plt.show()
-
-rmse = rms_difference / rms_observed
 print("normalised rmse", rmse.mean().item())
 rmse.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=3)
 plt.show()
 
+print("normalised rmse", normalised_rms_difference.mean().item())
+normalised_rms_difference.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=3)
+plt.show()
+
+# correlation plot
 corr = xr.corr(s_m_a, s_m_a_simulated, dim='TIME')
 print("corr", corr.mean().item())
 corr.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
 plt.show()
 
-
-# make_movie(s_m_a_simulated, -0.5, 0.5)
-# make_movie(s_m_a, -0.5, 0.5)
-
+# fraction plot
 surface_fraction = []
 entrainment_fraction = []
 ekman_fraction = []
 geo_fraction = []
-surface_contribution = []
-entrainment_contribution = []
-ekman_contribution = []
-geo_contribution = []
 total = abs(q_surface) + abs(q_entrainment) + abs(q_ekman) + abs(q_geostrophic)
 for month_num in s_m_a['TIME'].values:
     surface_fraction.append(
@@ -229,28 +200,41 @@ for month_num in s_m_a['TIME'].values:
     geo_fraction.append(
         (abs(q_geostrophic.sel(TIME=month_num)) / total.sel(TIME=month_num)).mean().item()
     )
-    surface_contribution.append(q_surface.sel(TIME=month_num).mean().item())
-    entrainment_contribution.append(q_entrainment.sel(TIME=month_num).mean().item())
-    ekman_contribution.append(q_ekman.sel(TIME=month_num).mean().item())
-    geo_contribution.append(q_geostrophic.sel(TIME=month_num).mean().item())
 
 plt.plot(s_m_a['TIME'], surface_fraction, label='Surface')
 plt.plot(s_m_a['TIME'], entrainment_fraction, label='Entrainment')
 plt.plot(s_m_a['TIME'], ekman_fraction, label='Ekman')
 plt.plot(s_m_a['TIME'], geo_fraction, label='Geostrophic')
-# plt.plot(s_m_a['TIME'], surface_contribution, label='Surface')
-# plt.plot(s_m_a['TIME'], entrainment_contribution, label='Entrainment')
-# plt.plot(s_m_a['TIME'], ekman_contribution, label='Ekman')
-# plt.plot(s_m_a['TIME'], geo_contribution, label='Geostrophic')
 plt.legend()
 # plt.ylim(0, 1)
 plt.show()
 
-t_m_a_simulated = load_and_prepare_dataset(
-    "datasets/Simulation-TA.nc"
-)['TA_SIMULATED']
+# spatial mean plot
+s_m_a_simulated = s_m_a_simulated.where(
+    (s_m_a_simulated['LATITUDE'] > 20) | (s_m_a_simulated['LATITUDE'] < -20), 0
+)
+s_m_a_simulated_spatial_mean = s_m_a_simulated.mean(dim=['LONGITUDE', 'LATITUDE'])
+s_m_a = s_m_a.where(
+    (s_m_a['LATITUDE'] > 20) | (s_m_a['LATITUDE'] < -20), 0
+)
+s_m_a_spatial_mean = s_m_a.mean(dim=['LONGITUDE', 'LATITUDE'])
+plt.plot(s_m_a_simulated_spatial_mean['TIME'], s_m_a_simulated_spatial_mean, label='Simulated')
+plt.plot(s_m_a_spatial_mean['TIME'], s_m_a_spatial_mean, label='Observed')
+plt.legend()
+plt.show()
 
-corr_ssta_sssa = xr.corr(s_m_a_simulated, t_m_a_simulated, dim='TIME')
-print("corr ssta sssa", corr_ssta_sssa.mean().item())
-corr_ssta_sssa.plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=-1, vmax=1)
+# QQ plot
+plt.figure(figsize=(6, 6))
+for lon, lat in zip(s_m_a_simulated['LONGITUDE'], s_m_a_simulated['LATITUDE']):
+    plt.plot(
+        s_m_a.sel(LONGITUDE=lon, LATITUDE=lat).values,
+        s_m_a_simulated.sel(LONGITUDE=lon, LATITUDE=lat).values,
+        '.'
+    )
+x = np.linspace(-5, 5, 100)
+plt.plot(x, x, 'r--')
+plt.xlim(-5, 5)
+plt.ylim(-5, 5)
+# plt.yscale('log', base=2)
+# plt.xscale('log', base=2)
 plt.show()

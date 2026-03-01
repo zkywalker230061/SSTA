@@ -206,6 +206,67 @@ def save_ekman_anomaly_salinity():
     )
 
 
+def save_ekman_temperature():
+    """Calculate and save Ekman temperature dataset."""
+
+    with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
+        if "datasets/Simulation-Ekman_Heat_Flux_new-(2004-2018).nc" in logs_datasets.read():
+            return
+
+    t_m = load_and_prepare_dataset(
+        "datasets/.test-ml.nc"
+    )['MIXED_LAYER_TEMP']
+    tao_ds = load_and_prepare_dataset(
+        "datasets/Turbulent_Surface_Stress-(2004-2018).nc"
+    )
+
+    dt_m_dtheta = (
+        np.gradient(t_m, axis=t_m.get_axis_num('LONGITUDE'))
+    )
+    dt_m_dtheta_da = xr.DataArray(
+        dt_m_dtheta,
+        coords=t_m.coords,
+        dims=t_m.dims,
+    )
+    dtheta_dx = 1 / (R * np.cos(np.deg2rad(t_m['LATITUDE']))) / (np.pi/180)
+    dtheta_dx = dtheta_dx.expand_dims(LONGITUDE=t_m['LONGITUDE'])
+    dt_m_dx_da = dt_m_dtheta_da * dtheta_dx
+    dt_m_dx_da.name = 'dt_m_dx'
+
+    dt_m_dphi = (
+        np.gradient(t_m, axis=t_m.get_axis_num('LATITUDE'))
+    )
+    dt_m_dphi_da = xr.DataArray(
+        dt_m_dphi,
+        coords=t_m.coords,
+        dims=t_m.dims,
+    )
+    dphi_dy = 1 / R / (np.pi/180)
+    dt_m_dy_da = dt_m_dphi_da * dphi_dy
+    dt_m_dy_da.name = 'dt_m_dy'
+
+    f = 2 * (2*np.pi/(24*60*60)) * np.sin(
+        np.deg2rad(t_m['LATITUDE'])
+    )
+    f = f.expand_dims(LONGITUDE=t_m['LONGITUDE'])
+
+    q_ekman = C_O / f * (
+        tao_ds['avg_iews'] * dt_m_dy_da -
+        tao_ds['avg_inss'] * dt_m_dx_da
+    )
+
+    q_ekman.attrs['units'] = 'W/m^2'
+    q_ekman.attrs['long_name'] = (
+        'Monthly Q_Ekman Jan 2004 - Dec 2018 (15.0 year)'
+    )
+    q_ekman.name = 'EKMAN_HEAT_FLUX'
+
+    save_file(
+        q_ekman,
+        "datasets/Simulation-Ekman_Heat_Flux_new-(2004-2018).nc"
+    )
+
+
 def main():
     """Main function to calcuate Ekman term."""
 
@@ -214,6 +275,8 @@ def main():
 
     save_ekman_anomaly_temperature()
     save_ekman_anomaly_salinity()
+
+    # save_ekman_temperature()
 
 
 if __name__ == "__main__":
