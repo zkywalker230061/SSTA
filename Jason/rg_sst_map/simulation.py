@@ -1,3 +1,4 @@
+#%%
 # --- 1. Running Implicit Scheme ---------------------------------- 
 import xarray as xr
 import numpy as np
@@ -8,11 +9,12 @@ import pandas as pd
 from chris_utils import get_anomaly, coriolis_parameter
 from chris_utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from chris_utils import remove_empty_attributes, make_movie, get_eof_with_nan_consideration
-from utils_read_nc import get_monthly_mean, load_and_prepare_dataset
+# from utils_read_nc import get_monthly_mean, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
 from matplotlib.animation import FuncAnimation
+from utils_ekman import repeat_monthly_field_array
 
-
+plt.rcParams['animation.ffmpeg_path'] = r'C:\ffmpeg\bin\ffmpeg.exe'
 
 matplotlib.use('TkAgg')
 
@@ -24,28 +26,35 @@ INCLUDE_EKMAN = True
 INCLUDE_ENTRAINMENT = True
 INCLUDE_GEOSTROPHIC = False
 INCLUDE_GEOSTROPHIC_DISPLACEMENT = False
-CLEAN_CHRIS_PREV_CUR = False        # only really useful when entrainment is turned on
+CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turned on
 
 
-USE_NEW_H_BAR_NEW_T_SUB = True 
+USE_NEW_H_BAR_NEW_T_SUB = False
 
 
 
 observed_path = r"C:\Users\jason\MSciProject\Mixed_Layer_Datasets.nc"
+observed_T_path_Reynold_anom = r"C:\Users\jason\MSciProject\sst_anomalies-(2004-2018).nc"
+observed_T_path_Reynold = r"C:\Users\jason\MSciProject\sst_ltm.nc"
 HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = r"C:\Users\jason\MSciProject\heat_flux_interpolated_all_contributions.nc"
 # HEAT_FLUX_DATA_PATH = "../datasets/heat_flux_interpolated.nc"
 EKMAN_ANOMALY_DATA_PATH = r"C:\Users\jason\MSciProject\Ekman_Anomaly_Full_Datasets.nc"
 TEMP_DATA_PATH = r"C:\Users\jason\MSciProject\RG_ArgoClim_Temperature_2019.nc"
-ENTRAINMENT_VEL_DATA_PATH = r"C:\Users\jason\MSciProject\Entrainment_Velocity-(2004-2018).nc"
+
+
+ENTRAINMENT_VEL_DATA_PATH = r"C:\Users\jason\MSciProject\Entrainment_Vel_h.nc"
+NEW_ENTRAINMENT_VEL_DATA_PATH = r"C:\Users\jason\MSciProject\Entrainment_Vel_New_h.nc"
 # ENTRAINMENT_VEL_DENOISED_DATA_PATH = "../datasets/entrainment_vel_denoised.nc"
 # H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
 
 # Note we were using the uncapped hbar previously 
-H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\hbar.nc"
-NEW_H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\new_hbar.nc"
+H_DATA_PATH = r"C:\Users\jason\MSciProject\h.nc"
+NEW_H_DATA_PATH = r"C:\Users\jason\MSciProject\new_h.nc"
 
-T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\t_sub.nc"
-NEW_T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\new_T_sub_prime.nc"
+T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\Tsub_Max_Gradient_Method_h.nc"
+NEW_T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\Tsub_Max_Gradient_Method_New_h.nc"
+
+
 
 GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH = r"C:\Users\jason\MSciProject\geostrophic_anomaly_downloaded.nc"
 GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = r"C:\Users\jason\MSciProject\geostrophic_anomaly_calculated.nc"
@@ -59,12 +68,13 @@ g = 9.81
 
 if USE_NEW_H_BAR_NEW_T_SUB:
     # New h bar
-    hbar_ds = xr.open_dataset(NEW_H_BAR_DATA_PATH, decode_times=False)
-    hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
+    h_ds = xr.open_dataset(NEW_H_DATA_PATH, decode_times=False)
+    h_da = h_ds["MLD"]
+    hbar_da = get_monthly_mean(h_da)
 
     # New t sub
     t_sub_ds = xr.open_dataset(NEW_T_SUB_DATA_PATH, decode_times=False)
-    t_sub_da = t_sub_ds["ANOMALY_SUB_TEMPERATURE"]
+    t_sub_da = t_sub_ds["SUB_TEMPERATURE"]
         
     # Observed Data (Tm) using new h
     observed_temp_ds_full = xr.open_dataset(observed_path, decode_times=False)
@@ -84,11 +94,16 @@ if USE_NEW_H_BAR_NEW_T_SUB:
 
     # print(f"Original Mean Ekman: {ekman_anomaly_ds['Q_Ek_anom'].mean().values}")
     # print(f"Centered Mean Ekman: {ekman_anomaly_da_final.mean().values}")
+    entrainment_vel_ds = xr.open_dataset(NEW_ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
+    entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
+    entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
+    print(entrainment_vel_da)
 
 else:
     # New "old" h bar
-    hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
-    hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
+    h_ds = xr.open_dataset(H_DATA_PATH, decode_times=False)
+    h_da = h_ds["MLD"]
+    hbar_da = get_monthly_mean(h_da)
 
     # New "old" t sub
     t_sub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
@@ -107,10 +122,17 @@ else:
     obs_temp_anom = get_anomaly(observed_temp_ds_full, "MIXED_LAYER_TEMP", obs_temp_mean)
     obs_temp_anom = obs_temp_anom["MIXED_LAYER_TEMP_ANOMALY"]
 
+    # Reynolds SST mean and anom
+    observed_temp_ds_reynold = xr.open_dataset(observed_T_path_Reynold_anom, decode_times=False)
+    observed_temperature_anomaly_reynold = observed_temp_ds_reynold['anom']
+
+    observed_temp_ds_reynold = xr.open_dataset(observed_T_path_Reynold, decode_times=False)
+    observed_temperature_mean_reynold = observed_temp_ds_reynold['sst']
+
     # Ekman Anomaly using new "old" h
     ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
     ekman_anomaly_da = ekman_anomaly_ds["TEMP_EKMAN_ANOM"]
-    # ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
+    ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
 
     # ekman_anomaly_da_centred_mean = get_monthly_mean(ekman_anomaly_ds["Q_Ek_anom"])
     # ekman_anomaly_da_final = get_anomaly(ekman_anomaly_ds, "Q_Ek_anom", ekman_anomaly_da_centred_mean)
@@ -119,6 +141,10 @@ else:
     # print(f"Original Mean Ekman: {ekman_anomaly_ds['Q_Ek_anom'].mean().values}")
     # print(f"Centered Mean Ekman: {ekman_anomaly_da_final.mean().values}")
 
+    entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
+    entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
+    entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
+    print(entrainment_vel_da)
 
 
 # Unchanged Parameters for the simulation 
@@ -142,10 +168,10 @@ surface_flux_da = heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY']
 # print(f"Double-Centered Mean: {surface_flux_da_final.mean().values}")
 
 # Entrainment Velocity
-entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
-entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
-entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
-print(entrainment_vel_da)
+# entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
+# entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
+# entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
+# print(entrainment_vel_da)
 
 # Overwrite off-centred anomalies to avoid changing variables in the simulation
 # surface_flux_da = surface_flux_da_final
@@ -467,7 +493,13 @@ print(entrainment_vel_da.min().values)
 
 # Plotting 
 
-make_movie(obs_temp_anom, -5, 5)
+obs_temp_mean_repeated = repeat_monthly_field_array(obs_temp_mean)
+observed_temperature_mean_reynold_repeated = repeat_monthly_field_array(observed_temperature_mean_reynold)
+
+delta_t_mean = obs_temp_mean_repeated - observed_temperature_mean_reynold_repeated
+
+make_movie(observed_temperature_anomaly_reynold, -5, 5)
 
 for element in model_names:
+    all_anomalies_ds[f"{element}"] = all_anomalies_ds[f"{element}"] + delta_t_mean
     make_movie(all_anomalies_ds[f"{element}"], -5, 5)

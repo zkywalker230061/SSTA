@@ -419,7 +419,7 @@ def make_movie(dataset, vmin, vmax, colorbar_label=None, ENSO_ds=None, savepath=
 
     animation = FuncAnimation(fig, update, frames=len(times), interval=300, blit=False)
     if savepath is not None:
-        animation.save(savepath, fps=2, dpi=200)
+        animation.save(savepath, writer='ffmpeg', fps=2, dpi=200)
     plt.show()
 
 
@@ -589,3 +589,97 @@ def coriolis_parameter(lat):
     f = xr.DataArray(f, coords={'LATITUDE': lat}, dims=['LATITUDE'])
     f.attrs['units'] = 's^-1'
     return f
+
+def get_month_from_time(time):
+    month = (time + 0.5) % 12
+    if month == 0:
+        month = 12.0
+    return month
+
+def compute_upwind_advection(working_anom, u, v, dx, dy, delta_t):
+
+    inv_dx = 1.0 / dx 
+    inv_dy = 1.0 / dy
+
+    CFL_x_freq = (abs(u) * inv_dx).max()
+    CFL_y_freq = (abs(v) * inv_dy).max()
+
+    substeps = int(np.ceil(max(float(CFL_x_freq), float(CFL_y_freq)) * delta_t)) + 1
+    sub_dt = delta_t / substeps
+
+    temp_iter = working_anom.copy()
+    div_total = xr.zeros_like(temp_iter)
+    
+    negative_u = (u < 0)
+    positive_v = (v > 0)
+    for _ in range(substeps):
+        # Flux enters from neighbor
+        F_east = xr.where(negative_u, -u * temp_iter, -u * temp_iter.shift(LONGITUDE=-1))
+        F_west = xr.where(negative_u, -u * temp_iter.shift(LONGITUDE=1), -u * temp_iter)
+        G_north = xr.where(positive_v, v * temp_iter, v * temp_iter.shift(LATITUDE=-1))
+        G_south = xr.where(positive_v, v * temp_iter.shift(LATITUDE=1), v * temp_iter)
+
+        # Net divergence
+        div_step = (F_east.fillna(0) - F_west.fillna(0)) * inv_dx + \
+                   (G_north.fillna(0) - G_south.fillna(0)) * inv_dy
+        
+        div_total += div_step
+        temp_iter -= sub_dt * div_step
+
+    return div_total / substeps
+
+def calculate_RMSE_normalised (obs, model, dim = 'TIME'):
+    """
+    Calculates Root Mean Square Error.
+    Formula: sqrt( mean( (obs - model)^2 ) )
+    """
+    # First Datapoint was set to 0 in the sim
+    # We removed it from rmse analysis 
+
+    model = model.isel(TIME=slice(1,None))
+    obs = obs.isel(TIME=slice(1,None))
+
+    model_mask = model.where(abs(model["LATITUDE"]) > 5)
+    obs_mask = obs.where(abs(obs["LATITUDE"]) > 5)
+
+    # model_adjusted = model[model_mask]
+    # obs_adjusted = obs[obs_mask]
+
+
+    error = model_mask - obs_mask
+    squared_error = error ** 2
+    mean_squared_error = squared_error.mean(dim=dim)
+    rmse = np.sqrt(mean_squared_error)
+
+    normal_squared_error = obs**2
+    normal_mean_squared_error = normal_squared_error.mean(dim=dim)
+    normal_rmse = np.sqrt(normal_mean_squared_error)
+
+    weights = np.cos(np.deg2rad(mean_squared_error.LATITUDE))
+    weighted_mse = mean_squared_error.weighted(weights).mean(dim=("LATITUDE", "LONGITUDE"))
+    global_weighted_rmse = float(np.sqrt(weighted_mse))
+
+    weights_obs = np.cos(np.deg2rad(normal_mean_squared_error.LATITUDE))
+    weighted_mse_obs = normal_mean_squared_error.weighted(weights_obs).mean(dim=("LATITUDE", "LONGITUDE"))
+    global_weighted_rmse_obs = float(np.sqrt(weighted_mse_obs))
+
+    corrected_rmse = rmse / normal_rmse
+
+    global_rmse = global_weighted_rmse / global_weighted_rmse_obs
+    return corrected_rmse, global_rmse
+
+def get_clean_error_distribution(test_da, obs_da):
+    """
+    Calculates error (Test - Obs), slices time, and returns 
+    a flattened numpy array with NaNs removed.
+    """
+    # 1. Align and Slice (Time slice 1:end)
+    test_sliced = test_da.isel(TIME=slice(1, None))
+    obs_sliced = obs_da.isel(TIME=slice(1, None))
+    
+    # 2. Calculate Error (xarray handles alignment automatically)
+    error_da = test_sliced - obs_sliced
+    
+    # 3. Flatten and drop NaNs
+    flat_error = error_da.values.flatten()
+    return flat_error[~np.isnan(flat_error)]
