@@ -264,7 +264,7 @@ class ProfessionalSSTDashboard:
 
     def run_simulation(self, event):
         t0 = time.time()
-        self.log_status("Running Physics Model... Please wait.", 0)
+        self.log_status("Running Physics Model... wait...", 0)
         self.params['gamma'] = self.s_gamma.val
 
         # Constants
@@ -351,8 +351,8 @@ class ProfessionalSSTDashboard:
         else:
             self.obs_current = self.obs_argo 
 
-        t_sim = time.time() - t0
-        self.log_status(f"Physics Done ({t_sim:.2f}s). Calculating Stats...", t_sim)
+        
+        self.log_status(f"Calculating Stats...wait...",)
         self.calc_statistics()
         
     def calc_statistics(self):
@@ -384,7 +384,7 @@ class ProfessionalSSTDashboard:
         self.lag_of_max = self.da_corr.idxmax(dim="lag")
 
         t_stat_total = time.time() - t0
-        self.log_status("Simulation & Stats Complete", t_stat_total)
+        self.log_status("Simulation Complete", t_stat_total)
         self.update_visuals_only(None)
 
     def update_visuals_only(self, event):
@@ -408,14 +408,14 @@ class ProfessionalSSTDashboard:
         
         elif 'Lag of Max Corr' in mode:
             data = self.lag_of_max
-            vmin, vmax = -6, 6
-            cmap = 'PuOr'
+            vmin, vmax = -12, 12
+            cmap = 'nipy_spectral'
             title = "Lag (Months) of Maximum Correlation\n(Blue = Model Leads, Orange = Model Lags)"
             cbar_label = "Lag [Months]"
 
         elif 'RMSE (Norm)' in mode:
             data = self.rmse_norm
-            vmin, vmax = 0, 3
+            vmin, vmax = 0, 2
             cmap = 'nipy_spectral'
             title = "Normalized RMSE"
             cbar_label = "RMSE Ratio"
