@@ -1,21 +1,26 @@
+import sklearn.metrics
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from eofs.tools.standard import correlation_map
 from scipy import stats
+from sklearn.metrics import mutual_info_score
+from sklearn.preprocessing import KBinsDiscretizer
 
+from Chris.correlation_significance import get_significance
 from Chris.utils import make_movie, get_eof, get_eof_with_nan_consideration, get_eof_from_ppca_py, get_save_name, \
     get_month_from_time
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
+from correlation_significance import mutual_information
 
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN_ANOM_ADVECTION = True
-INCLUDE_EKMAN_MEAN_ADVECTION = False
-INCLUDE_ENTRAINMENT = False
+INCLUDE_EKMAN_MEAN_ADVECTION = True
+INCLUDE_ENTRAINMENT = True
 INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING = False
-INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = False
-INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = False
+INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
+INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
 
 SPLIT_SURFACE = True
 INCLUDE_RADIATIVE_SURFACE = True
@@ -450,13 +455,49 @@ def plot_correlation():
         #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/correlations/" + save_name + "_correlation.jpg")
         #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_poster/full_model_correlation.png", dpi=400)
         plt.show()
+
     else:
         print("PLOT_CORRELATION requires CONSIDER_OBSERVATIONS=True")
+
+
+def plot_mutual_information():
+    if CONSIDER_OBSERVATIONS:
+        mutual_info = xr.apply_ufunc(mutual_information, to_plot, observed_anomaly, kwargs={'mask': True}, input_core_dims=[['TIME'], ['TIME']], output_core_dims=[[]], vectorize=True, output_dtypes=[float])
+
+        print(mutual_info.mean().values)
+        mutual_info.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
+        plt.title("")
+        plt.xlabel("Longitude (º)")
+        plt.ylabel("Latitude (º)")
+        cbar = plt.gcf().axes[-1]
+        cbar.set_ylabel('Pearson Correlation Coefficient', rotation=90)
+        plt.title("Mutual Information between model and SST observation")
+        #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/correlations/" + save_name + "_correlation.jpg")
+        #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_poster/full_model_correlation.png", dpi=400)
+        plt.show()
+
+    else:
+        print("PLOT_MUTUAL_INFORMATION requires CONSIDER_OBSERVATIONS=True")
+
+def plot_significant_correlation():
+    correlation, significant_correlation = get_significance(to_plot, observed_anomaly, resamples=1000, test_statistic="PEARSON")
+    fig, ax = plt.subplots()
+    correlation.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
+    lons = significant_correlation.LONGITUDE.values
+    lats = significant_correlation.LATITUDE.values
+    lon_grid, lat_grid = np.meshgrid(lons, lats)
+    ax.contourf(lon_grid, lat_grid, significant_correlation.values.astype(float), levels=[0.5, 1.5], hatches=['///'], colors='none')
+    plt.title("")
+    plt.xlabel("Longitude (º)")
+    plt.ylabel("Latitude (º)")
+    cbar = plt.gcf().axes[-1]
+    cbar.set_ylabel('Pearson Correlation Coefficient', rotation=90)
+    plt.show()
 
 # plot_full_model(save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/" + save_name + ".mp4")
 # plot_full_model(obs=True, save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/Reynolds_observations.mp4")
 
-plot_full_model()
+# plot_full_model()
 # plot_enso()
 # eof_movie()
 # explained_variance_from_each_mode()
@@ -466,3 +507,5 @@ plot_full_model()
 # track_warming_effects()
 # track_anomaly_persistence(6, 9)
 # plot_correlation()
+# plot_mutual_information()
+plot_significant_correlation()
