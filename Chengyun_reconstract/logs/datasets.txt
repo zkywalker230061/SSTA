@@ -44,12 +44,8 @@ datasets/Surface_Water_Rate-Seasonal_Mean.nc
 1768703561.6286004
 datasets/Surface_Heat_Flux_Anomalies-(2004-2018).nc
 1768704080.900508
-datasets/Surface_Water_Rate_Anomalies-(2004-2018).nc
-1768704081.445243
 datasets/Simulation-Surface_Heat_Flux-(2004-2018).nc
 1768704081.5706854
-datasets/Simulation-Surface_Water_Rate-(2004-2018).nc
-1768704081.6448245
 datasets/Turbulent_Surface_Stress-Seasonal_Mean.nc
 1768704618.6223648
 datasets/Turbulent_Surface_Stress_Anomalies-(2004-2018).nc
@@ -90,3 +86,7 @@ datasets/Simulation-Ekman_Heat_Flux-(2004-2018).nc
 1771858520.1849833
 datasets/Simulation-Ekman_Water_Rate-(2004-2018).nc
 1771858520.6478415
+datasets/Surface_Water_Rate_Anomalies-(2004-2018).nc
+1772551459.7756
+datasets/Simulation-Surface_Water_Rate-(2004-2018).nc
+1772551471.091314
