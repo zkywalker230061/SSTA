@@ -24,8 +24,8 @@ def main():
         return
 
     prepare_rgargo.main()
-    prepare_era5.main()
-    prepare_reynolds.main()
+    prepare_era5.main()  # needs xesmf
+    prepare_reynolds.main()  # needs xesmf
 
     calculate_surf.main()
     calculate_ent.main()

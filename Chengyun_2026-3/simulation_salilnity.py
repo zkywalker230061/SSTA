@@ -22,6 +22,7 @@ SURFACE = True
 ENTRAINMENT = True
 EKMAN = True
 GEOSTROPHIC = True
+GAMMA = 0.0035
 
 RHO_O = 1025  # kg / m^3
 SECONDS_MONTH = 30 * 24 * 60 * 60  # seconds in a month
@@ -104,8 +105,13 @@ ds_m_a_dt = (
     + q_geostrophic
 ) / (RHO_O * h_monthly_mean)
 
-# _lambda = w_e_monthly_mean / h_monthly_mean + 1e-20 + 0.0015 / (RHO_O * h_monthly_mean)
-_lambda = w_e_monthly_mean / h_monthly_mean + 1e-20
+_lambda = w_e_monthly_mean / h_monthly_mean + GAMMA / (RHO_O * h_monthly_mean)
+
+integrate_factor = xr.where(
+    _lambda == 0,
+    SECONDS_MONTH,
+    (1 - np.exp(-_lambda * SECONDS_MONTH)) / _lambda
+)
 
 s_m_a_simulated_list = []
 
@@ -122,9 +128,7 @@ for month_num in s_m_a['TIME'].values:
                      * w_e_monthly_mean.sel(TIME=month_num-1)
                      / h_monthly_mean.sel(TIME=month_num-1))
                     + ds_m_a_dt.sel(TIME=month_num-1)
-                )
-                * (1 - np.exp(-_lambda.sel(TIME=month_num-1) * SECONDS_MONTH))
-                / _lambda.sel(TIME=month_num-1)
+                ) * integrate_factor.sel(TIME=month_num-1)
             )
         )
         temp = s_m_a_simulated_da
@@ -273,8 +277,16 @@ plt.ylim(-1, 1)
 plt.show()
 
 # autocorrelation plot
-autocorr_simulated = acf(s_m_a_simulated.mean(dim=['LONGITUDE', 'LATITUDE']), nlags=24)
-autocorr_observed = acf(s_m_a.mean(dim=['LONGITUDE', 'LATITUDE']), nlags=24)
+autocorr_simulated = acf(
+    s_m_a_simulated.mean(dim=['LONGITUDE', 'LATITUDE']),
+    # s_m_a_simulated.sel(LONGITUDE=-35.5, LATITUDE=53.5),
+    nlags=24
+)
+autocorr_observed = acf(
+    s_m_a.mean(dim=['LONGITUDE', 'LATITUDE']),
+    # s_m_a.sel(LONGITUDE=-35.5, LATITUDE=53.5),
+    nlags=24
+)
 plt.plot(autocorr_simulated, label='Simulated')
 plt.plot(autocorr_observed, label='Observed')
 plt.legend()

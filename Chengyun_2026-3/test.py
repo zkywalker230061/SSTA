@@ -7,4 +7,3 @@ import cartopy.crs as ccrs
 from utilities import load_and_prepare_dataset
 from utilities import get_monthly_mean, get_anomaly
 from utilities import save_file
-
