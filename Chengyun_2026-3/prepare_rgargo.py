@@ -182,15 +182,14 @@ def save_salinity_anomalies():
     save_file(s_a, "datasets/Salinity_Anomalies-(2004-2025).nc")
 
 
-# TODO
 def _trapezoid_mean(quantity, depth, h_single):
     """
-    Integrate temperature profile up to depth h_single.
+    Integrate quantity profile up to depth h_single.
 
     Parameters
     ----------
     quantity: np.ndarray
-        Temperature profile array.
+        Quantity profile array.
     depth: np.ndarray
         Depth profile array.
     h_single: float
@@ -199,40 +198,37 @@ def _trapezoid_mean(quantity, depth, h_single):
     Returns
     -------
     float
-        Integrated temperature up to h_single.
+        Integrated quantity up to h_single.
     """
 
-    if np.isnan(h_single):
+    if not np.isfinite(h_single) or h_single <= 0:
         return np.nan
 
-    q_at_h = np.interp(h_single, depth, quantity)
+    # clip h to available depth range
+    h_eff = min(h_single, depth[-1])
 
-    mask_below = depth < h_single
-    p_below = depth[mask_below]
-    q_below = quantity[mask_below]
-    if len(p_below) < 1:
-        return np.nan
+    q_at_h = np.interp(h_eff, depth, quantity)
+    q_at_0 = np.interp(0.0, depth, quantity)
 
-    p_final = np.append(p_below, h_single)
-    q_final = np.append(q_below, q_at_h)
+    mask_mid = (depth > 0.0) & (depth < h_eff)
+    p_final = np.concatenate(([0.0], depth[mask_mid], [h_eff]))
+    q_final = np.concatenate(([q_at_0], quantity[mask_mid], [q_at_h]))
 
-    q_m = np.trapezoid(q_final, p_final) / h_single
-
-    return q_m
+    return np.trapezoid(q_final, p_final) / h_eff
 
 
 def save_mixed_layer_temperature():
     """Save mixed layer temperature dataset."""
 
     with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Mixed_Layer_Temperature-(2004-2018).nc" in logs_datasets.read():
+        if "datasets/Mixed_Layer_Temperature-(2004-2025).nc" in logs_datasets.read():
             return
 
     t = load_and_prepare_dataset(
-        "datasets/Temperature-(2004-2018).nc",
+        "datasets/Temperature-(2004-2025).nc",
     )['TEMPERATURE']
     h = load_and_prepare_dataset(
-        "datasets/Mixed_Layer_Depth-(2004-2018).nc",
+        "datasets/Mixed_Layer_Depth-(2004-2025).nc",
     )['MLD']
 
     t_m_list = []
@@ -254,12 +250,12 @@ def save_mixed_layer_temperature():
                     coords="different", compat='equals')
 
     t_m.attrs['units'] = t.attrs.get('units')
-    t_m.attrs['long_name'] = 'Monthly Mixed Layer Temperature Jan 2004 - Dec 2018 (15.0 year)'
+    t_m.attrs['long_name'] = 'Monthly Mixed Layer Temperature Jan 2004 - Dec 2025 (22.0 year)'
     t_m.name = "ML_TEMPERATURE"
 
     save_file(
         t_m,
-        "datasets/Mixed_Layer_Temperature-(2004-2018).nc"
+        "datasets/Mixed_Layer_Temperature-(2004-2025).nc"
     )
 
 
@@ -267,14 +263,14 @@ def save_mixed_layer_salinity():
     """Save mixed layer salinity dataset."""
 
     with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Mixed_Layer_Salinity-(2004-2018).nc" in logs_datasets.read():
+        if "datasets/Mixed_Layer_Salinity-(2004-2025).nc" in logs_datasets.read():
             return
 
     s = load_and_prepare_dataset(
-        "datasets/Salinity-(2004-2018).nc",
+        "datasets/Salinity-(2004-2025).nc",
     )['SALINITY']
     h = load_and_prepare_dataset(
-        "datasets/Mixed_Layer_Depth-(2004-2018).nc",
+        "datasets/Mixed_Layer_Depth-(2004-2025).nc",
     )['MLD']
 
     s_m_list = []
@@ -296,12 +292,12 @@ def save_mixed_layer_salinity():
                     coords="different", compat='equals')
 
     s_m.attrs['units'] = s.attrs.get('units')
-    s_m.attrs['long_name'] = 'Monthly Mixed Layer Salinity Jan 2004 - Dec 2018 (15.0 year)'
+    s_m.attrs['long_name'] = 'Monthly Mixed Layer Salinity Jan 2004 - Dec 2025 (22.0 year)'
     s_m.name = "ML_SALINITY"
 
     save_file(
         s_m,
-        "datasets/Mixed_Layer_Salinity-(2004-2018).nc"
+        "datasets/Mixed_Layer_Salinity-(2004-2025).nc"
     )
 
 
@@ -309,16 +305,16 @@ def save_monthly_mean_mixed_layer_temperature():
     """Save the monthly mean mixed layer temperature dataset."""
 
     with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Mixed_Layer_Temperature-Seasonal_Mean.nc" in logs_datasets.read():
+        if "datasets/Mixed_Layer_Temperature-Clim_Mean.nc" in logs_datasets.read():
             return
 
     t_m = load_and_prepare_dataset(
-        "datasets/Mixed_Layer_Temperature-(2004-2018).nc",
+        "datasets/Mixed_Layer_Temperature-(2004-2025).nc",
     )['ML_TEMPERATURE']
     t_m_monthly_mean = get_monthly_mean(t_m)
     save_file(
         t_m_monthly_mean,
-        "datasets/Mixed_Layer_Temperature-Seasonal_Mean.nc"
+        "datasets/Mixed_Layer_Temperature-Clim_Mean.nc"
     )
 
 
@@ -326,16 +322,16 @@ def save_monthly_mean_mixed_layer_salinity():
     """Save the monthly mean mixed layer salinity dataset."""
 
     with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Mixed_Layer_Salinity-Seasonal_Mean.nc" in logs_datasets.read():
+        if "datasets/Mixed_Layer_Salinity-Clim_Mean.nc" in logs_datasets.read():
             return
 
     s_m = load_and_prepare_dataset(
-        "datasets/Mixed_Layer_Salinity-(2004-2018).nc",
+        "datasets/Mixed_Layer_Salinity-(2004-2025).nc",
     )['ML_SALINITY']
     s_m_monthly_mean = get_monthly_mean(s_m)
     save_file(
         s_m_monthly_mean,
-        "datasets/Mixed_Layer_Salinity-Seasonal_Mean.nc"
+        "datasets/Mixed_Layer_Salinity-Clim_Mean.nc"
     )
 
 
@@ -343,14 +339,14 @@ def save_mixed_layer_temperature_anomalies():
     """Save mixed layer temperature anomaly dataset."""
 
     with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Mixed_Layer_Temperature_Anomalies-(2004-2018).nc" in logs_datasets.read():
+        if "datasets/Mixed_Layer_Temperature_Anomalies-(2004-2025).nc" in logs_datasets.read():
             return
 
     t_m = load_and_prepare_dataset(
-        "datasets/Mixed_Layer_Temperature-(2004-2018).nc",
+        "datasets/Mixed_Layer_Temperature-(2004-2025).nc",
     )['ML_TEMPERATURE']
     t_m_monthly_mean = load_and_prepare_dataset(
-        "datasets/Mixed_Layer_Temperature-Seasonal_Mean.nc",
+        "datasets/Mixed_Layer_Temperature-Clim_Mean.nc",
     )['MONTHLY_MEAN_ML_TEMPERATURE']
     t_m_a = get_anomaly(
         t_m,
@@ -358,7 +354,7 @@ def save_mixed_layer_temperature_anomalies():
     )
     save_file(
         t_m_a,
-        "datasets/Mixed_Layer_Temperature_Anomalies-(2004-2018).nc"
+        "datasets/Mixed_Layer_Temperature_Anomalies-(2004-2025).nc"
     )
 
 
@@ -366,14 +362,14 @@ def save_mixed_layer_salinity_anomalies():
     """Save mixed layer salinity anomaly dataset."""
 
     with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
-        if "datasets/Mixed_Layer_Salinity_Anomalies-(2004-2018).nc" in logs_datasets.read():
+        if "datasets/Mixed_Layer_Salinity_Anomalies-(2004-2025).nc" in logs_datasets.read():
             return
 
     s_m = load_and_prepare_dataset(
-        "datasets/Mixed_Layer_Salinity-(2004-2018).nc",
+        "datasets/Mixed_Layer_Salinity-(2004-2025).nc",
     )['ML_SALINITY']
     s_m_monthly_mean = load_and_prepare_dataset(
-        "datasets/Mixed_Layer_Salinity-Seasonal_Mean.nc",
+        "datasets/Mixed_Layer_Salinity-Clim_Mean.nc",
     )['MONTHLY_MEAN_ML_SALINITY']
     s_m_a = get_anomaly(
         s_m,
@@ -381,7 +377,7 @@ def save_mixed_layer_salinity_anomalies():
     )
     save_file(
         s_m_a,
-        "datasets/Mixed_Layer_Salinity_Anomalies-(2004-2018).nc"
+        "datasets/Mixed_Layer_Salinity_Anomalies-(2004-2025).nc"
     )
 
 
@@ -397,12 +393,12 @@ def main():
 
     calculate_mixedlayerdepth.main()
 
-    # save_mixed_layer_temperature()
-    # save_mixed_layer_salinity()
-    # save_monthly_mean_mixed_layer_temperature()
-    # save_monthly_mean_mixed_layer_salinity()
-    # save_mixed_layer_temperature_anomalies()
-    # save_mixed_layer_salinity_anomalies()
+    save_mixed_layer_temperature()
+    save_mixed_layer_salinity()
+    save_monthly_mean_mixed_layer_temperature()
+    save_monthly_mean_mixed_layer_salinity()
+    save_mixed_layer_temperature_anomalies()
+    save_mixed_layer_salinity_anomalies()
 
 
 if __name__ == "__main__":
