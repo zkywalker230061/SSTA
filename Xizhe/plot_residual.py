@@ -478,28 +478,68 @@ print("Mean h:", float(h_point.mean().values))
 Qsum = xr.zeros_like(Tobs) 
 if INCLUDE_SURFACE:
     Qsum = Qsum + flux_all["Qsurf"]
-if INCLUDE_EKMAN_ANOM_ADVECTION or INCLUDE_EKMAN_MEAN_ADVECTION:          # FIXED flag name
+if INCLUDE_EKMAN_ANOM_ADVECTION:          # FIXED logic: strictly anomaly
     Qsum = Qsum + flux_all["Qek"]
-if INCLUDE_GEOSTROPHIC_ANOM_ADVECTION or INCLUDE_GEOSTROPHIC_MEAN_ADVECTION:    # FIXED flag name
+if INCLUDE_GEOSTROPHIC_ANOM_ADVECTION:    # FIXED logic: strictly anomaly
     Qsum = Qsum + flux_all["Qgeo"]
 
-# Convert to K/month tendency contribution
+# Convert heat fluxes to K/month tendency contribution
 rhs_flux = (Qsum / (rho_0 * c_0 * h_time)) * dt
 rhs_flux = rhs_flux.rename("rhs_flux")
 
-# Entrainment contribution
 if INCLUDE_ENTRAINMENT:
     rhs_ent = (Qent / (rho_0 * c_0 * h_time)) * dt
     rhs_ent = rhs_ent.rename("rhs_ent")
 else:
     rhs_ent = 0
 
-# Damping contribution (use observed anomaly for closure)
 rhs_damp = -(gamma_0 / (rho_0 * c_0 * h_time)) * Tobs * dt
 rhs_damp = rhs_damp.rename("rhs_damp")
 
-# Total RHS
-rhs_total = rhs_flux + rhs_ent + rhs_damp
+rhs_mean_adv = xr.zeros_like(Tobs)
+
+if INCLUDE_GEOSTROPHIC_MEAN_ADVECTION or INCLUDE_EKMAN_MEAN_ADVECTION:
+    alpha_mean_list = []
+    beta_mean_list = []
+    
+    # Expand monthly climatology velocities to the full TIME dimension
+    for m in month_index.values:
+        a_geo = sea_surface_monthlymean_ds['alpha'].sel(MONTH=int(m)) if INCLUDE_GEOSTROPHIC_MEAN_ADVECTION else 0
+        b_geo = sea_surface_monthlymean_ds['beta'].sel(MONTH=int(m)) if INCLUDE_GEOSTROPHIC_MEAN_ADVECTION else 0
+        
+        a_ek = ekman_mean_advection['ekman_alpha'].sel(MONTH=int(m)) if INCLUDE_EKMAN_MEAN_ADVECTION else 0
+        b_ek = ekman_mean_advection['ekman_beta'].sel(MONTH=int(m)) if INCLUDE_EKMAN_MEAN_ADVECTION else 0
+        
+        alpha_mean_list.append(a_geo + a_ek)
+        beta_mean_list.append(b_geo + b_ek)
+
+    alpha_time = xr.concat(alpha_mean_list, dim=Tobs["TIME"]).assign_coords(TIME=Tobs["TIME"])
+    beta_time  = xr.concat(beta_mean_list, dim=Tobs["TIME"]).assign_coords(TIME=Tobs["TIME"])
+    
+    # Align velocities with Tobs
+    alpha_time, beta_time, Tobs = xr.align(alpha_time, beta_time, Tobs, join="inner")
+    
+    # Calculate spatial gradients of Tobs (K / degree)
+    dTobs_dlon = Tobs.differentiate("LONGITUDE")
+    dTobs_dlat = Tobs.differentiate("LATITUDE")
+    
+    # Convert dx/dy from degrees to meters
+    earth_radius = 6371000.0
+    latitudes_rad = np.deg2rad(Tobs.LATITUDE)
+    dx_per_deg = (2 * np.pi * earth_radius / 360.0) * np.cos(latitudes_rad)
+    dy_per_deg = (2 * np.pi * earth_radius / 360.0)
+    
+    dTobs_dx = dTobs_dlon / dx_per_deg
+    dTobs_dy = dTobs_dlat / dy_per_deg
+    
+    # Advective Tendency = - (u*dT/dx + v*dT/dy) * dt
+    # Resulting unit: K / month
+    rhs_mean_adv = -(alpha_time * dTobs_dx + beta_time * dTobs_dy) * dt
+
+rhs_mean_adv = rhs_mean_adv.rename("rhs_mean_adv")
+
+# 4.6) Total RHS (now including mean advection)
+rhs_total = rhs_flux + rhs_ent + rhs_damp + rhs_mean_adv
 rhs_total = rhs_total.rename("rhs_total")
 
 # -------------------------------------------------------------------------
