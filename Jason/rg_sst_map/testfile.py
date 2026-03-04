@@ -12,8 +12,6 @@ from chris_utils import remove_empty_attributes, make_movie, get_eof_with_nan_co
 # from utils_read_nc import get_monthly_mean, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
 from matplotlib.animation import FuncAnimation
-from scipy.stats import skew, kurtosis
-from scipy.stats import norm
 
 
 
@@ -25,8 +23,8 @@ USE_DOWNLOADED_SSH = False
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN = True
 INCLUDE_ENTRAINMENT = True
-INCLUDE_GEOSTROPHIC = False
-INCLUDE_GEOSTROPHIC_DISPLACEMENT = False
+INCLUDE_GEOSTROPHIC = True
+INCLUDE_GEOSTROPHIC_DISPLACEMENT = True
 CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turned on
 
 
@@ -66,8 +64,8 @@ gamma_0 = 15
 g = 9.81
 
 observed_temp_ds_reynold = xr.open_dataset(observed_T_path_Reynold, decode_times=False)
-observed_temperature_anomaly_reynold = observed_temp_ds_reynold['anom'].isel(LATITUDE=slice(0,130))
-#%%
+observed_temperature_anomaly_reynold = observed_temp_ds_reynold['anom']
+
 if USE_NEW_H_BAR_NEW_T_SUB:
     # New h bar
     h_ds = xr.open_dataset(NEW_H_DATA_PATH, decode_times=False)
@@ -480,6 +478,49 @@ flux_components_ds = xr.merge(flux_components_to_merge)
 
 
 print(entrainment_vel_da.min().values)
+#------------------------------------------------------------------------------------------------------------
+#%%
+def calculate_RMSE (obs, model, dim = 'TIME'):
+    """
+    Calculates Root Mean Square Error.
+    Formula: sqrt( mean( (obs - model)^2 ) )
+    """
+
+    model = model.isel(TIME=slice(1,None))
+    obs = obs.isel(TIME=slice(1,None))
+
+    error = model - obs
+    squared_error = error ** 2
+    mean_squared_error = squared_error.mean(dim=dim)
+    rmse = np.sqrt(mean_squared_error)
+    return rmse
+
+def calculate_RMSE_normalised (obs, model, dim = 'TIME'):
+    """
+    Calculates Root Mean Square Error.
+    Formula: sqrt( mean( (obs - model)^2 ) )
+    """
+    # First Datapoint was set to 0 in the sim
+    # We removed it from rmse analysis 
+
+    model = model.isel(TIME=slice(1,None))
+    obs = obs.isel(TIME=slice(1,None))
+
+    error = model - obs
+    squared_error = error ** 2
+    mean_squared_error = squared_error.mean(dim=dim)
+    rmse = np.sqrt(mean_squared_error)
+
+    normal_squared_error = obs**2
+    normal_mean_squared_error = normal_squared_error.mean(dim=dim)
+    normal_rmse = np.sqrt(normal_mean_squared_error)
+    rmse_avg = np.mean(normal_rmse).values
+
+    corrected_rmse = rmse / normal_rmse
+    return corrected_rmse, rmse_avg
+
+
+
 
 schemes = {
     "Explicit": all_anomalies_ds["EXPLICIT"],
@@ -491,180 +532,72 @@ schemes = {
     "CHRIS_CAPPED_EXPONENT": all_anomalies_ds["CHRIS_CAPPED_EXPONENT"]
 }
 
-#%%
-#--- 2. Helper Functions ---------------------------------------------------
+for key in schemes:
+    schemes[key] = schemes[key].isel(TIME=slice(1, None))
 
-def get_clean_error_distribution(test_da, obs_da):
-    """
-    Calculates error (Test - Obs), slices time, and returns 
-    a flattened numpy array with NaNs removed.
-    """
-    # 1. Align and Slice (Time slice 1:end)
-    test_sliced = test_da.isel(TIME=slice(1, None))
-    obs_sliced = obs_da.isel(TIME=slice(1, None))
+
+# fig, axes = plt.subplots(3, 3, figsize=(12,7))
+
+
+# for ax, (scheme_name, model_da) in zip(axes.flat, schemes.items()):
+#     # Calculate RMSE over the 'TIME' dimension
+#     # new_data = model_da.isel(LATITUDE=slice(0,-90) and )
+#     # observed_temperature_anomaly_selected = observed_temperature_anomaly.isel(LATITUDE=slice(0,-90))
+#     rmse_map, global_score = calculate_RMSE(observed_temperature_anomaly_reynold, model_da, dim='TIME')
     
-    # 2. Calculate Error (xarray handles alignment automatically)
-    error_da = test_sliced - obs_sliced
-    
-    # 3. Flatten and drop NaNs
-    flat_error = error_da.values.flatten()
-    return flat_error[~np.isnan(flat_error)]
+#     # Plotting
+#     # ax = plt.subplot(3, 2, i + 1)
+#     rmse_map.plot(ax=ax, cmap='nipy_spectral', cbar_kwargs={'label': 'RMSE (K)'}, vmin = 0, vmax = 3)
+#     ax.set_xlabel("Longitude")
+#     ax.set_ylabel("Lattitude")
+#     ax.set_title(f"{scheme_name} - Overall RMSE")
+#     print(f"{scheme_name} Score: {global_score}")
+#     max_rmse = rmse_map.max().item()
+#     print(scheme_name, max_rmse)
+# plt.tight_layout()
+# fig.delaxes(axes[2, 1]) # Removes the 8th subplot (row 2, column 1)
+# fig.delaxes(axes[2, 2])
+# fig.text(
+#     0.99, 0.01,
+#     f"Gamma = {gamma_0}\n"
+#     f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
+#     f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
+#     f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
+#     f"INCLUDE_GEOSTROPHIC = {INCLUDE_GEOSTROPHIC}\n"
+#     f"INCLUDE_GEOSTROPHIC_DISPLACEMENT = {INCLUDE_GEOSTROPHIC_DISPLACEMENT}",
+#     ha='right', va='bottom', fontsize=18
+# )
+# plt.show()
 
-#%%
-#--- 3. Calculate Errors ---------------------------------------------------
 
-# Dictionary to store processed error arrays
-error_distributions = {}
+fig, axes = plt.subplots(3, 3, figsize=(12,7))
 
-print("Calculating errors...")
-
-# summer_indices = [
-#     i for i in range(180)
-#     if (i % 12 in [5, 6, 7]) and (i != 0)
-# ]
-
-# print(f"Summer indices: {summer_indices}")
-
-for name, data in schemes.items():
-    print(f"Processing {name}...")
-    # new_data = data.isel(LATITUDE=slice(0,-90))
+for ax, (scheme_name, model_da) in zip(axes.flat, schemes.items()):
+    # Calculate RMSE over the 'TIME' dimension
+    # new_data = model_da.isel(LATITUDE=slice(0,-90) and )
     # observed_temperature_anomaly_selected = observed_temperature_anomaly.isel(LATITUDE=slice(0,-90))
-    error_distributions[name] = get_clean_error_distribution(data, obs_temp_anom)
-
-
-#%%
-#--- 4. Plotting: Histograms with Middle 50% Region (IQR) ------------------
-
-# Create a figure with enough subplots
-num_schemes = len(schemes)
-cols = 2
-rows = int(np.ceil(num_schemes / cols))
-
-fig, axes = plt.subplots(rows, cols, figsize=(15, 6 * rows), constrained_layout=True)
-axes_flat = axes.flatten()
-
-for i, (name, err_data) in enumerate(error_distributions.items()):
-    ax = axes_flat[i]
+    rmse_map, global_score = calculate_RMSE_normalised(obs_temp_anom, model_da, dim='TIME')
     
-    # 1. Plot Histogram
-    sns.kdeplot(err_data, bw_adjust=1.0, label=name, ax=ax)
-    
-    # 2. Calculate Percentiles
-    # The middle 50% lies between the 25th and 75th percentiles
-    q25, q75 = np.percentile(err_data, [25, 75])
-    
-    # 3. Add Shaded Region for Middle 50%
-    # axvspan draws a vertical span (rectangle) across the plot
-    ax.axvspan(q25, q75, color='green', alpha=0.2, label='Middle 50% (IQR)')
-    ax.axvline(q25, color='green', linestyle=':', linewidth=1.5)
-    ax.axvline(q75, color='green', linestyle=':', linewidth=1.5)
-
-    ax.axvline(np.min(err_data), color='firebrick', linestyle='--', alpha=0.6, label=f'Min: {np.min(err_data):.2e}')
-    ax.axvline(np.max(err_data), color='darkorange', linestyle='--', alpha=0.6, label=f'Max: {np.max(err_data):.2e}')
-    
-    # 4. Add Reference Lines
-    ax.axvline(0, color='black', linewidth=1, alpha=0.5)
-
-    # 5. Formatting & Annotations
-    ax.set_title(f"{name} Scheme Error Distribution")
-    ax.set_xlabel("Error (K)")
-    ax.set_ylabel("Frequency")
-
-    # Add text annotation to show the width of this region
-    iqr_width = q75 - q25
-    # Place text near the top of the range
-    y_limits = ax.get_ylim()
-    ax.text(5, y_limits[1]*0.5, f"IQR Width:\n{iqr_width:.3f} K", 
-            horizontalalignment='center', color='darkgreen', fontweight='bold')
-    ax.legend(loc='upper right', fontsize = 'x-small')
-
-    #skewness and kurtosis
-    err_data_skew = skew(err_data, axis=0, bias=True)
-    err_data_kurt = kurtosis(err_data, axis=0, bias=True)
-    mean, std = norm.fit(err_data) 
-    print(name, mean, std)
-    ax.text(0.9,0.01, f"Skewness = {err_data_skew:.3f} \n Kurtosis = {err_data_kurt:.3f}")
-
-
-# Turn off unused subplots
-if len(axes_flat) > num_schemes:
-    for j in range(num_schemes, len(axes_flat)):
-        axes_flat[j].axis('off')
-
+    # Plotting
+    # ax = plt.subplot(3, 2, i + 1)
+    rmse_map.plot(ax=ax, cmap='nipy_spectral', cbar_kwargs={'label': 'RMSE (K)'}, vmin = 0, vmax = 2)
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Lattitude")
+    ax.set_title(f'{scheme_name} Scheme - Normalised RMSE')
+    print(scheme_name, global_score)
+    max_rmse = rmse_map.max().item()
+    print(scheme_name, max_rmse)
+plt.tight_layout()
+fig.delaxes(axes[2, 1]) # Removes the 8th subplot (row 2, column 1)
+fig.delaxes(axes[2, 2])
 fig.text(
     0.99, 0.01,
     f"Gamma = {gamma_0}\n"
     f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
     f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
-    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
-    ha='right', va='bottom', fontsize=12
-)
-plt.show()
-
-#%%
-#--- 5. Plotting: Combined KDE (Log Scale) ---------------------------------
-
-plt.figure(figsize=(12, 7))
-
-for name, err_data in error_distributions.items():
-    # KDE plot
-    sns.kdeplot(err_data, bw_adjust=1.0, label=name)
-
-# Formatting
-plt.xlim(-10, 10)        
-plt.yscale("log")      
-plt.ylim(1e-4, 1e2)
-plt.title("Comparison of Temporal Error Distributions (Log-Scale)")
-plt.xlabel("Error (K)")
-plt.ylabel("Probability Density (Log Scale)")
-plt.legend()
-plt.grid(True, which="both", ls="--", alpha=0.3)
-plt.text(
-    0.99, 0.01,
-    f"Gamma = {gamma_0}\n"
-    f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
-    f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
-    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
-    ha='right', va='bottom', fontsize=18
-)
-plt.show()
-
-
-
-#%%
-#--- 6. Plotting: Cumulative Distribution Function (CDF) with 50% Box ------
-
-plt.figure(figsize=(12, 7))
-
-# Iterate through schemes and plot their CDF
-for name, err_data in error_distributions.items():
-    sns.ecdfplot(data=err_data, label=name, linewidth=2, alpha=0.5)
-
-# Add reference lines
-plt.axvline(0, color='black', linestyle='--', alpha=0.5, linewidth=1, label="Zero Error")
-plt.axhline(0.5, color='black', linestyle=':', alpha=0.5, label="50% Probability")
-
-# Add Guidelines for the 25% - 75% probability zone
-plt.axhline(0.25, color='gray', linestyle=':', alpha=0.5)
-plt.axhline(0.75, color='gray', linestyle=':', alpha=0.5)
-plt.text(plt.xlim()[0], 0.25, " 25%", verticalalignment='bottom', color='gray')
-plt.text(plt.xlim()[0], 0.75, " 75%", verticalalignment='bottom', color='gray')
-
-plt.axhspan(0.25, 0.75, color='grey' , alpha=0.2)
-
-# Formatting
-plt.title("Cumulative Distribution Function (CDF) of Errors")
-plt.xlabel("Error (K)")
-plt.ylabel("Proportion")
-plt.xlim(-5, 5) # Adjust this limit based on your data range
-plt.grid(True, alpha=0.3)
-plt.legend()
-plt.text(
-    0.99, 0.01,
-    f"Gamma = {gamma_0}\n"
-    f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
-    f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
-    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
+    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
+    f"INCLUDE_GEOSTROPHIC = {INCLUDE_GEOSTROPHIC}\n"
+    f"INCLUDE_GEOSTROPHIC_DISPLACEMENT = {INCLUDE_GEOSTROPHIC_DISPLACEMENT}",
     ha='right', va='bottom', fontsize=18
 )
 plt.show()

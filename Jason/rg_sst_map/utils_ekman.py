@@ -175,3 +175,52 @@ def repeat_monthly_field(ds, var_name, n_repeats=15):
         },
     )
     return out
+
+
+# Gemini aided 
+def repeat_monthly_field_array(da, n_repeats=15):
+    """
+    Repeat a monthly 3D DataArray (MONTH, LATITUDE, LONGITUDE) 
+    n_repeats times to create a full time series.
+
+    Parameters
+    ----------
+    da : xarray.DataArray
+        Input DataArray with dims ("MONTH", "LATITUDE", "LONGITUDE").
+        Must have a "MONTH" coordinate of length 12.
+    n_repeats : int, default 15
+        Number of years to tile.
+
+    Returns
+    -------
+    xarray.DataArray
+        Tiled DataArray on ("TIME", "LATITUDE", "LONGITUDE").
+    """
+    # 1. Generate the continuous TIME coordinate (0.5, 1.5, ... 179.5)
+    # This matches the Argo/Roemmich-Gilson time centering
+    month_vals = da["MONTH"].values
+    time_coord = np.tile(month_vals, n_repeats).astype(float)
+    
+    for i in range(len(time_coord)):
+        time_coord[i] = time_coord[i] + (i // 12) * 12
+        
+    time_coord = time_coord - 0.5
+
+    # 2. Tile the actual data along the first axis (MONTH -> TIME)
+    # np.tile with (n_repeats, 1, 1) repeats the 12-month block vertically
+    data_tiled = np.tile(da.values, (n_repeats, 1, 1))
+
+    # 3. Reconstruct as a DataArray to keep attributes and name
+    out = xr.DataArray(
+        data=data_tiled,
+        dims=("TIME", "LATITUDE", "LONGITUDE"),
+        coords={
+            "TIME": time_coord,
+            "LATITUDE": da["LATITUDE"].values,
+            "LONGITUDE": da["LONGITUDE"].values,
+        },
+        name=da.name,
+        attrs=da.attrs
+    )
+    
+    return out

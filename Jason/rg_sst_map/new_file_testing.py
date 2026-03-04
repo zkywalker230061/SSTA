@@ -1,6 +1,6 @@
 import xarray as xr
 import numpy as np
-from chris_utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
+from chris_utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset, make_movie
 
 observed_path = r"C:\Users\jason\MSciProject\Mixed_Layer_Datasets.nc"
 HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = r"C:\Users\jason\MSciProject\heat_flux_interpolated_all_contributions.nc"
@@ -11,9 +11,12 @@ ENTRAINMENT_VEL_DATA_PATH = r"C:\Users\jason\MSciProject\Entrainment_Velocity-(2
 # ENTRAINMENT_VEL_DENOISED_DATA_PATH = "../datasets/entrainment_vel_denoised.nc"
 # H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
 
-# Note we were using the uncapped hbar previously 
+# Note we were using the uncapped hbar previously
+
+OLD_H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc" 
 H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\hbar.nc"
 NEW_H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\new_hbar.nc"
+
 
 T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\t_sub.nc"
 NEW_T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\new_T_sub_prime.nc"
@@ -21,7 +24,7 @@ NEW_T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\new_T_sub_prime.nc"
 GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH = r"C:\Users\jason\MSciProject\geostrophic_anomaly_downloaded.nc"
 GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = r"C:\Users\jason\MSciProject\geostrophic_anomaly_calculated.nc"
 SEA_SURFACE_GRAD_DATA_PATH = r"C:\Users\jason\MSciProject\sea_surface_interpolated_grad.nc"
-
+ALL_SCHEMES_DATA_PATHA = R
 
 hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
 new_hbar_ds = xr.open_dataset(NEW_H_BAR_DATA_PATH, decode_times=False)

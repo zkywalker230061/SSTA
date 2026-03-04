@@ -1,13 +1,19 @@
 #%%
+# --- 1. Running Implicit Scheme ---------------------------------- 
 import xarray as xr
 import numpy as np
-import matplotlib.pyplot as plt
-
-from chris_utils import make_movie, get_eof_with_nan_consideration, coriolis_parameter
-from chris_utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
-from matplotlib.animation import FuncAnimation
 import matplotlib
 import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+from chris_utils import get_anomaly, coriolis_parameter
+from chris_utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
+from chris_utils import remove_empty_attributes, make_movie, get_eof_with_nan_consideration
+# from utils_read_nc import get_monthly_mean, load_and_prepare_dataset
+from matplotlib.animation import FuncAnimation
+from matplotlib.animation import FuncAnimation
+
+
 
 matplotlib.use('TkAgg')
 
@@ -17,9 +23,9 @@ USE_DOWNLOADED_SSH = False
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN = True
 INCLUDE_ENTRAINMENT = True
-INCLUDE_GEOSTROPHIC = False
-INCLUDE_GEOSTROPHIC_DISPLACEMENT = False
-CLEAN_CHRIS_PREV_CUR = True       # only really useful when entrainment is turned on
+INCLUDE_GEOSTROPHIC_MEAN = True
+INCLUDE_GEOSTROPHIC_ANOM = True
+CLEAN_CHRIS_PREV_CUR = True        # only really useful when entrainment is turned on
 
 
 USE_NEW_H_BAR_NEW_T_SUB = False
@@ -27,20 +33,26 @@ USE_NEW_H_BAR_NEW_T_SUB = False
 
 
 observed_path = r"C:\Users\jason\MSciProject\Mixed_Layer_Datasets.nc"
+observed_T_path_Reynold = r"C:\Users\jason\MSciProject\sst_anomalies-(2004-2018).nc"
 HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = r"C:\Users\jason\MSciProject\heat_flux_interpolated_all_contributions.nc"
 # HEAT_FLUX_DATA_PATH = "../datasets/heat_flux_interpolated.nc"
 EKMAN_ANOMALY_DATA_PATH = r"C:\Users\jason\MSciProject\Ekman_Anomaly_Full_Datasets.nc"
 TEMP_DATA_PATH = r"C:\Users\jason\MSciProject\RG_ArgoClim_Temperature_2019.nc"
-ENTRAINMENT_VEL_DATA_PATH = r"C:\Users\jason\MSciProject\Entrainment_Velocity-(2004-2018).nc"
+
+
+ENTRAINMENT_VEL_DATA_PATH = r"C:\Users\jason\MSciProject\Entrainment_Vel_h.nc"
+NEW_ENTRAINMENT_VEL_DATA_PATH = r"C:\Users\jason\MSciProject\Entrainment_Vel_New_h.nc"
 # ENTRAINMENT_VEL_DENOISED_DATA_PATH = "../datasets/entrainment_vel_denoised.nc"
 # H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
 
 # Note we were using the uncapped hbar previously 
-H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\hbar.nc"
-NEW_H_BAR_DATA_PATH = r"C:\Users\jason\MSciProject\new_hbar.nc"
+H_DATA_PATH = r"C:\Users\jason\MSciProject\h.nc"
+NEW_H_DATA_PATH = r"C:\Users\jason\MSciProject\new_h.nc"
 
-T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\t_sub.nc"
+T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\Tsub_Max_Gradient_Method.nc"
 NEW_T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\new_T_sub_prime.nc"
+
+
 
 GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH = r"C:\Users\jason\MSciProject\geostrophic_anomaly_downloaded.nc"
 GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = r"C:\Users\jason\MSciProject\geostrophic_anomaly_calculated.nc"
@@ -51,11 +63,14 @@ c_0 = 4100.0
 gamma_0 = 15
 g = 9.81
 
+observed_temp_ds_reynold = xr.open_dataset(observed_T_path_Reynold, decode_times=False)
+observed_temperature_anomaly_reynold = observed_temp_ds_reynold['anom']
 
 if USE_NEW_H_BAR_NEW_T_SUB:
     # New h bar
-    hbar_ds = xr.open_dataset(NEW_H_BAR_DATA_PATH, decode_times=False)
-    hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
+    h_ds = xr.open_dataset(NEW_H_DATA_PATH, decode_times=False)
+    h_da = h_ds["MONTHLY_MEAN_MLD"]
+    hbar_da = get_monthly_mean(h_da)
 
     # New t sub
     t_sub_ds = xr.open_dataset(NEW_T_SUB_DATA_PATH, decode_times=False)
@@ -82,8 +97,9 @@ if USE_NEW_H_BAR_NEW_T_SUB:
 
 else:
     # New "old" h bar
-    hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
-    hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
+    h_ds = xr.open_dataset(H_DATA_PATH, decode_times=False)
+    h_da = h_ds["MLD"]
+    hbar_da = get_monthly_mean(h_da)
 
     # New "old" t sub
     t_sub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
@@ -105,7 +121,7 @@ else:
     # Ekman Anomaly using new "old" h
     ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
     ekman_anomaly_da = ekman_anomaly_ds["TEMP_EKMAN_ANOM"]
-    # ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
+    ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
 
     # ekman_anomaly_da_centred_mean = get_monthly_mean(ekman_anomaly_ds["Q_Ek_anom"])
     # ekman_anomaly_da_final = get_anomaly(ekman_anomaly_ds, "Q_Ek_anom", ekman_anomaly_da_centred_mean)
@@ -114,6 +130,10 @@ else:
     # print(f"Original Mean Ekman: {ekman_anomaly_ds['Q_Ek_anom'].mean().values}")
     # print(f"Centered Mean Ekman: {ekman_anomaly_da_final.mean().values}")
 
+    entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
+    entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
+    entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
+    print(entrainment_vel_da)
 
 
 # Unchanged Parameters for the simulation 
@@ -137,10 +157,10 @@ surface_flux_da = heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY']
 # print(f"Double-Centered Mean: {surface_flux_da_final.mean().values}")
 
 # Entrainment Velocity
-entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
-entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
-entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
-print(entrainment_vel_da)
+# entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
+# entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
+# entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
+# print(entrainment_vel_da)
 
 # Overwrite off-centred anomalies to avoid changing variables in the simulation
 # surface_flux_da = surface_flux_da_final
@@ -455,92 +475,256 @@ if INCLUDE_ENTRAINMENT:
     flux_components_to_merge.append(entrainment_flux_implicit_ds)
 
 flux_components_ds = xr.merge(flux_components_to_merge)
-print(flux_components_ds)
-#------------------------------------------------------------------------------------------------------------
-#%%
-def calculate_RMSE (obs, model, dim = 'TIME'):
-    """
-    Calculates Root Mean Square Error.
-    Formula: sqrt( mean( (obs - model)^2 ) )
-    """
-
-    model = model.isel(TIME=slice(1,None))
-    obs = obs.isel(TIME=slice(1,None))
-
-    error = model - obs
-    squared_error = error ** 2
-    mean_squared_error = squared_error.mean(dim=dim)
-    rmse = np.sqrt(mean_squared_error)
-    return rmse
-
-def calculate_RMSE_normalised (obs, model, dim = 'TIME'):
-    """
-    Calculates Root Mean Square Error.
-    Formula: sqrt( mean( (obs - model)^2 ) )
-    """
-    # First Datapoint was set to 0 in the sim
-    # We removed it from rmse analysis 
-
-    model = model.isel(TIME=slice(1,None))
-    obs = obs.isel(TIME=slice(1,None))
-
-    error = model - obs
-    squared_error = error ** 2
-    mean_squared_error = squared_error.mean(dim=dim)
-    rmse = np.sqrt(mean_squared_error)
-
-    normal_squared_error = obs**2
-    normal_mean_squared_error = normal_squared_error.mean(dim=dim)
-    normal_rmse = np.sqrt(normal_mean_squared_error)
-
-    corrected_rmse = rmse / normal_rmse
-    return corrected_rmse
 
 
-schemes = {
-    "Explicit": all_anomalies_ds["EXPLICIT"],
-    "Implicit": all_anomalies_ds["IMPLICIT"],
-    "Semi-Implicit": all_anomalies_ds["SEMI_IMPLICIT"],
-    "Chris Mean K": all_anomalies_ds["CHRIS_MEAN_K"],
-    "CHRIS_PREV_K": all_anomalies_ds["CHRIS_PREV_K"],
-    "CHRIS_PREV_CUR_CLEAN": all_anomalies_ds["CHRIS_PREV_CUR_CLEAN"],
-    "CHRIS_CAPPED_EXPONENT": all_anomalies_ds["CHRIS_CAPPED_EXPONENT"]
-}
-
-for key in schemes:
-    schemes[key] = schemes[key].isel(TIME=slice(1, None))
+print(entrainment_vel_da.min().values)
 
 
-fig, axes = plt.subplots(3, 3, figsize=(12,7))
+#--- 2.1 Prepare Observed Temperature Anomaly ------------------------------------------------------------
 
 
-for ax, (scheme_name, model_da) in zip(axes.flat, schemes.items()):
-    # Calculate RMSE over the 'TIME' dimension
-    # new_data = model_da.isel(LATITUDE=slice(0,-90) and )
-    # observed_temperature_anomaly_selected = observed_temperature_anomaly.isel(LATITUDE=slice(0,-90))
-    rmse_map = calculate_RMSE(obs_temp_anom, model_da, dim='TIME')
+implicit_model_anomaly_ds = all_anomalies_ds["IMPLICIT"]
+
+
+#--- 2.2 Helper Functions (Visualization) ------------------------------------------------------------
+def make_lag_movie(data_array, vmin=-1, vmax=1, savepath=None, cmap='RdBu_r'):
+    """Generates an animation of the correlation map across lags."""
+    lags = data_array.lag.values
     
-    # Plotting
-    # ax = plt.subplot(3, 2, i + 1)
-    rmse_map.plot(ax=ax, cmap='nipy_spectral', cbar_kwargs={'label': 'RMSE (K)'}, vmin = 0, vmax = 3)
+    fig, ax = plt.subplots(figsize=(8, 5))
+    
+    # Initial Plot
+    mesh = data_array.isel(lag=0).plot(
+        ax=ax, 
+        cmap=cmap, 
+        vmin=vmin, vmax=vmax,
+        add_colorbar=True,
+        cbar_kwargs={'label': 'Correlation Coefficient'}
+    )
+    
+    title = ax.set_title(f'Lag: {lags[0]} months')
+    ax.set_xlabel('Longitude')
+    ax.set_ylabel('Latitude')
+
+    def update(frame):
+        data_slice = data_array.isel(lag=frame).values
+        mesh.set_array(data_slice.ravel())
+        title.set_text(f'Lag: {lags[frame]} months')
+        return [mesh, title]
+
+    anim = FuncAnimation(fig, update, frames=len(lags), interval=600, blit=False)
+    
+    if savepath:
+        anim.save(savepath, fps=5, dpi=150)
+    plt.show()
+
+def plot_map(data, title, label, cmap="nipy_spectral", vmin=None, vmax=None, levels=None):
+    fig, ax = plt.subplots(1, 1, figsize=(9, 5))
+    
+    # Handle levels if provided (for discrete colorbar)
+    plot_kwargs = {'cmap': cmap, 'cbar_kwargs': {'label': label}}
+    if vmin is not None and vmax is not None:
+        plot_kwargs.update({'vmin': vmin, 'vmax': vmax})
+    if levels is not None:
+        plot_kwargs.update({'levels': levels})
+
+    data.plot(ax=ax, **plot_kwargs)
+
+    ax.set_title(title)
     ax.set_xlabel("Longitude")
-    ax.set_ylabel("Lattitude")
-    ax.set_title(f'{scheme_name} Scheme - Overall RMSE')
-    max_rmse = rmse_map.max().item()
-    print(scheme_name, max_rmse)
-plt.tight_layout()
-fig.delaxes(axes[2, 1]) # Removes the 8th subplot (row 2, column 1)
-fig.delaxes(axes[2, 2])
-fig.text(
-    0.99, 0.01,
-    f"Gamma = {gamma_0}\n"
-    f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
-    f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
-    f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}",
-    ha='right', va='bottom', fontsize=18
+    ax.set_ylabel("Latitude")
+    fig.text(
+        0.99, 0.01,
+        f"Gamma = {gamma_0}\n"
+        f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
+        f"INCLUDE_EKMAN = {INCLUDE_EKMAN}\n"
+        f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
+        f"INCLUDE_GEOSTROPHIC = {INCLUDE_GEOSTROPHIC_MEAN}\n"
+        f"INCLUDE_GEOSTROPHIC_DISPLACEMENT = {INCLUDE_GEOSTROPHIC_ANOM}",
+        ha='right', va='bottom', fontsize=8
+        )
+    plt.tight_layout()
+    plt.show()
+
+#%%
+#--- 3. Cross Correlation Calculation ----------------------------------------------------------------
+
+# 3.1 Setup Parameters
+lags = np.arange(-12, 13)
+scheme_name = "Implicit"
+lat = observed_temperature_anomaly['LATITUDE'].values
+lon = observed_temperature_anomaly['LONGITUDE'].values
+
+# 3.2 Pre-calculate Autocorrelation (Persistence)
+# High autocorrelation reduces the Effective Degrees of Freedom (N_eff).
+r_x = xr.corr(observed_temperature_anomaly, 
+              observed_temperature_anomaly.shift(TIME=1), dim="TIME")
+r_y = xr.corr(implicit_model_anomaly_ds, 
+              implicit_model_anomaly_ds.shift(TIME=1), dim="TIME")
+
+# 3.3 Core Calculation Function
+def calculate_lag_stats(obs, model, lag, r_x_map, r_y_map):
+    """
+    Calculates Correlation (r), T-statistic, and Effective N for a single lag.
+    """
+    # Shift model: Positive lag => Model lags Obs
+    model_shifted = model.shift(TIME=lag)
+    
+    # 1. Correlation
+    r = xr.corr(obs, model_shifted, dim="TIME")
+    
+    # 2. Effective Degrees of Freedom (Bretherton et al. 1999)
+    # N_total = 180. We subtract abs(lag) because shifting loses data points.
+    N_lagged = 180 - abs(lag)
+    N_effective = N_lagged * (1 - r_x_map * r_y_map) / (1 + r_x_map * r_y_map)
+    
+    # 3. T-Statistic
+    t_stat = r * np.sqrt((N_effective - 2) / (1 - r**2))
+    
+    return r, t_stat, N_effective
+
+# 3.4 Execute Loop over Lags
+print("Calculating cross-correlations...")
+results = [calculate_lag_stats(observed_temperature_anomaly, 
+                               implicit_model_anomaly_ds, 
+                               k, r_x, r_y) for k in lags]
+
+r_list, t_list, n_list = zip(*results)
+lag_dim = xr.DataArray(lags, dims="lag", name="lag")
+
+corr_by_lag = xr.concat(r_list, dim=lag_dim)
+t_stat_by_lag = xr.concat(t_list, dim=lag_dim)
+n_eff_by_lag = xr.concat(n_list, dim=lag_dim)
+
+# 3.5 Calculate Significance (P-Value)
+# Two-tailed test using Survival Function (sf = 1 - cdf)
+p_values_da = 2 * t.sf(np.abs(t_stat_by_lag), df=n_eff_by_lag - 2)
+p_values_da = xr.DataArray(p_values_da, coords=t_stat_by_lag.coords, name="p_value")
+
+# Mask for significance (95% confidence)
+significant_mask = p_values_da < 0.05
+sig_correlations = corr_by_lag.where(significant_mask)
+
+#%%
+# --- 4. Visualization: Static Map (Lag 0) -----------------------------------------------------------
+plot_map(
+    data=corr_by_lag.sel(lag=0),
+    title=f'{scheme_name} Scheme - Cross Correlation (Lag 0)',
+    label='Correlation',
+    cmap='nipy_spectral', 
+    vmin=-1, vmax=1
 )
+
+#%%
+# --- 5. Visualization: Time Series (Selected Locations) ---------------------------------------------
+locations = [
+    {'name': 'Southern Ocean', 'lat': -52.5, 'lon': -95.5, 'color': 'red'},
+    {'name': 'North Atlantic', 'lat': 41.5, 'lon': -50.5, 'color': 'green'},
+    {'name': 'North Atlantic 2', 'lat': 50, 'lon': -25, 'color': 'pink'},
+    {'name': 'Indian', 'lat': -20, 'lon': 75, 'color': 'blue'},
+    {'name': 'North Pacific', 'lat': 30, 'lon': -150, 'color': 'goldenrod'},
+    {'name': 'Cape Agulhas', 'lat': -40, 'lon': 25, 'color': 'orange'},
+]
+
+plt.figure(figsize=(10, 6))
+
+for loc in locations:
+    # 'nearest' selects the closest grid cell to the specified lat/lon
+    point_data = corr_by_lag.sel(LATITUDE=loc['lat'], LONGITUDE=loc['lon'], method='nearest')
+    
+    plt.plot(
+        point_data['lag'], 
+        point_data, 
+        label=f"{loc['name']}", 
+        color=loc['color'], 
+        marker='o', markersize=4, alpha=0.8
+    )
+
+plt.axvline(0, color='k', linestyle='--', alpha=0.5, label='Zero Lag')
+plt.axhline(0, color='k', linewidth=0.8)
+plt.ylim(-1, 1)
+plt.xlabel("Lag (months)\n(Positive: Model lags Obs)")
+plt.ylabel("Cross-correlation")
+plt.title(f"{scheme_name} Scheme: Lagged Cross-Correlation")
+plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
 plt.show()
 
+#%%
+# --- 6. Visualization: Movie ------------------------------------------------------------------------
+# make_lag_movie(corr_by_lag, vmin=-1, vmax=1, savepath=None)
+
+#%%
+# --- 7. Visualization: Maps of Best Lag -------------------------------------------------------------
+
+# Strategy: Find the lag that produces the Strongest Magnitude Correlation (Positive OR Negative)
+# A) best positive correlation:
+# best_lag = corr_by_lag.idxmax(dim="lag")
+# best_corr = corr_by_lag.max(dim="lag")
+
+# B) strongest magnitude (ignoring sign):
+mask_obs = corr_by_lag.notnull().all(dim="lag")
+abs_run = np.abs(corr_by_lag)
+abs_filled = abs_run.where(np.isfinite(abs_run), -np.inf)
+best_idx = abs_filled.argmax(dim="lag") # dims: (LATITUDE, LONGITUDE)
+best_lag = corr_by_lag["lag"].isel(lag=best_idx) # dims: (LATITUDE, LONGITUDE)
+best_lag = best_lag.where(mask_obs)
+best_corr = corr_by_lag.isel(lag=best_idx) # dims: (LATITUDE, LONGITUDE)
+
+# # C) best (most negative) correlation:
+# best_lag = corr_by_lag.idxmin(dim="lag")
+# best_corr = corr_by_lag.min(dim="lag")
+
+# --- Plot 7.1: Value of the Best Correlation ---
+plot_map(
+    data=best_corr,
+    title=f"{scheme_name}: Max Correlation Value (at best lag)",
+    label="Correlation",
+    cmap="nipy_spectral",
+    vmin=-1, vmax=1
+)
+
+# --- Plot 7.2: Which Lag was the Best? ---
+# define discrete levels for the colorbar so each month is distinct
+lag_levels = np.arange(lags.min() - 0.5, lags.max() + 1.5, 1)
+plot_map(
+    data=best_lag,
+    title=f"{scheme_name}: Lag (months) of Max Correlation",
+    label="Lag (months)",
+    cmap="nipy_spectral",
+    levels=lag_levels
+)
+
+#%%
+# --- 8. Visualization: Maps of Best Lag (SIGNIFICAN ADDED) -------------------------------------------------------------
+
+# B) strongest magnitude (ignoring sign):
+mask_obs_sig = sig_correlations.notnull().all(dim="lag")
+abs_run_sig = np.abs(sig_correlations)
+abs_filled_sig = abs_run_sig.where(np.isfinite(abs_run_sig), -np.inf)
+best_idx_sig = abs_filled_sig.argmax(dim="lag") # dims: (LATITUDE, LONGITUDE)
+best_lag_sog =  sig_correlations["lag"].isel(lag=best_idx) # dims: (LATITUDE, LONGITUDE)
+best_lag_sig = best_lag_sog.where(mask_obs_sig)
+best_corr_sig = sig_correlations.isel(lag=best_idx_sig) # dims: (LATITUDE, LONGITUDE)
 
 
-# %%
+# --- Plot 7.1: Value of the Best Correlation ---
+plot_map(
+    data=best_corr_sig,
+    title=f"{scheme_name}: Max Correlation Value (at best lag with significance level 95%)",
+    label="Correlation",
+    cmap="nipy_spectral",
+    vmin=-1, vmax=1
+)
+
+# --- Plot 7.2: Which Lag was the Best? ---
+# define discrete levels for the colorbar so each month is distinct
+lag_levels = np.arange(lags.min() - 0.5, lags.max() + 1.5, 1)
+plot_map(
+    data=best_lag,
+    title=f"{scheme_name}: Lag (months) of Max Correlation with significance level 95%",
+    label="Lag (months)",
+    cmap="nipy_spectral",
+    levels=lag_levels
+)
