@@ -22,7 +22,7 @@ SURFACE = True
 ENTRAINMENT = True
 EKMAN = True
 GEOSTROPHIC = True
-GAMMA = 0.0035
+GAMMA = 0.004
 
 RHO_O = 1025  # kg / m^3
 SECONDS_MONTH = 30 * 24 * 60 * 60  # seconds in a month
@@ -141,7 +141,12 @@ s_m_a_simulated = xr.concat(
     coords="minimal"
 )
 
-s_m_a_simulated_monthly_mean = get_monthly_mean(s_m_a_simulated)
+s_m_a_simulated.name = 'SA_SIMULATED'
+s_m_a_simulated.attrs['units'] = 'PSU'
+
+s_m_a_simulated_monthly_mean = get_monthly_mean(
+    s_m_a_simulated.where(s_m_a_simulated.TIME >= 12.5, drop=True)
+)
 s_m_a_simulated = get_anomaly(s_m_a_simulated, s_m_a_simulated_monthly_mean)
 s_m_a_simulated = s_m_a_simulated.drop_vars('MONTH')
 
@@ -165,12 +170,6 @@ rms_simulated = np.sqrt((s_m_a_simulated ** 2).mean(dim=['TIME']))
 rms_observed = np.sqrt((s_m_a ** 2).mean(dim=['TIME']))
 rmse = rms_difference / rms_observed
 
-# normalised_simulated = s_m_a_simulated / rms_simulated
-# normalised_observed = s_m_a / rms_observed
-# normalised_rms_difference = np.sqrt(
-#     ((normalised_observed - normalised_simulated) ** 2).mean(dim=['TIME'])
-# )
-
 print("rms simulated", rms_simulated.mean().item())
 rms_simulated.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=0.5)
 plt.show()
@@ -180,10 +179,6 @@ plt.show()
 print("normalised rmse", rmse.mean().item())
 rmse.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=3)
 plt.show()
-
-# print("normalised rmse", normalised_rms_difference.mean().item())
-# normalised_rms_difference.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=3)
-# plt.show()
 
 # correlation plot
 corr = xr.corr(s_m_a, s_m_a_simulated, dim='TIME')

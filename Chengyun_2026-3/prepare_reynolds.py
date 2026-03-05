@@ -191,6 +191,44 @@ def save_reynolds_sst_anomalies():
     )
 
 
+def save_monthly_mean_reynolds_sst_no_2004():
+    """Save the monthly mean reynolds sst dataset without taking 2004 into account."""
+
+    with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
+        if "datasets/reynolds_sst_Clim_Mean_no_2004.nc" in logs_datasets.read():
+            return
+
+    sst = load_and_prepare_dataset(
+        "datasets/reynolds_sst-(2004-2025).nc",
+    )['SST']
+    sst = sst.where(sst.TIME >= 12.5, drop=True)
+    sst_monthly_mean = get_monthly_mean(sst)
+    save_file(
+        sst_monthly_mean,
+        "datasets/reynolds_sst_Clim_Mean_no_2004.nc"
+    )
+
+
+def save_reynolds_sst_anomalies_no_2004():
+    """Save the reynolds sst anomalies dataset using monthly mean without 2004."""
+
+    with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
+        if "datasets/reynolds_sst_Anomalies-(2004-2025)_no_2004.nc" in logs_datasets.read():
+            return
+
+    sst = load_and_prepare_dataset(
+        "datasets/reynolds_sst-(2004-2025).nc",
+    )['SST']
+    sst_monthly_mean = load_and_prepare_dataset(
+        "datasets/reynolds_sst_Clim_Mean_no_2004.nc",
+    )['MONTHLY_MEAN_SST']
+    sst_anomalies = get_anomaly(sst, sst_monthly_mean)
+    save_file(
+        sst_anomalies,
+        "datasets/reynolds_sst_Anomalies-(2004-2025)_no_2004.nc"
+    )
+
+
 def main():
     """Main function to prepare datasets from RGARGO."""
 
@@ -200,6 +238,9 @@ def main():
     save_reynolds_sst()
     save_monthly_mean_reynolds_sst()
     save_reynolds_sst_anomalies()
+
+    save_monthly_mean_reynolds_sst_no_2004()
+    save_reynolds_sst_anomalies_no_2004()
 
 
 if __name__ == "__main__":

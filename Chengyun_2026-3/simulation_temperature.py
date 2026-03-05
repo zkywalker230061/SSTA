@@ -83,7 +83,7 @@ t_m_a = load_and_prepare_dataset(
 t_m_a = t_m_a.drop_vars('MONTH')
 
 t_m_a_reynolds = load_and_prepare_dataset(
-    "datasets/reynolds_sst_Anomalies-(2004-2025).nc"
+    "datasets/reynolds_sst_Anomalies-(2004-2025)_no_2004.nc"
 )['ANOMALY_SST']
 t_m_a_reynolds = t_m_a_reynolds.drop_vars('MONTH')
 
@@ -143,7 +143,12 @@ t_m_a_simulated = xr.concat(
     coords="minimal"
 )
 
-t_m_a_simulated_monthly_mean = get_monthly_mean(t_m_a_simulated)
+t_m_a_simulated.name = 'TA_SIMULATED'
+t_m_a_simulated.attrs['units'] = 'K'
+
+t_m_a_simulated_monthly_mean = get_monthly_mean(
+    t_m_a_simulated.where(t_m_a.TIME >= 12.5, drop=True)
+)
 t_m_a_simulated = get_anomaly(t_m_a_simulated, t_m_a_simulated_monthly_mean)
 t_m_a_simulated = t_m_a_simulated.drop_vars('MONTH')
 
@@ -155,8 +160,6 @@ t_m_a_simulated = t_m_a_simulated.drop_vars('MONTH')
 #     save_path="compare_Liu.mp4"
 # )
 
-# t_m_a_simulated.name = 'TA_SIMULATED'
-# t_m_a_simulated.attrs['units'] = 'K'
 # t_m_a_simulated.to_netcdf("datasets/Simulation-TA.nc")
 
 # ----------------------------------------------------------------------------
@@ -176,12 +179,6 @@ rms_simulated = np.sqrt((t_m_a_simulated ** 2).mean(dim=['TIME']))
 rms_observed = np.sqrt((t_m_a_reynolds ** 2).mean(dim=['TIME']))
 rmse = rms_difference / rms_observed
 
-# normalised_simulated = t_m_a_simulated / rms_simulated
-# normalised_observed = t_m_a_reynolds / rms_observed
-# normalised_rms_difference = np.sqrt(
-#     ((normalised_observed - normalised_simulated) ** 2).mean(dim=['TIME'])
-# )
-
 print("rms simulated", rms_difference.mean().item())
 rms_simulated.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=3)
 plt.show()
@@ -191,11 +188,6 @@ plt.show()
 print("normalised rmse", rmse.mean().item())
 rmse.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=3)
 plt.show()
-
-# print("normalised rmse", normalised_rms_difference.mean().item())
-# normalised_rms_difference.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=3)
-# plt.show()
-
 
 # corr plot
 corr = xr.corr(t_m_a_reynolds, t_m_a_simulated, dim='TIME')

@@ -42,6 +42,10 @@ datasets/reynolds_sst_Clim_Mean.nc
 Wed Mar  4 00:56:04 2026
 datasets/reynolds_sst_Anomalies-(2004-2025).nc
 Wed Mar  4 00:56:04 2026
+datasets/reynolds_sst_Clim_Mean_no_2004.nc
+Thu Mar  5 19:58:31 2026
+datasets/reynolds_sst_Anomalies-(2004-2025)_no_2004.nc
+Thu Mar  5 19:58:31 2026
 
 datasets/Surface_Heat_Flux-Clim_Mean.nc
 Wed Mar  4 01:47:36 2026
