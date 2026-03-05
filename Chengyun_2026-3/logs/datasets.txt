@@ -1,0 +1,107 @@
+datasets/Temperature-(2004-2025).nc
+Tue Mar  3 23:22:33 2026
+datasets/Salinity-(2004-2025).nc
+Tue Mar  3 23:25:11 2026
+datasets/Temperature-Clim_Mean.nc
+Tue Mar  3 23:27:58 2026
+datasets/Salinity-Clim_Mean.nc
+Tue Mar  3 23:28:01 2026
+datasets/Temperature_Anomalies-(2004-2025).nc
+Tue Mar  3 23:28:06 2026
+datasets/Salinity_Anomalies-(2004-2025).nc
+Tue Mar  3 23:28:11 2026
+
+datasets/Mixed_Layer_Depth-(2004-2025).nc
+Tue Mar  3 23:33:16 2026
+datasets/Mixed_Layer_Depth-Clim_Mean.nc
+Tue Mar  3 23:33:18 2026
+
+datasets/Mixed_Layer_Temperature-(2004-2025).nc
+Wed Mar  4 01:31:09 2026
+datasets/Mixed_Layer_Salinity-(2004-2025).nc
+Wed Mar  4 01:36:14 2026
+datasets/Mixed_Layer_Temperature-Clim_Mean.nc
+Wed Mar  4 01:36:14 2026
+datasets/Mixed_Layer_Salinity-Clim_Mean.nc
+Wed Mar  4 01:36:15 2026
+datasets/Mixed_Layer_Temperature_Anomalies-(2004-2025).nc
+Wed Mar  4 01:36:15 2026
+datasets/Mixed_Layer_Salinity_Anomalies-(2004-2025).nc
+Wed Mar  4 01:36:15 2026
+
+datasets/Turbulent_Surface_Stress-(2004-2025).nc
+Wed Mar  4 00:00:37 2026
+datasets/Surface_Heat_Flux-(2004-2025).nc
+Wed Mar  4 00:01:04 2026
+datasets/Surface_Water_Rate-(2004-2025).nc
+Wed Mar  4 00:01:23 2026
+
+datasets/reynolds_sst-(2004-2025).nc
+Wed Mar  4 00:56:04 2026
+datasets/reynolds_sst_Clim_Mean.nc
+Wed Mar  4 00:56:04 2026
+datasets/reynolds_sst_Anomalies-(2004-2025).nc
+Wed Mar  4 00:56:04 2026
+datasets/reynolds_sst_Clim_Mean_no_2004.nc
+Thu Mar  5 19:58:31 2026
+datasets/reynolds_sst_Anomalies-(2004-2025)_no_2004.nc
+Thu Mar  5 19:58:31 2026
+
+datasets/Surface_Heat_Flux-Clim_Mean.nc
+Wed Mar  4 01:47:36 2026
+datasets/Surface_Water_Rate-Clim_Mean.nc
+Wed Mar  4 01:47:36 2026
+datasets/Surface_Heat_Flux_Anomalies-(2004-2025).nc
+Wed Mar  4 01:47:38 2026
+datasets/Surface_Water_Rate_Anomalies-(2004-2025).nc
+Wed Mar  4 01:47:38 2026
+
+datasets/Sub_Layer_Temperature-(2004-2025).nc
+Wed Mar  4 01:52:09 2026
+datasets/Sub_Layer_Salinity-(2004-2025).nc
+Wed Mar  4 01:53:05 2026
+datasets/Sub_Layer_Temperature-Clim_Mean.nc
+Wed Mar  4 01:53:06 2026
+datasets/Sub_Layer_Salinity-Clim_Mean.nc
+Wed Mar  4 01:53:06 2026
+datasets/Sub_Layer_Temperature_Anomalies-(2004-2025).nc
+Wed Mar  4 01:53:06 2026
+datasets/Sub_Layer_Salinity_Anomalies-(2004-2025).nc
+Wed Mar  4 01:53:07 2026
+datasets/Mixed_Layer_Entrainment_Velocity-(2004-2025).nc
+Wed Mar  4 01:53:07 2026
+datasets/Mixed_Layer_Entrainment_Velocity-Clim_Mean.nc
+Wed Mar  4 01:53:07 2026
+
+datasets/Turbulent_Surface_Stress-Clim_Mean.nc
+Wed Mar  4 01:57:43 2026
+datasets/Turbulent_Surface_Stress_Anomalies-(2004-2025).nc
+Wed Mar  4 01:57:44 2026
+
+datasets/alpha.nc
+Wed Mar  4 02:16:20 2026
+datasets/beta.nc
+Wed Mar  4 02:16:23 2026
+datasets/Sea_Surface_Height-(2004-2025).nc
+Wed Mar  4 02:17:22 2026
+datasets/Sea_Surface_Height-Clim_Mean.nc
+Wed Mar  4 02:17:23 2026
+datasets/Sea_Surface_Height_Anomalies-(2004-2025).nc
+Wed Mar  4 02:17:24 2026
+
+datasets/Simulation-Surface_Heat_Flux-(2004-2025).nc
+Wed Mar  4 01:47:39 2026
+datasets/Simulation-Surface_Water_Rate-(2004-2025).nc
+Wed Mar  4 01:47:39 2026
+datasets/Simulation-Entrainment_Heat_Flux-(2004-2025).nc
+Wed Mar  4 01:53:07 2026
+datasets/Simulation-Entrainment_Water_Rate-(2004-2025).nc
+Wed Mar  4 01:53:08 2026
+datasets/Simulation-Ekman_Heat_Flux-(2004-2025).nc
+Wed Mar  4 01:57:45 2026
+datasets/Simulation-Ekman_Water_Rate-(2004-2025).nc
+Wed Mar  4 01:57:45 2026
+datasets/Simulation-Geostrophic_Heat_Flux-(2004-2025).nc
+Wed Mar  4 02:17:25 2026
+datasets/Simulation-Geostrophic_Water_Rate-(2004-2025).nc
+Wed Mar  4 02:17:27 2026

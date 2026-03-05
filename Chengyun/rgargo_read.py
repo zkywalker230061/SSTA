@@ -173,22 +173,24 @@ def main():
         PRESSURE=0, method='nearest'
     )
     visualise_dataset(bathymetery)
+    print(bathymetery.max().item(), bathymetery.min().item())
 
     # mapping
     mapping = ds_temp['MAPPING_MASK'].sel(
         PRESSURE=0, method='nearest'
     )
     visualise_dataset(mapping)
+    print(mapping.max().item(), mapping.min().item())
 
     t_monthly_mean = load_and_prepare_dataset(
-        "../datasets/Temperature_Monthly_Mean.nc"
+        "../datasets/Temperature-Seasonal_Cycle_Mean.nc"
     )
     # visualise_dataset(
     #     t_monthly_mean['MONTHLY_MEAN_TEMPERATURE'].sel(PRESSURE=0, MONTH=1, method='nearest')
     # )
 
     hbar = load_and_prepare_dataset(
-        "../datasets/Mixed_Layer_Depth_Pressure_Monthly_Mean.nc"
+        "../datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
     )
     display(hbar)
     visualise_dataset(
