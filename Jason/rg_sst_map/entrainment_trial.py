@@ -10,72 +10,65 @@ from utils_read_nc import get_monthly_mean, get_anomaly, load_and_prepare_datase
 from utils_Tm_Sm import z_to_xarray
 from utils_ekman import repeat_monthly_field_array
 
-USE_NEW_MLD = True
 
 TEMP_DATA_PATH = r"C:\Users\jason\MSciProject\RG_ArgoClim_Temperature_2019.nc"
 TM_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Datasets.nc"
 T_SUB_MAX_GRAD_PATH = r"C:\Users\jason\MSciProject\Tsub_Max_Gradient_Method.nc"
+MLD_DATA_PATH = r"C:\Users\jason\MSciProject\h.nc"
+T_SUB_PATH = r"C:\Users\jason\MSciProject\t_sub.nc"
+ENTRAINMENT_VELOCITY_PATH = r"C:\Users\jason\MSciProject\Entrainment_Vel_h.nc"
 
-t_sub_max_grad = xr.open_dataset(T_SUB_MAX_GRAD_PATH, decode_times=False)
-t_sub_max_grad_da = t_sub_max_grad["SUB_TEMPERATURE"]
 
-t_ds = xr.open_dataset(TEMP_DATA_PATH, decode_times=False)
-tm = t_ds["ARGO_TEMPERATURE_MEAN"].expand_dims(TIME=len(t_ds.TIME), axis=0)
-ta = t_ds["ARGO_TEMPERATURE_ANOMALY"]
-t_full = tm + ta
 
-p_temp = t_ds['PRESSURE']
-lat_temp = t_ds['LATITUDE']
+
+TEMP_DATA_PATH_EXTENDED = r"C:\Users\jason\MSciProject\Temperature-(2004-2025).nc"
+MLD_DATA_EXTENDED_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth-(2004-2025).nc"
+ENTRAINMENT_CLIM_VELOCITY_PATH_EXTENDED = r"C:\Users\jason\MSciProject\Mixed_Layer_Entrainment_Velocity-Clim_Mean.nc"
+TM_DATA_PATH_EXTENDED = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature-(2004-2025).nc"
+T_SUB_PATH_EXTENDED = r"C:\Users\jason\MSciProject\Sub_Layer_Temperature-(2004-2025).nc"
+# t_sub_max_grad = xr.open_dataset(T_SUB_MAX_GRAD_PATH, decode_times=False)
+# t_sub_max_grad_da = t_sub_max_grad["SUB_TEMPERATURE"]
+
+Tm = xr.open_dataset(TM_DATA_PATH_EXTENDED, decode_times=False)["ML_TEMPERATURE"]
+print(Tm)
+# tm = t_ds["ARGO_TEMPERATURE_MEAN"].expand_dims(TIME=len(t_ds.TIME), axis=0)
+# ta = t_ds["ARGO_TEMPERATURE_ANOMALY"]
+# t_full = tm + ta
+
+
+t_full = xr.open_dataset(TEMP_DATA_PATH_EXTENDED, decode_times=False)["TEMPERATURE"]
+print(t_full)
+
+p_temp = t_full['PRESSURE']
+lat_temp = t_full['LATITUDE']
+
 depth_temp = depth_dbar_to_meter(p_temp,lat_temp)
 
 dz_temp = z_to_xarray(depth_temp, t_full) 
-
-t_full = fix_longitude_coord(t_full)
-dz_temp = fix_longitude_coord(dz_temp)
-
-if USE_NEW_MLD:
-    MLD_DATA_PATH = r"C:\Users\jason\MSciProject\new_h.nc"
-    T_SUB_PATH = r"C:\Users\jason\MSciProject\new T_sub.nc"
-    ENTRAINMENT_VELOCITY_PATH = r"C:\Users\jason\MSciProject\Entrainment_Vel_New_h.nc"
-    # Read Data Paths
-    mld_ds = xr.open_dataset(MLD_DATA_PATH, decode_times=False)
-    Tm_ds = xr.open_dataset(TM_DATA_PATH, decode_times=False)
-    t_sub = xr.open_dataset(T_SUB_PATH, decode_times=False)
-    ent_vel_ds = xr.open_dataset(ENTRAINMENT_VELOCITY_PATH, decode_times=False)
-
-    # Extract DataArrays
-    Tm = Tm_ds["UPDATED_MIXED_LAYER_TEMP"]
-    t_sub_da = t_sub["SUB_TEMPERATURE"]
-    mld_da = mld_ds["MLD"]
-    ent_vel_da = ent_vel_ds["ENTRAINMENT_VELOCITY"]
-
-    # Convert h from dbar to metres
-    mld_meters = -gsw.z_from_p(mld_da, mld_da.LATITUDE)
-    mld_meters.attrs['units'] = 'm'
-    mld_meters.attrs['long_name'] = ('Mixed Layer Depth (h)')
+print(dz_temp)
+# t_full = fix_longitude_coord(t_full)
+# dz_temp = fix_longitude_coord(dz_temp)
+# print(dz_temp)
 
 
-else:
-    MLD_DATA_PATH = r"C:\Users\jason\MSciProject\h.nc"
-    T_SUB_PATH = r"C:\Users\jason\MSciProject\t_sub.nc"
-    ENTRAINMENT_VELOCITY_PATH = r"C:\Users\jason\MSciProject\Entrainment_Vel_h.nc"
 
-    # Read Data Paths
-    mld_ds = xr.open_dataset(MLD_DATA_PATH, decode_times=False)
-    Tm_ds = xr.open_dataset(TM_DATA_PATH, decode_times=False)
-    t_sub = xr.open_dataset(T_SUB_PATH, decode_times=False)
-    ent_vel_ds = xr.open_dataset(ENTRAINMENT_VELOCITY_PATH, decode_times=False)
+# Read Data Paths
+mld_da = xr.open_dataset(MLD_DATA_EXTENDED_PATH, decode_times=False)["MLD"]
 
-    # Extract DataArrays
-    Tm = Tm_ds["MIXED_LAYER_TEMP"]
-    t_sub_da = t_sub["SUB_TEMPERATURE"]
-    mld_da = mld_ds["MLD"]
-    ent_vel_da = ent_vel_ds["ENTRAINMENT_VELOCITY"]
+# Tm_ds = xr.open_dataset(TM_DATA_PATH, decode_times=False)
+t_sub_da = xr.open_dataset(T_SUB_PATH_EXTENDED, decode_times=False)["SUB_TEMPERATURE"]
+print(t_sub_da)
+ent_vel_da = xr.open_dataset(ENTRAINMENT_CLIM_VELOCITY_PATH_EXTENDED, decode_times=False)["MONTHLY_MEAN_w_e"]
 
-    # Convert h from dbar to metres
-    mld_meters = -gsw.z_from_p(mld_da, mld_da.LATITUDE)
-    mld_meters.attrs['units'] = 'm'
-    mld_meters.attrs['long_name'] = ('Mixed Layer Depth (h)')
+# Extract DataArrays
+# Tm = Tm_ds["MIXED_LAYER_TEMP"]
+# t_sub_da = t_sub["SUB_TEMPERATURE"]
+
+
+# Convert h from dbar to metres
+mld_meters = -gsw.z_from_p(mld_da, mld_da.LATITUDE)
+mld_meters.attrs['units'] = 'm'
+mld_meters.attrs['long_name'] = ('Mixed Layer Depth (h)')
 
 
 RHO_O = 1025  # kg / m^3
@@ -122,10 +115,8 @@ def save_entrainment_velocity():
     # )
 
     ent_vel_ds = ent_vel.to_dataset(name='ENTRAINMENT_VELOCITY')
-    if USE_NEW_MLD:
-        ent_vel_ds.to_netcdf(r"C:\Users\jason\MSciProject\Entrainment_Vel_New_h.nc")
-    else:
-        ent_vel_ds.to_netcdf(r"C:\Users\jason\MSciProject\Entrainment_Vel_h.nc")
+    
+    ent_vel_ds.to_netcdf(r"C:\Users\jason\MSciProject\Entrainment_Vel_h.nc")
 
 
 local_mld_limit = mld_meters.max(dim='TIME')
@@ -192,35 +183,35 @@ def calculate_tsub_dataset(t_full, mld_meters, depth_xr):
 # print("--- Calculating Entrainment Velocity... ---")
 # save_entrainment_velocity()
 
-# t_profile = t_full.isel(TIME=0, LATITUDE=50, LONGITUDE=50)
-# z_profile = dz_temp.isel(TIME=0, LATITUDE=50, LONGITUDE=50)
-# mld_val = mld_meters.isel(TIME=0, LATITUDE=50, LONGITUDE=50)
-# limit_val = local_mld_limit.isel(LATITUDE=50, LONGITUDE=50)
+t_profile = t_full.isel(TIME=0, LATITUDE=50, LONGITUDE=50)
+z_profile = dz_temp.isel(TIME=0, LATITUDE=50, LONGITUDE=50)
+mld_val = mld_meters.isel(TIME=0, LATITUDE=50, LONGITUDE=50)
+limit_val = local_mld_limit.isel(LATITUDE=50, LONGITUDE=50)
 
 
-# t_sub_point = find_max_gradient_tsub(t_profile, z_profile, mld_val, limit_val)
-# t_sub_reference_point = t_sub_da.isel(TIME=0, LATITUDE=50, LONGITUDE=50)
+t_sub_point = find_max_gradient_tsub(t_profile, z_profile, mld_val, limit_val)
+t_sub_reference_point = t_sub_da.isel(TIME=0, LATITUDE=50, LONGITUDE=50)
 
 
-# print(f"--- Single Point Test (Lat Index 50, Lon Index 50) ---")
-# print(f"Mixed Layer Temp (Tm): {Tm.isel(TIME=0, LATITUDE=50, LONGITUDE=50).values:.4f} °C")
-# print(f"New Subsurface Temp (Tsub): {float(t_sub_point):.4f} °C")
-# print(f"Old Subsurface Temp (Tsub): {float(t_sub_reference_point):.4f} °C")
-# print(f"New Thermal Jump (Tsub - Tm): {float(t_sub_point - Tm.isel(TIME=0, LATITUDE=50, LONGITUDE=50)):.4f} °C")
-# print(f"Old Thermal Jump (Tsub - Tm): {float(t_sub_reference_point - Tm.isel(TIME=0, LATITUDE=50, LONGITUDE=50)):.4f} °C")
+print(f"--- Single Point Test (Lat Index 50, Lon Index 50) ---")
+print(f"Mixed Layer Temp (Tm): {Tm.isel(TIME=0, LATITUDE=50, LONGITUDE=50).values:.4f} °C")
+print(f"New Subsurface Temp (Tsub): {float(t_sub_point):.4f} °C")
+print(f"Old Subsurface Temp (Tsub): {float(t_sub_reference_point):.4f} °C")
+print(f"New Thermal Jump (Tsub - Tm): {float(t_sub_point - Tm.isel(TIME=0, LATITUDE=50, LONGITUDE=50)):.4f} °C")
+print(f"Old Thermal Jump (Tsub - Tm): {float(t_sub_reference_point - Tm.isel(TIME=0, LATITUDE=50, LONGITUDE=50)):.4f} °C")
 
 
-# # Checking if Tsub < Tm for new method (max gradient)
-# if t_sub_point < Tm.isel(TIME=0, LATITUDE=50, LONGITUDE=50):
-#     print("Success: Tsub is colder than the mixed layer.")
-# else:
-#     print("Warning: Tsub is warmer than Tm. Check your search mask logic.")
+# Checking if Tsub < Tm for new method (max gradient)
+if t_sub_point < Tm.isel(TIME=0, LATITUDE=50, LONGITUDE=50):
+    print("Success: Tsub is colder than the mixed layer.")
+else:
+    print("Warning: Tsub is warmer than Tm. Check your search mask logic.")
 
-# # Checking if Tsub < Tm for old method
-# if t_sub_reference_point < Tm.isel(TIME=0, LATITUDE=50, LONGITUDE=50):
-#     print("Success: Tsub is colder than the mixed layer.")
-# else:
-#     print("Warning: Tsub is warmer than Tm. Check your search mask logic.")
+# Checking if Tsub < Tm for old method
+if t_sub_reference_point < Tm.isel(TIME=0, LATITUDE=50, LONGITUDE=50):
+    print("Success: Tsub is colder than the mixed layer.")
+else:
+    print("Warning: Tsub is warmer than Tm. Check your search mask logic.")
 
 
 
@@ -228,12 +219,10 @@ def calculate_tsub_dataset(t_full, mld_meters, depth_xr):
 t_sub_new_da = calculate_tsub_dataset(t_full, mld_meters, dz_temp)
 
 print("Calculating T_sub (Maximum Gradient Method)...")
-if USE_NEW_MLD:
-    with ProgressBar():
-        t_sub_new_da.to_netcdf(r"C:\Users\jason\MSciProject\Tsub_Max_Gradient_Method_New_h.nc")
-else:
-    with ProgressBar():
-        t_sub_new_da.to_netcdf(r"C:\Users\jason\MSciProject\Tsub_Max_Gradient_Method_h.nc") 
+
+
+with ProgressBar():
+    t_sub_new_da.to_netcdf(r"C:\Users\jason\MSciProject\Sub_Layer_Temperature_Max_Gradient_Method-(2004-2025).nc") 
 
 
 # date = 11.5
@@ -256,24 +245,24 @@ else:
 # plt.show()
 
 
-Tm_bar = get_monthly_mean(Tm)
-Tm_prime = get_anomaly(Tm, Tm_bar)
+# Tm_bar = get_monthly_mean(Tm)
+# Tm_prime = get_anomaly(Tm, Tm_bar)
 
 
-t_sub_old_bar = get_monthly_mean(t_sub_da)
-t_sub_old_prime = get_anomaly(t_sub_da, t_sub_old_bar)
+# t_sub_old_bar = get_monthly_mean(t_sub_da)
+# t_sub_old_prime = get_anomaly(t_sub_da, t_sub_old_bar)
 
-t_sub_new_bar = get_monthly_mean(t_sub_max_grad_da)
-t_sub_new_prime = get_anomaly(t_sub_max_grad_da, t_sub_new_bar)
+# t_sub_new_bar = get_monthly_mean(t_sub_max_grad_da)
+# t_sub_new_prime = get_anomaly(t_sub_max_grad_da, t_sub_new_bar)
 
 
-ent_vel_monthly = get_monthly_mean(ent_vel_da)
-ent_vel_bar = repeat_monthly_field_array(ent_vel_monthly)
+# ent_vel_monthly = get_monthly_mean(ent_vel_da)
+# ent_vel_bar = repeat_monthly_field_array(ent_vel_monthly)
 # ent_vel_monthly = get_monthly_mean
 
 
-delta_t_old = t_sub_old_prime - Tm_prime
-delta_t_new = t_sub_new_prime - Tm_prime
+# delta_t_old = t_sub_old_prime - Tm_prime
+# delta_t_new = t_sub_new_prime - Tm_prime
 
 
 

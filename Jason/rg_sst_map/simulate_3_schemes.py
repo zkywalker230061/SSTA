@@ -14,8 +14,9 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.animation import FuncAnimation
 from utils_ekman import repeat_monthly_field_array
 from tqdm import tqdm
-from chris_utils import calculate_RMSE_normalised, get_clean_error_distribution
+from chris_utils import calculate_RMSE_normalised, get_clean_error_distribution, decompose_mse
 from scipy.stats import skew, kurtosis, norm
+
 
 plt.rcParams['animation.ffmpeg_path'] = r'C:\ffmpeg\bin\ffmpeg.exe'
 
@@ -25,6 +26,19 @@ matplotlib.use('TkAgg')
 USE_DOWNLOADED_SSH = False
 
 
+
+
+added_baseline = False
+testparam = False
+
+# Compute Simulation & Simulation Variable Settings 
+COMPUTE_SIM = True 
+COMPUTE_IMP = True 
+COMPUTE_EXP = False
+COMPUTE_SIMP = False
+
+USE_DOWNLOADED_SSH = False
+
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN_ANOM_ADVECTION = True
 INCLUDE_EKMAN_MEAN_ADVECTION = True
@@ -32,17 +46,16 @@ INCLUDE_ENTRAINMENT = True
 INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
 INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
 
-USE_NEW_H_BAR_NEW_T_SUB = False
 
-added_baseline = False
-testparam = False
+# Display And/Or Save Simulation Settings 
+SHOW_SIMULATIONS = False
+SAVE_SIMULATIONS = False
 
-
-COMPUTE_SIM = True
-COMPUTE_NRMSE = True
-COMPUTE_PDF_ANALYSIS = True
-SHOW_SIMULATIONS = True
-SAVE_SIMULATIONS = True
+# Statistical Analysis Settings
+COMPUTE_NRMSE = False
+COMPUTE_PDF_ANALYSIS = False
+COMPUTE_MSE_DECOMPOSITION = True
+COMPUTE_PRINCIPAL_COMPONENT = True
 
 # ----------1. Defining Physical Parameters for Simulations ---------------------
 explicit_stability_limit = 1e-7
@@ -169,24 +182,43 @@ geostrophic_anomaly_da = geostrophic_anomaly_ds["GEOSTROPHIC_ANOMALY"]
 sea_surface_grad_ds = xr.open_dataset(SEA_SURFACE_GRAD_DATA_PATH, decode_times=False)
 sea_surface_monthlymean_ds = xr.open_dataset(SEA_SURFACE_MONTHLY_MEAN_DATA_PATH, decode_times=False)
 
+
+# Preprocessing Reynolds Anomaly 
+mean_obs = repeat_monthly_field_array(observed_temperature_mean_reynold)
+
+reynolds_sst = mean_obs + observed_temperature_anomaly_reynold
+# reynolds_sst_y = reynolds_sst.isel(TIME=slice(12,None))
+
+reynolds_mean = get_monthly_mean(reynolds_sst)
+reynolds_mean_stacked = repeat_monthly_field_array(reynolds_mean, n_repeats=15)
+
+reynolds_anom = reynolds_sst - reynolds_mean_stacked # mean anomalies of order 1e-6
+
+
 #----------4. Initialising Lists for Different Schemes for Simulations -----------------------------
 
-# initialise lists for temperature anomalies for each model
+# initialise lists for temperature anomalies and entrainment fluxes for each model
+
 implicit_model_anomalies = []
 explicit_model_anomalies = []
 semi_implicit_model_anomalies = []
 
-# initialise lists for entrainment fluxes for each model; for categorising each component
 entrainment_fluxes_implicit = []
 entrainment_fluxes_explicit = []
 entrainment_fluxes_semi_implicit = []
-
 # Diagnostic storage for Fluxes (W/m^2)
-flux_diag_surface = []
-flux_diag_ekman_anom = []
-flux_diag_geo_anom = []
-flux_diag_entrainment = []
-flux_diag_total_mean_adv = []
+
+flux_diag_surface = [] # I will always have surface flux set to true so no adjustment needed
+if INCLUDE_EKMAN_ANOM_ADVECTION:
+    flux_diag_ekman_anom = []
+if INCLUDE_GEOSTROPHIC_ANOM_ADVECTION:
+    flux_diag_geo_anom = []
+if INCLUDE_ENTRAINMENT:
+    flux_diag_entrainment = []
+if INCLUDE_GEOSTROPHIC_MEAN_ADVECTION or INCLUDE_EKMAN_MEAN_ADVECTION:
+    flux_diag_total_mean_adv = []
+
+
 #-----------5. Testing Drift Before Simulations -----------------------
 
 components = {
@@ -255,15 +287,15 @@ if COMPUTE_SIM:
                 base = temperature_ds.sel(PRESSURE=2.5, TIME=month)['ARGO_TEMPERATURE_ANOMALY'] - \
                     temperature_ds.sel(PRESSURE=2.5, TIME=month)['ARGO_TEMPERATURE_ANOMALY']
                 base = base.expand_dims(TIME=[month])
-                implicit_model_anomalies.append(base)
-                explicit_model_anomalies.append(base)
-                semi_implicit_model_anomalies.append(base)
+                implicit_model_anomalies.append(base) if COMPUTE_IMP == True else None
+                explicit_model_anomalies.append(base) if COMPUTE_EXP == True else None
+                semi_implicit_model_anomalies.append(base) if COMPUTE_SIMP == True else None
                 added_baseline = True
             else:
                 # Previous Month States 
-                prev_imp = implicit_model_anomalies[-1].isel(TIME=-1)
-                prev_exp = explicit_model_anomalies[-1].isel(TIME=-1)
-                prev_semi = semi_implicit_model_anomalies[-1].isel(TIME=-1)
+                prev_imp = implicit_model_anomalies[-1].isel(TIME=-1) if COMPUTE_IMP == True else None
+                prev_exp = explicit_model_anomalies[-1].isel(TIME=-1) if COMPUTE_EXP == True else None
+                prev_semi = semi_implicit_model_anomalies[-1].isel(TIME=-1) if COMPUTE_SIMP == True else None
 
                 # Current Velocities and Monthly Data 
                 alpha_curr = alpha_mean.sel(MONTH=month_in_year)
@@ -273,9 +305,12 @@ if COMPUTE_SIM:
                 cur_tsub = t_sub_da.sel(TIME=month)
 
                 if INCLUDE_GEOSTROPHIC_MEAN_ADVECTION or INCLUDE_EKMAN_MEAN_ADVECTION:
-                    div_imp = compute_upwind_advection(prev_imp, alpha_curr, beta_curr, dx, dy, delta_t)
-                    div_exp = compute_upwind_advection(prev_exp, alpha_curr, beta_curr, dx, dy, delta_t)
-                    div_semi = compute_upwind_advection(prev_semi, alpha_curr, beta_curr, dx, dy, delta_t)
+                    if COMPUTE_IMP:
+                        div_imp = compute_upwind_advection(prev_imp, alpha_curr, beta_curr, dx, dy, delta_t)
+                    if COMPUTE_EXP:
+                        div_exp = compute_upwind_advection(prev_exp, alpha_curr, beta_curr, dx, dy, delta_t)
+                    if COMPUTE_SIMP:
+                        div_semi = compute_upwind_advection(prev_semi, alpha_curr, beta_curr, dx, dy, delta_t)
                 else:
                     div_imp = div_exp = div_semi = xr.zeros_like(prev_imp)
                 
@@ -305,9 +340,13 @@ if COMPUTE_SIM:
                 cur_a_exp = cur_a + div_curr.clip(-explicit_stability_limit, explicit_stability_limit)
                 cur_a_exp = cur_a_exp.clip(max= 0.9/ delta_t)
 
-                new_imp = (prev_imp + delta_t * (cur_b - div_imp)) / (1 + delta_t * cur_a_stable)
-                new_exp = prev_exp + delta_t * (cur_b - cur_a_exp * prev_exp - div_exp)
-                new_semi = (prev_semi + 0.5 * delta_t * (cur_b + b_prev - div_semi)) / (1 + delta_t * cur_a_stable)
+                
+                if COMPUTE_IMP:
+                    new_imp = (prev_imp + delta_t * (cur_b - div_imp)) / (1 + delta_t * cur_a_stable)
+                if COMPUTE_EXP:
+                    new_exp = prev_exp + delta_t * (cur_b - cur_a_exp * prev_exp - div_exp)
+                if COMPUTE_SIMP:
+                    new_semi = (prev_semi + 0.5 * delta_t * (cur_b + b_prev - div_semi)) / (1 + delta_t * cur_a_stable)
 
                 energy_factor = rho_0 * c_0 * cur_hbar
 
@@ -325,52 +364,81 @@ if COMPUTE_SIM:
                     flux_diag_total_mean_adv.append(q_mean_adv.expand_dims(TIME=[month]))
                 
                 b_prev = cur_b
-                implicit_model_anomalies.append(new_imp.expand_dims(TIME=[month]))
-                explicit_model_anomalies.append(new_exp.expand_dims(TIME=[month]))
-                semi_implicit_model_anomalies.append(new_semi.expand_dims(TIME=[month]))
+            
+                if COMPUTE_IMP:
+                    implicit_model_anomalies.append(new_imp.expand_dims(TIME=[month]))
+                
+                if COMPUTE_EXP:
+                    explicit_model_anomalies.append(new_exp.expand_dims(TIME=[month]))
+                if COMPUTE_SIMP:
+                    semi_implicit_model_anomalies.append(new_semi.expand_dims(TIME=[month]))
 
     # Gemini aided 
     # --- 8. Post-Processing: Aligning to Reynolds Benchmark ---
-    print("Concatenating model results...")
+    print("Concatenating active model results...")
 
+    datasets_to_merge = []
     # Merge the 3 primary numerical schemes
-    imp_ds = xr.concat([da.drop_vars('MONTH', errors='ignore') for da in implicit_model_anomalies], 'TIME').rename("IMPLICIT")
-    exp_ds = xr.concat([da.drop_vars('MONTH', errors='ignore') for da in explicit_model_anomalies], 'TIME').rename("EXPLICIT")
-    semi_ds = xr.concat([da.drop_vars('MONTH', errors='ignore') for da in semi_implicit_model_anomalies], 'TIME').rename("SEMI_IMPLICIT")
+    scheme_configs = [
+    (COMPUTE_IMP, implicit_model_anomalies, "IMPLICIT"),
+    (COMPUTE_EXP, explicit_model_anomalies, "EXPLICIT"),
+    (COMPUTE_SIMP, semi_implicit_model_anomalies, "SEMI_IMPLICIT")
+]
 
-    print("Merging schemes...")
-    all_models = xr.merge([imp_ds, exp_ds, semi_ds])
+    for active, anomaly_list, name in scheme_configs:
+        if active and anomaly_list:
+            print(f"Applying {name} baseline coordinate shift (Argo -> Reynolds)...")
+            
+            # 1. Convert list to a temporary 3D DataArray for calculation
+            raw_ds = xr.concat(
+            [da.drop_vars('MONTH', errors='ignore') for da in anomaly_list], 
+            dim='TIME')
+            
+            # 2. Step A: Internal Recenter (Removes numerical drift)
+            # We calculate the climatology of the model's own output
+            model_climatology = get_monthly_mean(raw_ds)
+            
+            # 3. Step B: Apply the shift using repeat_monthly_field_array
+            # This aligns the model's 0 to the physical 0
+            climatology_stacked = repeat_monthly_field_array(model_climatology, n_repeats=15)
+            recentered_da = raw_ds - climatology_stacked
+            
+            # 4. Prepare for final merge
+            final_ds = recentered_da.rename(name).to_dataset()
+            datasets_to_merge.append(final_ds)
+            
+            # Free memory of temporary lists
+            del raw_ds, recentered_da
 
-    del imp_ds, exp_ds, semi_ds
+    if datasets_to_merge:
+        print(f"Merging {len(datasets_to_merge)} active schemes...")
+        all_models = xr.merge(datasets_to_merge)
+        all_models = remove_empty_attributes(all_models)
+        del datasets_to_merge 
+    else:
+        print("No schemes were computed.")
 
-    # Calculate the climatological offset: Argo Mean - Reynolds Mean
-    # This represents the fixed physical difference between the two datasets
+    # End of Gemini aided code
 
     if SHOW_SIMULATIONS:
-        make_movie(observed_temperature_anomaly_reynold, -3, 3)
-        obs_temp_mean_repeated = repeat_monthly_field_array(obs_temp_mean)
-        observed_temperature_mean_reynold_repeated = repeat_monthly_field_array(observed_temperature_mean_reynold)
+        print("Displaying Reynolds Benchmark...")
+        if SAVE_SIMULATIONS:
+            make_movie(observed_temperature_anomaly_reynold, -3, 3, 
+                    savepath=r"C:\Users\jason\MSciProject\Observed_Reynolds_Anomaly.mp4")
+        else:
+            make_movie(observed_temperature_anomaly_reynold, -3, 3)
 
-        delta_t_mean = obs_temp_mean_repeated - observed_temperature_mean_reynold_repeated
-
-
-        print("Applying baseline coordinate shift (Argo -> Reynolds)...")
-        for scheme in ["IMPLICIT", "EXPLICIT", "SEMI_IMPLICIT"]:
-            # Step A: Internal Recenter (removes any model-specific numerical drift)
-            model_climatology = get_monthly_mean(all_models[scheme])
-            recentered_anom_ds = get_anomaly(all_models, scheme, model_climatology)
-            recentered_anom = recentered_anom_ds[f"{scheme}_ANOMALY"]
+        for scheme_name in all_models.data_vars:
+            data_array = all_models[scheme_name]
+            print(f"Processing video for: {scheme_name}")
             
-            # Step B: Baseline shift (aligns the model's 0 to the Reynolds 0)
-            # all_models[scheme] = recentered_anom + delta_t_mean
             if SAVE_SIMULATIONS:
-                save_path = fr"C:\Users\jason\MSciProject\{scheme.capitalize()}_Scheme_Temp_Anomaly.mp4"
-                print(f"Saving movie for {scheme} to {save_path}...")
-                make_movie(recentered_anom, -3, 3, savepath=save_path)
+                save_path = fr"C:\Users\jason\MSciProject\{scheme_name.capitalize()}_Scheme_Temp_Anomaly.mp4"
+                print(f"Saving to {save_path}...")
+                make_movie(data_array, -3, 3, savepath=save_path)
             else:
-                make_movie(all_models[f"{scheme}_ANOMALY"], -3,3)
+                make_movie(data_array, -3, 3)
             
-        all_models = remove_empty_attributes(all_models)
     # all_models.to_netcdf(r"C:\Users\jason\MSciProject\SSTA_All_Schemes_Final.nc")
 
 if not COMPUTE_SIM:
@@ -379,29 +447,41 @@ if not COMPUTE_SIM:
     all_models = xr.open_dataset(test_file_path, decode_times=False)
 
     if SHOW_SIMULATIONS:
-
-        if SAVE_SIMULATIONS: 
-            make_movie(observed_temperature_anomaly_reynold, -3, 3, savepath=r"C:\Users\jason\MSciProject\Observed_Reynolds_Anomaly.mp4")
-            make_movie(all_models["EXPLICIT_ANOMALY"], -3, 3, savepath=r"C:\Users\jason\MSciProject\Explicit_Scheme_Temp_Anomaly.mp4")
-            make_movie(all_models["SEMI_IMPLICIT_ANOMALY"], -3, 3, savepath=r"C:\Users\jason\MSciProject\Semi_Implicit_Scheme_Temp_Anomaly.mp4")
-            make_movie(all_models["IMPLICIT_ANOMALY"], -3, 3, savepath=r"C:\Users\jason\MSciProject\Implicit_Scheme_Temp_Anomaly.mp4")
-        
+        print("Displaying Reynolds Benchmark...")
+        if SAVE_SIMULATIONS:
+            make_movie(observed_temperature_anomaly_reynold, -3, 3, 
+                    savepath=r"C:\Users\jason\MSciProject\Observed_Reynolds_Anomaly.mp4")
         else:
             make_movie(observed_temperature_anomaly_reynold, -3, 3)
-            make_movie(all_models["EXPLICIT_ANOMALY"], -3, 3)
-            make_movie(all_models["SEMI_IMPLICIT_ANOMALY"], -3, 3)
-            make_movie(all_models["IMPLICIT_ANOMALY"], -3, 3)
 
-schemes = {
-        "Explicit": all_models["EXPLICIT_ANOMALY"],
-        "Implicit": all_models["IMPLICIT_ANOMALY"],
-        "Semi-Implicit": all_models["SEMI_IMPLICIT_ANOMALY"]
-    }
+        for scheme_name in all_models.data_vars:
+            data_array = all_models[scheme_name]
+            print(f"Processing video for: {scheme_name}")
+            
+            if SAVE_SIMULATIONS:
+                save_path = fr"C:\Users\jason\MSciProject\{scheme_name.capitalize()}_Scheme_Temp_Anomaly_PreSaved_File.mp4"
+                print(f"Saving to {save_path}...")
+                make_movie(data_array, -3, 3, savepath=save_path)
+            else:
+                make_movie(data_array, -3, 3)
+
+
+
+
+# --------------------------- Statistical Analysis ----------------------------
+
+# Redefine Scheme Dictionary 
+# schemes = {
+#         "Explicit": all_models["EXPLICIT"],
+#         "Implicit": all_models["IMPLICIT"],
+#         "Semi-Implicit": all_models["SEMI_IMPLICIT"]
+#     }
 
 if COMPUTE_NRMSE:
-    for scheme_name, model_da in schemes.items():
+    for scheme_name in all_models.data_vars:
+        model_da = all_models[scheme_name]
         fig, axes = plt.subplots(1, 1, figsize=(12,7))
-        rmse_map, global_score = calculate_RMSE_normalised(observed_temperature_anomaly_reynold, model_da, dim='TIME')
+        rmse_map, global_score = calculate_RMSE_normalised(reynolds_anom, model_da, dim='TIME')
         
         # Plotting
         # ax = plt.subplot(3, 2, i + 1)
@@ -427,11 +507,12 @@ if COMPUTE_PDF_ANALYSIS:
     error_distributions = {}
     print("Calculating errors for all schemes...")
 
-    for name, data in schemes.items():
-        print(f"Processing {name}...")
-        error_distributions[name] = get_clean_error_distribution(data, observed_temperature_anomaly_reynold)
+    for scheme_name in all_models.data_vars:
+        data = all_models[scheme_name]
+        print(f"Processing {scheme_name}...")
+        error_distributions[scheme_name] = get_clean_error_distribution(data, reynolds_anom)
 
-    num_schemes = len(schemes)
+    num_schemes = len(all_models.data_vars)
     cols = 2
     rows = int(np.ceil(num_schemes / cols))
 
@@ -497,3 +578,167 @@ if COMPUTE_PDF_ANALYSIS:
             ha='right', va='bottom', fontsize=18
         )
     plt.show()
+
+if COMPUTE_MSE_DECOMPOSITION:
+    print("Calculating MSE....")
+    for scheme_name in all_models.data_vars:
+        data = all_models[scheme_name]
+        results = decompose_mse(reynolds_anom, data)
+
+        bias_da = results['bias'] 
+        bias_pct = results['bias_pct'] 
+
+        var_da = results['variance']
+        var_pct = results['variance_pct']
+
+        phase_da = results['phase']
+        phase_pct = results['phase_pct']
+
+        total_mse_da = results['total']
+
+        fig, axes = plt.subplots(2, 2, figsize=(20, 10))
+        axes = axes.flatten()  
+
+        plot_names = ["Bias Error", "Variance Error", "Phase Error", "Total MSE"]
+        maps_to_plot = [bias_da, var_da, phase_da, total_mse_da]
+
+        mse_configs = [
+            ("Bias Error", bias_da, -1e-12, 1e-12),
+            ("Variance Error", var_da, 0, 1),
+            ("Phase Error", phase_da, 0, 1),
+            ("Total MSE", total_mse_da, 0, 1)
+        ]
+
+        mse_pct_configs = [
+            ("Bias Percentage Error", bias_pct, 0, 100),
+            ("Variance Percentage Error", var_pct, 0, 100),
+            ("Phase Percentage Error", phase_pct, 0, 100),
+            ("Total MSE", total_mse_da, 0, 1)
+        ]
+
+        for i, (name, item, vmin_val, vmax_val) in enumerate(mse_configs):
+            im = item.plot(ax=axes[i], cmap='nipy_spectral', add_colorbar=True, 
+                        cbar_kwargs={'label': f'{name}'},
+                        vmin=vmin_val, vmax=vmax_val)
+            
+            axes[i].set_title(f'{plot_names[i]}')
+            
+        
+            mean_val = item.mean().item()
+            print(f"{plot_names[i]} Mean: {mean_val:.4f}")
+
+        plt.tight_layout()
+        fig.suptitle(f"{scheme_name} Scheme MSE Decomposition (Gamma={gamma_0})", fontsize=20)
+        plt.tight_layout()
+        plt.show()
+
+        fig, axes = plt.subplots(2, 2, figsize=(20, 10))
+        axes = axes.flatten()
+        for i, (name, item, vmin_val, vmax_val) in enumerate(mse_pct_configs):
+            im = item.plot(ax=axes[i], cmap='nipy_spectral', add_colorbar=True, 
+                        cbar_kwargs={'label': f'{name}'},
+                        vmin=vmin_val, vmax=vmax_val)
+            
+            axes[i].set_title(f'{plot_names[i]}')
+            
+        
+            # mean_val = item.mean().item()
+            # print(f"{plot_names[i]} Mean: {mean_val:.4f}")
+
+        plt.tight_layout()
+        fig.suptitle(f"{scheme_name} Scheme MSE Decomposition (Gamma={gamma_0})", fontsize=20)
+        plt.tight_layout()
+        plt.show() 
+
+
+if COMPUTE_PRINCIPAL_COMPONENT:
+    n_modes = 5
+    ocean_mask = reynolds_anom.notnull().all(dim='TIME')
+    
+    print("Calculating EOFs for Reynolds Observations...")
+    # Using Chris function to get the eof of the obs
+    reconstructed_obs, exp_var_obs, pc_obs, eof_obs_da = get_eof_with_nan_consideration(
+        reynolds_anom, mask=ocean_mask, modes=n_modes
+    )
+
+    for scheme_name in all_models.data_vars:
+        data = all_models[scheme_name]
+        
+        fig, axes = plt.subplots(n_modes, 1, figsize=(12, 4 * n_modes), sharex=True)
+        if n_modes == 1:
+            axes = [axes]
+
+        for m in range(n_modes):
+            ax = axes[m]
+            
+            # psuedo pc calculation (dot product)
+            model_pseudo_pc = xr.dot(
+                data.fillna(0), 
+                eof_obs_da.sel(MODE=m).fillna(0), 
+                dims=['LATITUDE', 'LONGITUDE']
+            )
+
+            # observed pc 
+            obs_pc_raw = pc_obs[:, m]
+
+            # 4. Normalise (Z-score)
+            # model_pc_norm = (model_pseudo_pc - model_pseudo_pc.mean()) / model_pseudo_pc.std()
+            # obs_pc_norm = (obs_pc_raw - obs_pc_raw.mean()) / obs_pc_raw.std()
+
+            # 5. Plotting
+            time_coords = data.TIME.values 
+            
+            ax.plot(time_coords, obs_pc_raw, label="Observed (Reynolds)", color='black', alpha=0.6, linewidth=1.5)
+            ax.plot(time_coords, model_pseudo_pc, label=f"Model ({scheme_name})", color='crimson', linestyle='--', linewidth=1.5)
+            
+            # 6. Correlation Statistics
+            correlation = np.corrcoef(obs_pc_raw, model_pseudo_pc)[0, 1] # Use pseudo_pc directly for corr
+            ax.text(0.02, 0.9, f"Mode {m} | Correlation: {correlation:.2f}", transform=ax.transAxes, fontweight='bold')
+            
+            # RMSE Statistics 
+            raw_rmse = np.sqrt(np.mean((obs_pc_raw - model_pseudo_pc)**2))
+            obs_rms = np.sqrt(np.mean(obs_pc_raw**2))
+            nrmse_pc = raw_rmse / obs_rms
+            ax.text(0.02, 0.8, f"PC-RMSE: {nrmse_pc:.3f}", transform=ax.transAxes)
+            # Aesthetics
+            ax.set_ylabel("Amplitude (σ)")
+            ax.axhline(0, color='gray', linewidth=0.8, linestyle=':')
+            ax.legend(loc='upper right', fontsize='small')
+            ax.set_title(f"{scheme_name} | Principal Component Comparison: Mode {m}")
+
+        axes[-1].set_xlabel("Time (Months from 2004)")
+        plt.tight_layout()
+        plt.show()
+# print(observed_temperature_anomaly_reynold)
+# print(observed_temperature_mean_reynold)
+
+
+
+print(reynolds_sst.dims)
+print(reynolds_mean.dims)
+make_movie(reynolds_anom, -3,3)
+# psuedo_mean = get_monthly_mean(observed_temperature_anomaly_reynold)
+# real_anom = get_anomaly(observed_temp_ds_reynold, "SST", psuedo_mean)
+# observed_temperature_anomaly_reynold = observed_temp_ds_reynold["SST_ANOMALY"]
+mean_obs = reynolds_anom.mean(dim="TIME")
+fig, axes = plt.subplots(1, 1, figsize=(8,5))
+cmap = plt.get_cmap('RdBu_r').copy()
+cmap.set_bad(color="black")
+mean_obs.plot(ax=axes, cmap=cmap, cbar_kwargs={'label': '(K)'}, vmin = -1e-7, vmax = 1e-7)
+axes.set_xlabel("Longitude")
+axes.set_ylabel("Lattitude")
+axes.set_title(f'Mean Reynolds Anomaly')
+plt.tight_layout()
+plt.show()
+
+
+# mean_model = schemes["Implicit"].mean(dim="TIME")
+# fig, axes = plt.subplots(1, 1, figsize=(8,5))
+# cmap = plt.get_cmap('RdBu_r').copy()
+# cmap.set_bad(color="black")
+# mean_model.plot(ax=axes, cmap=cmap, cbar_kwargs={'label': '(K)'}, vmin = -0.05, vmax = 0.05)
+# axes.set_xlabel("Longitude")
+# axes.set_ylabel("Lattitude")
+# axes.set_title(f'Implicit Scheme Anomaly')
+# plt.tight_layout()
+# plt.show()

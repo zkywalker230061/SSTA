@@ -683,3 +683,36 @@ def get_clean_error_distribution(test_da, obs_da):
     # 3. Flatten and drop NaNs
     flat_error = error_da.values.flatten()
     return flat_error[~np.isnan(flat_error)]
+
+def decompose_mse(obs, model, dim='TIME'):
+    # 1. Basic Stats
+    mean_obs = obs.mean(dim=dim)
+    mean_mod = model.mean(dim=dim)
+    std_obs = obs.std(dim=dim)
+    std_mod = model.std(dim=dim)
+    
+    # 2. Correlation (r)
+    correlation = xr.corr(obs, model, dim=dim)
+    
+    # 3. Calculate Components
+    bias_sq = (mean_mod - mean_obs)**2
+    var_err = (std_mod - std_obs)**2
+    phase_err = 2 * std_mod * std_obs * (1 - correlation)
+    
+    total_mse = bias_sq + var_err + phase_err
+    
+    
+    bias_pct = (bias_sq / total_mse) * 100
+    variance_pct = (var_err / total_mse) * 100
+    phase_pct = (phase_err / total_mse) * 100
+    
+    
+    return {
+        "bias_pct": bias_pct,
+        "bias": bias_sq,
+        "variance_pct": variance_pct,
+        "variance": var_err,
+        "phase_pct": phase_pct,
+        "phase": phase_err,
+        "total": total_mse
+    }
