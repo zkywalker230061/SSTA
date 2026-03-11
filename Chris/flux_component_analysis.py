@@ -192,6 +192,36 @@ def correlate_turbulent_ekman():
     cbar.set_ylabel('Pearson Correlation Coefficient', rotation=90)
     plt.show()
 
+
+def covariance_ratio(component_list, component_names, make_plots=False):
+    # tendency = []
+    # for time in all_components["TOTAL_FLUX_ANOMALY"].TIME.values:
+    #     month = get_month_from_time(time)
+    #     tendency.append(all_components["TOTAL_FLUX_ANOMALY"].sel(TIME=time) / (rho_0 * c_0 * hbar_da.sel(MONTH=month)))
+    # tendency = xr.concat(tendency, "TIME")
+
+    tendency = all_components["SIGNED_TOTAL_FLUX_ANOMALY"]
+    tendency_var = ((tendency - tendency.mean(dim="TIME")) ** 2).mean(dim="TIME")
+    ratios = {}
+    for forcing in component_list:
+        cov = ((all_components[forcing] - all_components[forcing].mean(dim="TIME")) * (tendency - tendency.mean(dim="TIME"))).mean(dim="TIME")
+        ratios[forcing] = (cov / tendency_var).rename(forcing)
+    ratios = xr.Dataset(ratios)
+    ratios.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/covariances/" + save_name + "_covariances.nc")
+
+    if make_plots:
+        for i, forcing in enumerate(component_list):
+            name = component_names[i]
+            ratios[forcing].plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=1)
+            plt.title("")
+            plt.xlabel("Longitude (º)")
+            plt.ylabel("Latitude (º)")
+            cbar = plt.gcf().axes[-1]
+            cbar.set_ylabel('Covariance of ' + name, rotation=90)
+            plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/covariances/" + save_name + "_covariances_" + forcing + ".jpg", dpi=400)
+            plt.show()
+
+
 # all_components = all_components.where(((all_components.LATITUDE >= 20) & (all_components.LATITUDE <= 60)) | ((all_components.LATITUDE >= -60) & (all_components.LATITUDE <= -20)), drop=True)
 # all_components = all_components.sel(LATITUDE=slice(0, 90))      # NH
 # all_components = all_components.sel(LATITUDE=slice(-90, 0))     # SH
@@ -199,7 +229,7 @@ def correlate_turbulent_ekman():
 # all_components = all_components.sel(LATITUDE=slice(-60, -20))     # SH  midlat
 
 # get_flux_proportion("SURFACE_FLUX_ANOMALY", save_file=True)
-get_flux_proportion("EKMAN_ANOM_ADVECTION_ANOMALY", save_file=False)
+# get_flux_proportion("EKMAN_ANOM_ADVECTION_ANOMALY", save_file=False)
 # get_flux_proportion("ENTRAINMENT_ANOMALY", save_file=True)
 # get_flux_proportion("GEOSTROPHIC_ANOM_ADVECTION_ANOMALY", save_file=True)
 # get_flux_proportion("EKMAN_MEAN_ADVECTION_ANOMALY", save_file=True)
@@ -218,3 +248,5 @@ get_flux_proportion("EKMAN_ANOM_ADVECTION_ANOMALY", save_file=False)
 
 
 # correlate_turbulent_ekman()
+
+covariance_ratio(component_list, readable_component_list, True)

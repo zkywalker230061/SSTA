@@ -21,54 +21,75 @@ INCLUDE_EKMAN_ANOM_ADVECTION = True
 INCLUDE_EKMAN_MEAN_ADVECTION = True
 INCLUDE_ENTRAINMENT = True
 INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING = False
-INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = False
-INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = False
+INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
+INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
 
 SPLIT_SURFACE = True
 INCLUDE_RADIATIVE_SURFACE = True
-INCLUDE_TURBULENT_SURFACE = False
+INCLUDE_TURBULENT_SURFACE = True
 
 # geostrophic displacement integral: https://egusphere.copernicus.org/preprints/2025/egusphere-2025-3039/egusphere-2025-3039.pdf
 USE_DOWNLOADED_SSH = False
 USE_OTHER_MLD = False
 USE_MAX_GRADIENT_METHOD = True
 USE_LOG_FOR_ENTRAINMENT = False
+DATA_TO_2025 = True
 rho_0 = 1025.0
 c_0 = 4100.0
 gamma_0 = 15.0
 g = 9.81
 
-def run_model(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION, INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, USE_DOWNLOADED_SSH, USE_OTHER_MLD, USE_MAX_GRADIENT_METHOD, USE_LOG_FOR_ENTRAINMENT, gamma_0, SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE, INCLUDE_TURBULENT_SURFACE):
-    save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION, USE_DOWNLOADED_SSH, gamma0=gamma_0, INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION=INCLUDE_EKMAN_MEAN_ADVECTION, OTHER_MLD=USE_OTHER_MLD, MAX_GRAD_TSUB=USE_MAX_GRADIENT_METHOD, ENTRAINMENT_VEL_ANOM_FORC=INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, LOG_ENTRAINMENT_VELOCITY=USE_LOG_FOR_ENTRAINMENT, SPLIT_SURFACE=SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE=INCLUDE_RADIATIVE_SURFACE, INCLUDE_TURBULENT_SURFACE=INCLUDE_TURBULENT_SURFACE)
+def run_model(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION, INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, USE_DOWNLOADED_SSH, USE_OTHER_MLD, USE_MAX_GRADIENT_METHOD, USE_LOG_FOR_ENTRAINMENT, gamma_0, SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE, INCLUDE_TURBULENT_SURFACE, DATA_TO_2025):
+    save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION, USE_DOWNLOADED_SSH, gamma0=gamma_0, INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION=INCLUDE_EKMAN_MEAN_ADVECTION, OTHER_MLD=USE_OTHER_MLD, MAX_GRAD_TSUB=USE_MAX_GRADIENT_METHOD, ENTRAINMENT_VEL_ANOM_FORC=INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, LOG_ENTRAINMENT_VELOCITY=USE_LOG_FOR_ENTRAINMENT, SPLIT_SURFACE=SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE=INCLUDE_RADIATIVE_SURFACE, INCLUDE_TURBULENT_SURFACE=INCLUDE_TURBULENT_SURFACE, DATA_TO_2025=DATA_TO_2025)
 
     """Open all required datasets"""
 
-    HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/heat_flux_interpolated_all_contributions.nc"
-    EKMAN_ANOMALY_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Ekman_Current_Anomaly.nc"
-    TEMP_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/RG_ArgoClim_Temperature_2019.nc"
-    ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Entrainment_Velocity-(2004-2018).nc"
-    GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly_downloaded.nc"
-    GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly_calculated.nc"
-    EKMAN_MEAN_ADVECTION_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/ekman_mean_advection.nc"
-    ENTRAINMENT_VEL_ANOMALY_FORCING_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment_velocity_anomaly_forcing.nc"
+    if DATA_TO_2025:
+        HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Surface_Heat_Flux-(2004-2025).nc"
+        EKMAN_ANOMALY_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Simulation-Ekman_Heat_Flux-(2004-2025).nc"
+        # TEMP_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Mixed_Layer_Temperature_Anomalies-(2004-2025).nc"
+        TEMP_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/RG_ArgoClim_Temperature_2019.nc"
+        GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Simulation-Geostrophic_Heat_Flux-(2004-2025).nc"
+        EKMAN_MEAN_ADVECTION_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/2025_ekman_mean_advection.nc"
+        #ENTRAINMENT_VEL_ANOMALY_FORCING_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/2025_entrainment_velocity_anomaly_forcing.nc"
+        ENTRAINMENT_VEL_ANOMALY_FORCING_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment_velocity_anomaly_forcing.nc"
 
-    if USE_OTHER_MLD:
-        MLD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_h.nc"
-        H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_h_bar.nc"
-        T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_t_sub_anomaly.nc"
+
+        if USE_OTHER_MLD:
+            H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_h_bar.nc"
+            T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_t_sub_anomaly.nc"
+
+        else:
+            H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Mixed_Layer_Depth-(2004-2025).nc"
+            T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Sub_Layer_Temperature_Anomalies-(2004-2025).nc"
+
+        if USE_MAX_GRADIENT_METHOD:
+            T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Sub_Layer_Temperature_Max_Gradient_Method-(2004-2025).nc"
+
+        ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Mixed_Layer_Entrainment_Velocity-(2004-2025).nc"
 
     else:
-        # H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure-Seasonal_Cycle_Mean.nc"
-        # H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
-        H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/hbar.nc"
-        MLD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure-(2004-2018).nc"
-        T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub.nc"
+        HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/heat_flux_interpolated_all_contributions.nc"
+        EKMAN_ANOMALY_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Ekman_Current_Anomaly.nc"
+        TEMP_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/RG_ArgoClim_Temperature_2019.nc"
+        GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly_downloaded.nc"
+        GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/geostrophic_anomaly_calculated.nc"
+        EKMAN_MEAN_ADVECTION_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/ekman_mean_advection.nc"
+        ENTRAINMENT_VEL_ANOMALY_FORCING_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment_velocity_anomaly_forcing.nc"
 
-    if USE_MAX_GRADIENT_METHOD:
-        T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/Tsub_Max_Gradient_Method_h.nc"
-        ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/Entrainment_Vel_h.nc"
-    else:
-        ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Entrainment_Velocity-(2004-2018).nc"
+        if USE_OTHER_MLD:
+            H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_h_bar.nc"
+            T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_t_sub_anomaly.nc"
+
+        else:
+            H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/hbar.nc"
+            T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub.nc"
+
+        if USE_MAX_GRADIENT_METHOD:
+            T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/Tsub_Max_Gradient_Method_h.nc"
+            ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/Entrainment_Vel_h.nc"
+        else:
+            ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Entrainment_Velocity-(2004-2018).nc"
 
     temperature_ds = load_and_prepare_dataset(TEMP_DATA_PATH)
 
@@ -77,6 +98,16 @@ def run_model(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_EKMAN_MEAN_
                                     heat_flux_ds['avg_ishf']
     heat_flux_ds['RADIATIVE_HEAT_FLUX'] = heat_flux_ds['avg_snlwrf'] + heat_flux_ds['avg_snswrf']
     heat_flux_ds['TURBULENT_HEAT_FLUX'] = heat_flux_ds['avg_slhtf'] + heat_flux_ds['avg_ishf']
+
+    # print(abs(get_anomaly(heat_flux_ds, 'avg_slhtf', get_monthly_mean(heat_flux_ds['avg_slhtf']))['avg_slhtf_ANOMALY']).mean().values)
+    # print(abs(get_anomaly(heat_flux_ds, 'avg_ishf', get_monthly_mean(heat_flux_ds['avg_ishf']))['avg_ishf_ANOMALY']).mean().values)
+    # print(abs(get_anomaly(heat_flux_ds, 'TURBULENT_HEAT_FLUX', get_monthly_mean(heat_flux_ds['TURBULENT_HEAT_FLUX']))['TURBULENT_HEAT_FLUX_ANOMALY']).mean().values)
+    # make_movie(get_anomaly(heat_flux_ds, 'avg_slhtf', get_monthly_mean(heat_flux_ds['avg_slhtf']))['avg_slhtf_ANOMALY'], vmin=-200, vmax=200)
+    # make_movie(get_anomaly(heat_flux_ds, 'avg_ishf', get_monthly_mean(heat_flux_ds['avg_ishf']))['avg_ishf_ANOMALY'], vmin=-200, vmax=200)
+    # make_movie(get_anomaly(heat_flux_ds, 'TURBULENT_HEAT_FLUX', get_monthly_mean(heat_flux_ds['TURBULENT_HEAT_FLUX']))['TURBULENT_HEAT_FLUX_ANOMALY'], vmin=-200, vmax=200)
+    # turbulent heat flux always negative, of course the anomaly isn't always
+    # Qturb anomaly in NA strongest in wintertime
+
     heat_flux_monthly_mean = get_monthly_mean(heat_flux_ds['NET_HEAT_FLUX'])
     heat_flux_anomaly_ds = get_anomaly(heat_flux_ds, 'NET_HEAT_FLUX', heat_flux_monthly_mean)
     surface_flux_da = heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY']
@@ -90,11 +121,18 @@ def run_model(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_EKMAN_MEAN_
     turb_surface_flux_da = turb_heat_flux_anomaly_ds['TURBULENT_HEAT_FLUX_ANOMALY']
 
     ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
-    ekman_anomaly_da = ekman_anomaly_ds['Q_Ek_anom']
+    if DATA_TO_2025:
+        ekman_anomaly_da = ekman_anomaly_ds['ANOMALY_EKMAN_HEAT_FLUX']
+    else:
+        ekman_anomaly_da = ekman_anomaly_ds['Q_Ek_anom']
     ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
 
     hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
-    hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
+    if DATA_TO_2025:
+        h_da = hbar_ds["MLD"]
+        hbar_da = get_monthly_mean(h_da)
+    else:
+        hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
 
     entrainment_vel_anomaly_forcing_ds = xr.open_dataset(ENTRAINMENT_VEL_ANOMALY_FORCING_DATA_PATH, decode_times=False)
     entrainment_vel_anomaly_forcing = entrainment_vel_anomaly_forcing_ds["ENTRAINMENT_VEL_ANOMALY_FORCING"]
@@ -102,12 +140,17 @@ def run_model(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_EKMAN_MEAN_
     t_sub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
     if USE_OTHER_MLD:
         t_sub_da = t_sub_ds["ANOMALY_SUB_TEMPERATURE"]
+    # elif DATA_TO_2025:
+    #     t_sub_da = get_anomaly(t_sub_ds, "SUB_TEMPERATURE", get_monthly_mean(t_sub_ds["SUB_TEMPERATURE"]))["SUB_TEMPERATURE_ANOMALY"]
     else:
         # t_sub_da = t_sub_ds["SUB_TEMPERATURE"]
         t_sub_da = get_anomaly(t_sub_ds, "SUB_TEMPERATURE", get_monthly_mean(t_sub_ds["SUB_TEMPERATURE"]))["SUB_TEMPERATURE_ANOMALY"]
 
     entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
-    entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
+    if DATA_TO_2025:
+        entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['w_e'])
+    else:
+        entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
     entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN']
 
     if USE_DOWNLOADED_SSH:
@@ -117,10 +160,19 @@ def run_model(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_EKMAN_MEAN_
         ssh_var_name = "sla"
     else:
         geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH, decode_times=False)
-        SEA_SURFACE_GRAD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_calculated_grad.nc"
-        SEA_SURFACE_MONTHLY_MEAN_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_monthly_mean_calculated_grad.nc"
+        if DATA_TO_2025:
+            SEA_SURFACE_GRAD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/2025_sea_surface_calculated_grad.nc"
+            SEA_SURFACE_MONTHLY_MEAN_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/2025_sea_surface_monthly_mean_calculated_grad.nc"
+        else:
+            SEA_SURFACE_GRAD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_calculated_grad.nc"
+            SEA_SURFACE_MONTHLY_MEAN_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_monthly_mean_calculated_grad.nc"
         ssh_var_name = "ssh"
-    geostrophic_anomaly_da = geostrophic_anomaly_ds["GEOSTROPHIC_ANOMALY"]
+
+    if DATA_TO_2025:
+        geostrophic_anomaly_da = geostrophic_anomaly_ds["ANOMALY_GEOSTROPHIC_HEAT_FLUX"]
+    else:
+        geostrophic_anomaly_da = geostrophic_anomaly_ds["GEOSTROPHIC_ANOMALY"]
+
 
     sea_surface_grad_ds = xr.open_dataset(SEA_SURFACE_GRAD_DATA_PATH, decode_times=False)
     sea_surface_monthlymean_ds = xr.open_dataset(SEA_SURFACE_MONTHLY_MEAN_DATA_PATH, decode_times=False)
@@ -139,7 +191,7 @@ def run_model(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_EKMAN_MEAN_
     added_baseline = False
     for month in heat_flux_anomaly_ds.TIME.values:
         if int(month) % 10 == 0:
-            print("Month " + str(int(month)) + " of 180")
+            print("Month " + str(int(month)) + " of 180 (or more for 2025 case)")
         # find the previous and current month from 1 to 12 to access the monthly-averaged data (hbar, entrainment vel.)
         prev_month = month - 1
         month_in_year = get_month_from_time(month)
@@ -255,7 +307,8 @@ def run_model(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_EKMAN_MEAN_
             cur_entrainment_vel = entrainment_vel_da.sel(MONTH=month_in_year)
             cur_geo_anom = geostrophic_anomaly_da.sel(TIME=month)
             cur_hbar = hbar_da.sel(MONTH=month_in_year)
-            cur_entrainment_vel_anomaly_forcing = entrainment_vel_anomaly_forcing.sel(TIME=month)
+            if not DATA_TO_2025:
+                cur_entrainment_vel_anomaly_forcing = entrainment_vel_anomaly_forcing.sel(TIME=month)
 
             # static forcings = surface flux + Ekman anomolous advection + part of entrainment
             cur_static_forcings = xr.zeros_like(cur_ekman_anom)
@@ -329,7 +382,7 @@ def run_model(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_EKMAN_MEAN_
     model_anomalies_ds = model_anomalies_ds.to_dataset(name="IMPLICIT")
 
     # remove whatever seasonal cycle remains
-    monthly_mean = get_monthly_mean(model_anomalies_ds["IMPLICIT"].sel(TIME=slice(24.5, 179.5)))
+    monthly_mean = get_monthly_mean(model_anomalies_ds["IMPLICIT"].sel(TIME=slice(12.5, 180.5)))
     model_anomalies_ds["IMPLICIT"] = get_anomaly(model_anomalies_ds, "IMPLICIT", monthly_mean)["IMPLICIT_ANOMALY"]
     model_anomalies_ds = model_anomalies_ds.drop_vars("IMPLICIT_ANOMALY")
 
@@ -400,19 +453,19 @@ def run_model(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_EKMAN_MEAN_
     print(flux_components_ds)
     flux_components_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/" + save_name + "_flux_components.nc")
 
-    # mean_anomalies = []
-    # for TIME in model_anomalies_ds["IMPLICIT"].TIME:
-    #     mean_anomalies.append(model_anomalies_ds["IMPLICIT"].sel(TIME=TIME).mean(dim=["LATITUDE", "LONGITUDE"]))
-    # plt.grid()
-    # plt.plot(model_anomalies_ds["IMPLICIT"].TIME, mean_anomalies)
-    # plt.show()
+    mean_anomalies = []
+    for TIME in model_anomalies_ds["IMPLICIT"].TIME:
+        mean_anomalies.append(model_anomalies_ds["IMPLICIT"].sel(TIME=TIME).mean(dim=["LATITUDE", "LONGITUDE"]))
+    plt.grid()
+    plt.plot(model_anomalies_ds["IMPLICIT"].TIME, mean_anomalies)
+    plt.show()
     #
     # print(model_anomalies_ds["IMPLICIT"].values)
     make_movie(model_anomalies_ds["IMPLICIT"], -3, 3)
 
 
-run_model(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION, INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, USE_DOWNLOADED_SSH, USE_OTHER_MLD, USE_MAX_GRADIENT_METHOD, USE_LOG_FOR_ENTRAINMENT, gamma_0, SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE, INCLUDE_TURBULENT_SURFACE)
+run_model(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION, INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, USE_DOWNLOADED_SSH, USE_OTHER_MLD, USE_MAX_GRADIENT_METHOD, USE_LOG_FOR_ENTRAINMENT, gamma_0, SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE, INCLUDE_TURBULENT_SURFACE, DATA_TO_2025)
 
-# run_model(True, True, True, True, False, True, True, False, False, True, False, 15.0, True, True, True)
-# run_model(True, True, True, True, False, True, True, False, False, True, False, 15.0, True, True, False)
-# run_model(True, True, True, True, False, True, True, False, False, True, False, 15.0, True, False, True)
+# run_model(True, True, True, False, False, True, True, False, False, True, False, 15.0, True, True, False)
+# run_model(True, False, False, False, False, True, True, False, False, True, False, 15.0, True, True, False)
+# run_model(True, True, True, True, False, True, True, False, False, True, False, 15.0, True, False, False)

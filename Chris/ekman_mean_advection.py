@@ -1,14 +1,19 @@
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
-from SSTA.Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, coriolis_parameter
+from Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, coriolis_parameter
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset, compute_gradient_lon, compute_gradient_lat
 import matplotlib
 
 DOWNLOADED_SSH = False
+DATA_TO_2025 = True
 
-WIND_STRESS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/wind_stress_interpolated.nc"
-H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/hbar.nc"
+if DATA_TO_2025:
+    WIND_STRESS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Turbulent_Surface_Stress-(2004-2025).nc"
+    H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Mixed_Layer_Depth-(2004-2025).nc"
+else:
+    WIND_STRESS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/wind_stress_interpolated.nc"
+    H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/hbar.nc"
 CORIOLIS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/coriolis_parameter.nc"
 
 rho_0 = 1025.0
@@ -18,7 +23,11 @@ g = 9.81
 wind_stress_ds = xr.open_dataset(WIND_STRESS_DATA_PATH, decode_times=False)
 
 hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
-hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
+if DATA_TO_2025:
+    h_da = hbar_ds["MLD"]
+    hbar_da = get_monthly_mean(h_da)
+else:
+    hbar_da = hbar_ds["MONTHLY_MEAN_MLD"]
 
 coriolis_parameter_ds = xr.open_dataset(CORIOLIS_DATA_PATH, decode_times=False)
 coriolis_parameter_da = coriolis_parameter_ds["__xarray_dataarray_variable__"]
@@ -58,4 +67,7 @@ beta_grad_lat_contribution_ds.attrs["units"] = ""
 ekman_mean_advection = xr.Dataset({"ekman_alpha": alpha_contribution_da, "ekman_beta": beta_contribution_da, "ekman_alpha_grad_long": alpha_grad_long_contribution_ds, "ekman_beta_grad_lat": beta_grad_lat_contribution_ds})
 print(ekman_mean_advection)
 
-ekman_mean_advection.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/ekman_mean_advection.nc")
+if DATA_TO_2025:
+    ekman_mean_advection.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/2025_ekman_mean_advection.nc")
+else:
+    ekman_mean_advection.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/ekman_mean_advection.nc")

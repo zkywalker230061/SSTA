@@ -7,10 +7,14 @@ from eofs.tools.standard import correlation_map
 from scipy import stats
 from sklearn.metrics import mutual_info_score
 from sklearn.preprocessing import KBinsDiscretizer
+import cartopy.crs as ccrs
+from cartopy.mpl.ticker import (LongitudeFormatter, LatitudeFormatter, LatitudeLocator)
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 from Chris.correlation_significance import get_significance
 from Chris.utils import make_movie, get_eof, get_eof_with_nan_consideration, get_eof_from_ppca_py, get_save_name, \
-    get_month_from_time
+    get_month_from_time, format_cartopy
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from correlation_significance import mutual_information
 
@@ -39,6 +43,9 @@ MASK_TROPICS_LATITUDE = 15
 
 CONSIDER_OBSERVATIONS = True
 USE_REYNOLDS = True
+NORTH_ATLANTIC = False
+DATA_TO_2025 = True
+
 # note: changed everything to functions to be cleaner; no longer need these conditionals
 # MAKE_MOVIE = False
 # PLOT_MODE_CONTRIBUTIONS = False
@@ -48,14 +55,18 @@ USE_REYNOLDS = True
 # MAKE_REGRESSION_MAPS = False
 # TRACK_WARMING_EFFECTS = True
 
+NA_LAT_BOUNDS = slice(0, 80)
+NA_LONG_BOUNDS = slice(-80, 10)
+
 save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION,
                           USE_DOWNLOADED_SSH=USE_DOWNLOADED_SSH, gamma0=gamma_0,
-                          INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION=INCLUDE_EKMAN_MEAN_ADVECTION ,OTHER_MLD=USE_OTHER_MLD, MAX_GRAD_TSUB=USE_MAX_GRADIENT_METHOD, ENTRAINMENT_VEL_ANOM_FORC=INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, LOG_ENTRAINMENT_VELOCITY=USE_LOG_FOR_ENTRAINMENT, SPLIT_SURFACE=SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE=INCLUDE_RADIATIVE_SURFACE, INCLUDE_TURBULENT_SURFACE=INCLUDE_TURBULENT_SURFACE)
+                          INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION=INCLUDE_EKMAN_MEAN_ADVECTION ,OTHER_MLD=USE_OTHER_MLD, MAX_GRAD_TSUB=USE_MAX_GRADIENT_METHOD, ENTRAINMENT_VEL_ANOM_FORC=INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, LOG_ENTRAINMENT_VELOCITY=USE_LOG_FOR_ENTRAINMENT, SPLIT_SURFACE=SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE=INCLUDE_RADIATIVE_SURFACE, INCLUDE_TURBULENT_SURFACE=INCLUDE_TURBULENT_SURFACE, DATA_TO_2025=DATA_TO_2025)
 ALL_SCHEMES_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/all_anomalies/" + save_name + ".nc"
 IMPLICIT_SCHEME_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/" + save_name + ".nc"
 DENOISED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/cur_prev_denoised.nc"
 OBSERVATIONS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/RG_ArgoClim_Temperature_2019.nc"
 OBSERVATIONS_JJ_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/observed_anomaly_JJ.nc"
+OBSERVATIONS_2025_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Mixed_Layer_Temperature_Anomalies-(2004-2025).nc"
 REYNOLDS_OBS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sst_anomalies-(2004-2018).nc"
 ENSO_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/nina34.anom.nc"
 
@@ -71,8 +82,12 @@ argo_observations_ds = load_and_prepare_dataset(OBSERVATIONS_DATA_PATH)
 processed_observations_ds = xr.open_dataset(OBSERVATIONS_JJ_DATA_PATH, decode_times=False)
 if CONSIDER_OBSERVATIONS:
     if USE_REYNOLDS:
-        obs_ds = xr.open_dataset(REYNOLDS_OBS_DATA_PATH, decode_times=False)
-        observed_anomaly = obs_ds['anom']
+        if DATA_TO_2025:
+            obs_ds = xr.open_dataset(OBSERVATIONS_2025_DATA_PATH, decode_times=False)
+            observed_anomaly = obs_ds['ANOMALY_ML_TEMPERATURE']
+        else:
+            obs_ds = xr.open_dataset(REYNOLDS_OBS_DATA_PATH, decode_times=False)
+            observed_anomaly = obs_ds['anom']
     else:
         # observed_anomaly_before_processing = observations_ds["ARGO_TEMPERATURE_ANOMALY"].sel(PRESSURE=2.5)
         # observed_anomaly_before_processing_monthly_mean = get_monthly_mean(observed_anomaly_before_processing)
@@ -99,6 +114,8 @@ enso_indices_ds = enso_indices_ds.assign_coords(time=np.arange(len(enso_indices_
 
 
 def plot_full_model(to_plot="IMPLICIT", obs=False, save_path=None):
+    if NORTH_ATLANTIC:
+        all_schemes_ds[to_plot] = all_schemes_ds[to_plot].sel(LATITUDE=NA_LAT_BOUNDS).sel(LONGITUDE=NA_LONG_BOUNDS)  # only take north atlantic
     if obs:
         make_movie(observed_anomaly, -3, 3, colorbar_label="Argo Anomaly", ENSO_ds=enso_indices_ds, savepath=save_path)
     else:
@@ -124,6 +141,7 @@ start_mode = 0
 end_mode = 3
 to_plot_name = "IMPLICIT"
 to_plot = all_schemes_ds[to_plot_name]
+
 if MASK_TROPICS:
     to_plot = to_plot.where(
         (to_plot.LATITUDE > MASK_TROPICS_LATITUDE) | (to_plot.LATITUDE < -1 * MASK_TROPICS_LATITUDE), np.nan)
@@ -443,6 +461,7 @@ def track_anomaly_persistence(lag, start_month=None):
 
 def plot_correlation():
     if CONSIDER_OBSERVATIONS:
+        fig, ax = plt.subplots(subplot_kw={'projection': ccrs.PlateCarree()})
         correlation = xr.corr(to_plot, observed_anomaly, dim='TIME')
         print(correlation.mean().values)
         correlation.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
@@ -452,6 +471,7 @@ def plot_correlation():
         cbar = plt.gcf().axes[-1]
         cbar.set_ylabel('Pearson Correlation Coefficient', rotation=90)
         plt.title("Correlation between model and SST observation")
+        ax = format_cartopy(ax)
         #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/correlations/" + save_name + "_correlation.jpg")
         #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_poster/full_model_correlation.png", dpi=400)
         plt.show()
@@ -497,7 +517,7 @@ def plot_significant_correlation():
 # plot_full_model(save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/" + save_name + ".mp4")
 # plot_full_model(obs=True, save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/Reynolds_observations.mp4")
 
-# plot_full_model()
+# plot_full_model(save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/total_movie.mp4")
 # plot_enso()
 # eof_movie()
 # explained_variance_from_each_mode()
@@ -506,6 +526,6 @@ def plot_significant_correlation():
 # regression_map()
 # track_warming_effects()
 # track_anomaly_persistence(6, 9)
-# plot_correlation()
+plot_correlation()
 # plot_mutual_information()
-plot_significant_correlation()
+# plot_significant_correlation()

@@ -1,24 +1,27 @@
 import xarray as xr
 import pandas as pd
 import matplotlib.pyplot as plt
-from SSTA.Chris.utils import make_movie, load_and_prepare_dataset, compute_gradient_lat, compute_gradient_lon, \
+from Chris.utils import make_movie, load_and_prepare_dataset, compute_gradient_lat, compute_gradient_lon, \
     get_monthly_mean, get_anomaly, coriolis_parameter
 
 DOWNLOADED = False
+DATA_TO_2025 = True
 
 if DOWNLOADED:
     SEA_SURFACE_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_interpolated.nc"
     var_name = "sla"
+elif DATA_TO_2025:
+    SEA_SURFACE_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Sea_Surface_Height-(2004-2025).nc"
+    var_name = "ssh"
 else:
     SEA_SURFACE_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_calculated.nc"
     var_name = "ssh"
 sea_surface_ds = xr.open_dataset(SEA_SURFACE_DATA_PATH, decode_times=False)
 print(sea_surface_ds)
-temp_ds = load_and_prepare_dataset("/Volumes/G-DRIVE ArmorATD/Extension/datasets/RG_ArgoClim_Temperature_2019.nc")
 
-g = 9.81
-
-sea_surface_ds[var_name] = sea_surface_ds[var_name] * g     # mistaken divide by g in calculate
+if not DATA_TO_2025:
+    g = 9.81
+    sea_surface_ds[var_name] = sea_surface_ds[var_name] * g     # mistaken divide by g in calculate
 
 monthly_mean_sla = get_monthly_mean(sea_surface_ds[var_name])
 sea_surface_ds[var_name + '_ANOMALY'] = get_anomaly(sea_surface_ds, var_name, monthly_mean_sla)[var_name + "_ANOMALY"]
@@ -64,6 +67,9 @@ monthly_mean_ssh_ds["beta_grad_lat"] = beta_grad_lat
 if DOWNLOADED:
     sea_surface_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_interpolated_grad.nc")
     monthly_mean_ssh_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_monthly_mean_interpolated_grad.nc")
+elif DATA_TO_2025:
+    sea_surface_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/2025_sea_surface_calculated_grad.nc")
+    monthly_mean_ssh_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/2025_sea_surface_monthly_mean_calculated_grad.nc")
 else:
     sea_surface_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_calculated_grad.nc")
     #sea_surface_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_calculated_specific_volume_method_grad.nc")
