@@ -8,6 +8,7 @@ Chengyun Zhu
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
+from statsmodels.tsa.stattools import acf
 
 from utilities import load_and_prepare_dataset
 from utilities import get_monthly_mean, get_anomaly
@@ -16,7 +17,8 @@ from utilities import get_monthly_mean, get_anomaly
 
 # matplotlib.use('TkAgg')
 
-SURFACE = True
+SURFACE_RAD = True
+SURFACE_TURB = True
 ENTRAINMENT = True
 EKMAN = True
 GEOSTROPHIC = True
@@ -30,27 +32,21 @@ SECONDS_MONTH = 30 * 24 * 60 * 60  # seconds in a month
 q_surface_ds = load_and_prepare_dataset(
     "datasets/Simulation-Surface_Heat_Flux-(2004-2018).nc"
 )
-q_surface = (
-    q_surface_ds['ANOMALY_avg_slhtf']
-    + q_surface_ds['ANOMALY_avg_ishf']
-    + q_surface_ds['ANOMALY_avg_snswrf']
-    + q_surface_ds['ANOMALY_avg_snlwrf']
-)
-q_surface = q_surface.drop_vars('MONTH')
-q_surface.name = 'ANOMALY_SURFACE_HEAT_FLUX'
 q_surface_rad = (
     q_surface_ds['ANOMALY_avg_snswrf']
     + q_surface_ds['ANOMALY_avg_snlwrf']
 )
-q_surface_rad.drop_vars('MONTH')
+q_surface_rad = q_surface_rad.drop_vars('MONTH')
+q_surface_rad.name = 'ANOMALY_SURFACE_RADIATIVE_HEAT_FLUX'
 q_surface_turb = (
     q_surface_ds['ANOMALY_avg_slhtf']
     + q_surface_ds['ANOMALY_avg_ishf']
 )
-q_surface_turb.drop_vars('MONTH')
-if not SURFACE:
-    q_surface = q_surface - q_surface
+q_surface_turb = q_surface_turb.drop_vars('MONTH')
+q_surface_turb.name = 'ANOMALY_SURFACE_TURBULENT_HEAT_FLUX'
+if not SURFACE_RAD:
     q_surface_rad = q_surface_rad - q_surface_rad
+if not SURFACE_TURB:
     q_surface_turb = q_surface_turb - q_surface_turb
 
 q_ekman = load_and_prepare_dataset(
@@ -116,7 +112,8 @@ w_e_monthly_mean = w_e_monthly_mean.rename({'MONTH': 'TIME'})
 w_e_monthly_mean['TIME'] = t_m_a.TIME
 
 dt_m_a_dt = (
-    q_surface
+    q_surface_rad
+    + q_surface_turb
     + q_ekman
     + q_geostrophic
 ) / (RHO_O * C_O * h_monthly_mean)
@@ -186,11 +183,11 @@ rms_simulated = np.sqrt((t_m_a_simulated ** 2).mean(dim=['TIME']))
 rms_observed = np.sqrt((t_m_a_reynolds ** 2).mean(dim=['TIME']))
 rmse = rms_difference / rms_observed
 
-normalised_simulated = t_m_a_simulated / rms_simulated
-normalised_observed = t_m_a_reynolds / rms_observed
-normalised_rms_difference = np.sqrt(
-    ((normalised_observed - normalised_simulated) ** 2).mean(dim=['TIME'])
-)
+# normalised_simulated = t_m_a_simulated / rms_simulated
+# normalised_observed = t_m_a_reynolds / rms_observed
+# normalised_rms_difference = np.sqrt(
+#     ((normalised_observed - normalised_simulated) ** 2).mean(dim=['TIME'])
+# )
 
 print("rms simulated", rms_difference.mean().item())
 rms_simulated.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=3)
@@ -202,9 +199,9 @@ print("normalised rmse", rmse.mean().item())
 rmse.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=3)
 plt.show()
 
-print("normalised rmse", normalised_rms_difference.mean().item())
-normalised_rms_difference.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=3)
-plt.show()
+# print("normalised rmse", normalised_rms_difference.mean().item())
+# normalised_rms_difference.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=3)
+# plt.show()
 
 
 # corr plot
@@ -306,4 +303,12 @@ plt.xlim(-5, 5)
 plt.ylim(-5, 5)
 # plt.yscale('log', base=2)
 # plt.xscale('log', base=2)
+plt.show()
+
+# autocorrelation plot
+autocorr_simulated = acf(t_m_a_simulated.mean(dim=['LONGITUDE', 'LATITUDE']), nlags=24)
+autocorr_observed = acf(t_m_a_reynolds.mean(dim=['LONGITUDE', 'LATITUDE']), nlags=24)
+plt.plot(autocorr_simulated, label='Simulated')
+plt.plot(autocorr_observed, label='Observed')
+plt.legend()
 plt.show()

@@ -8,6 +8,7 @@ Chengyun Zhu
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
+from statsmodels.tsa.stattools import acf
 
 from utilities import load_and_prepare_dataset
 from utilities import get_monthly_mean, get_anomaly
@@ -20,19 +21,36 @@ from utilities import get_monthly_mean, get_anomaly
 SURFACE = True
 ENTRAINMENT = True
 EKMAN = True
-GEOSTROPHIC = False
+GEOSTROPHIC = True
 
 RHO_O = 1025  # kg / m^3
 SECONDS_MONTH = 30 * 24 * 60 * 60  # seconds in a month
 
-
 q_surface_ds = load_and_prepare_dataset(
     "datasets/Simulation-Surface_Water_Rate-(2004-2018).nc"
-)
+)  # negative for evaporation, positive for precipitation
+
+s_m = load_and_prepare_dataset(
+    'datasets/.test-ml.nc'
+)['MIXED_LAYER_SALINITY']
+s_m_monthly_mean = get_monthly_mean(s_m)
+
+s_m_monthly_mean = xr.concat([s_m_monthly_mean] * 15, dim='MONTH').reset_coords(drop=True)
+s_m_monthly_mean = s_m_monthly_mean.rename({'MONTH': 'TIME'})
+s_m_monthly_mean['TIME'] = q_surface_ds.TIME
 q_surface = (
-    q_surface_ds['ANOMALY_avg_ie']
-    + q_surface_ds['ANOMALY_avg_tprate']
-)
+    - q_surface_ds['ANOMALY_avg_ie']  # negative sign to retrive E'
+    - q_surface_ds['ANOMALY_avg_tprate']  # negative to subtract P'
+) * s_m_monthly_mean  # (E' - P') * S_bar
+
+# --
+# q_surface_ds = load_and_prepare_dataset(
+#     "datasets/Simulation-Surface_Heat_Flux-(2004-2018).nc"
+# )
+# q_surface = (
+#     - q_surface_ds['ANOMALY_avg_slhtf'] / 2.4e6
+# ) * s_m_monthly_mean
+# --
 q_surface = q_surface.drop_vars('MONTH')
 q_surface.name = 'ANOMALY_SURFACE_WATER_RATE'
 if not SURFACE:
@@ -99,7 +117,8 @@ ds_m_a_dt = (
     + q_geostrophic
 ) / (RHO_O * h_monthly_mean)
 
-_lambda = w_e_monthly_mean / h_monthly_mean + 1e-20
+_lambda = w_e_monthly_mean / h_monthly_mean + 1e-20 + 0.0015 / (RHO_O * h_monthly_mean)
+# _lambda = w_e_monthly_mean / h_monthly_mean + 1e-20
 
 s_m_a_simulated_list = []
 
@@ -109,8 +128,6 @@ for month_num in s_m_a['TIME'].values:
         temp = s_m_a_simulated_da
     else:
         s_m_a_simulated_da = (
-            # s_m_a.sel(TIME=month_num-1)
-            # + ds_m_a_dt.sel(TIME=month_num-1) * SECONDS_MONTH
             temp * np.exp(-_lambda.sel(TIME=month_num-1) * SECONDS_MONTH)
             + (
                 (
@@ -155,11 +172,11 @@ rms_simulated = np.sqrt((s_m_a_simulated ** 2).mean(dim=['TIME']))
 rms_observed = np.sqrt((s_m_a ** 2).mean(dim=['TIME']))
 rmse = rms_difference / rms_observed
 
-normalised_simulated = s_m_a_simulated / rms_simulated
-normalised_observed = s_m_a / rms_observed
-normalised_rms_difference = np.sqrt(
-    ((normalised_observed - normalised_simulated) ** 2).mean(dim=['TIME'])
-)
+# normalised_simulated = s_m_a_simulated / rms_simulated
+# normalised_observed = s_m_a / rms_observed
+# normalised_rms_difference = np.sqrt(
+#     ((normalised_observed - normalised_simulated) ** 2).mean(dim=['TIME'])
+# )
 
 print("rms simulated", rms_simulated.mean().item())
 rms_simulated.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=0.5)
@@ -171,9 +188,9 @@ print("normalised rmse", rmse.mean().item())
 rmse.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=3)
 plt.show()
 
-print("normalised rmse", normalised_rms_difference.mean().item())
-normalised_rms_difference.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=3)
-plt.show()
+# print("normalised rmse", normalised_rms_difference.mean().item())
+# normalised_rms_difference.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=3)
+# plt.show()
 
 # correlation plot
 corr = xr.corr(s_m_a, s_m_a_simulated, dim='TIME')
@@ -224,6 +241,33 @@ plt.legend()
 plt.show()
 
 # QQ plot
+# s_m_a_simulated = s_m_a_simulated.where(
+#     (s_m_a_simulated['LATITUDE'] > 20) & (s_m_a_simulated['LATITUDE'] < 70), 0
+# )
+# s_m_a_simulated = s_m_a_simulated.where(
+#     (s_m_a_simulated['LONGITUDE'] > -100) & (s_m_a_simulated['LONGITUDE'] < 0), 0
+# )
+# s_m_a = s_m_a.where(
+#     (s_m_a['LATITUDE'] > 20) & (s_m_a['LATITUDE'] < 70), 0
+# )
+# s_m_a = s_m_a.where(
+#     (s_m_a['LONGITUDE'] > -100) & (s_m_a['LONGITUDE'] < 0), 0
+# )
+
+# s_m_a_simulated = s_m_a_simulated.where(
+#     ((s_m_a_simulated['LATITUDE'] < -20) & (s_m_a_simulated['LATITUDE'] > -60)), 0
+# )
+# s_m_a_simulated = s_m_a_simulated.where(
+#     ((s_m_a_simulated['LONGITUDE'] > -180) & (s_m_a_simulated['LONGITUDE'] < -55)), 0
+# )
+# s_m_a = s_m_a.where(
+#     ((s_m_a['LATITUDE'] < -20) & (s_m_a['LATITUDE'] > -60)), 0
+# )
+# s_m_a = s_m_a.where(
+#     ((s_m_a['LONGITUDE'] > -180) & (s_m_a['LONGITUDE'] < -55)), 0
+# )
+
+# s_m_a_simulated.sel(TIME=0.5).plot()
 plt.figure(figsize=(6, 6))
 for lon, lat in zip(s_m_a_simulated['LONGITUDE'], s_m_a_simulated['LATITUDE']):
     plt.plot(
@@ -231,10 +275,18 @@ for lon, lat in zip(s_m_a_simulated['LONGITUDE'], s_m_a_simulated['LATITUDE']):
         s_m_a_simulated.sel(LONGITUDE=lon, LATITUDE=lat).values,
         '.'
     )
-x = np.linspace(-5, 5, 100)
+x = np.linspace(-1, 1, 100)
 plt.plot(x, x, 'r--')
-plt.xlim(-5, 5)
-plt.ylim(-5, 5)
+plt.xlim(-1, 1)
+plt.ylim(-1, 1)
 # plt.yscale('log', base=2)
 # plt.xscale('log', base=2)
+plt.show()
+
+# autocorrelation plot
+autocorr_simulated = acf(s_m_a_simulated.mean(dim=['LONGITUDE', 'LATITUDE']), nlags=24)
+autocorr_observed = acf(s_m_a.mean(dim=['LONGITUDE', 'LATITUDE']), nlags=24)
+plt.plot(autocorr_simulated, label='Simulated')
+plt.plot(autocorr_observed, label='Observed')
+plt.legend()
 plt.show()
