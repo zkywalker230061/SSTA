@@ -633,17 +633,19 @@ def plot_eof_for_regional_analysis(EOFs, number, save_name=None):
         plt.savefig(save_name, dpi=400)
     # plt.show()
 
-def get_eofs(model, start_mode, end_mode, map_mask):
+def get_eofs(model, start_mode, end_mode, map_mask, invert=True, standardise=True):
     monthly_mean = get_monthly_mean(model)
     eof_modes, explained_variance, PCs, EOFs = get_eof_with_nan_consideration(model, modes=end_mode, mask=map_mask,
                                                                               tolerance=1e-15,
                                                                               monthly_mean_ds=monthly_mean,
                                                                               start_mode=start_mode, max_iterations=4)
-    PCs = PCs * -1
-    EOFs = EOFs * -1
-    PCs_standard = (PCs - PCs.mean(axis=0)) / PCs.std(axis=0)  # standardise
-    EOFs_standard = (EOFs - EOFs.mean(dim=["LATITUDE", "LONGITUDE"])) / EOFs.std(dim=["LATITUDE", "LONGITUDE"])
-    return [EOFs_standard, PCs_standard, eof_modes, explained_variance]
+    if invert:
+        PCs = PCs * -1
+        EOFs = EOFs * -1
+    if standardise:
+        PCs = (PCs - PCs.mean(axis=0)) / PCs.std(axis=0)  # standardise
+        EOFs = (EOFs - EOFs.mean(dim=["LATITUDE", "LONGITUDE"])) / EOFs.std(dim=["LATITUDE", "LONGITUDE"])
+    return [EOFs, PCs, eof_modes, explained_variance]
 
 
 def get_eof(model, obs=False, obs_da=None, save_folder=None, map_mask=None):
@@ -708,3 +710,12 @@ def format_cartopy(ax):     # from Julia's code
     gl.xlabel_style = {'size': 10}
     gl.ylabel_style = {'size': 10}
     return ax
+
+
+def mask_dataset(ds, regions):
+    for lat_bounds, long_bounds in regions:
+        lat_mask = (ds.LATITUDE >= lat_bounds.start) & (ds.LATITUDE <= lat_bounds.stop)
+        long_mask = (ds.LONGITUDE >= long_bounds.start) & (ds.LONGITUDE <= long_bounds.stop)
+        inside_bounds = lat_mask & long_mask
+        ds = ds.where(~inside_bounds)
+    return ds

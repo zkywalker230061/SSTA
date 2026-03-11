@@ -18,11 +18,11 @@ e.g.
 """
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN_ANOM_ADVECTION = True
-INCLUDE_EKMAN_MEAN_ADVECTION = True
-INCLUDE_ENTRAINMENT = True
+INCLUDE_EKMAN_MEAN_ADVECTION = False
+INCLUDE_ENTRAINMENT = False
 INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING = False
 INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
-INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
+INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = False
 
 SPLIT_SURFACE = True
 INCLUDE_RADIATIVE_SURFACE = True
@@ -191,7 +191,11 @@ def run_model(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_EKMAN_MEAN_
     added_baseline = False
     for month in heat_flux_anomaly_ds.TIME.values:
         if int(month) % 10 == 0:
-            print("Month " + str(int(month)) + " of 180 (or more for 2025 case)")
+            if DATA_TO_2025:
+                print("Month " + str(int(month)) + " of 264")
+            else:
+                print("Month " + str(int(month)) + " of 180")
+
         # find the previous and current month from 1 to 12 to access the monthly-averaged data (hbar, entrainment vel.)
         prev_month = month - 1
         month_in_year = get_month_from_time(month)
@@ -382,7 +386,10 @@ def run_model(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_EKMAN_MEAN_
     model_anomalies_ds = model_anomalies_ds.to_dataset(name="IMPLICIT")
 
     # remove whatever seasonal cycle remains
-    monthly_mean = get_monthly_mean(model_anomalies_ds["IMPLICIT"].sel(TIME=slice(12.5, 180.5)))
+    if DATA_TO_2025:
+        monthly_mean = get_monthly_mean(model_anomalies_ds["IMPLICIT"].sel(TIME=slice(12.5, 264.5)))
+    else:
+        monthly_mean = get_monthly_mean(model_anomalies_ds["IMPLICIT"].sel(TIME=slice(12.5, 180.5)))
     model_anomalies_ds["IMPLICIT"] = get_anomaly(model_anomalies_ds, "IMPLICIT", monthly_mean)["IMPLICIT_ANOMALY"]
     model_anomalies_ds = model_anomalies_ds.drop_vars("IMPLICIT_ANOMALY")
 
@@ -456,16 +463,64 @@ def run_model(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_EKMAN_MEAN_
     mean_anomalies = []
     for TIME in model_anomalies_ds["IMPLICIT"].TIME:
         mean_anomalies.append(model_anomalies_ds["IMPLICIT"].sel(TIME=TIME).mean(dim=["LATITUDE", "LONGITUDE"]))
-    plt.grid()
-    plt.plot(model_anomalies_ds["IMPLICIT"].TIME, mean_anomalies)
-    plt.show()
+    # plt.grid()
+    # plt.plot(model_anomalies_ds["IMPLICIT"].TIME, mean_anomalies)
+    # plt.show()
     #
     # print(model_anomalies_ds["IMPLICIT"].values)
-    make_movie(model_anomalies_ds["IMPLICIT"], -3, 3)
+    # make_movie(model_anomalies_ds["IMPLICIT"], -3, 3)
 
 
 run_model(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION, INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, USE_DOWNLOADED_SSH, USE_OTHER_MLD, USE_MAX_GRADIENT_METHOD, USE_LOG_FOR_ENTRAINMENT, gamma_0, SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE, INCLUDE_TURBULENT_SURFACE, DATA_TO_2025)
 
-# run_model(True, True, True, False, False, True, True, False, False, True, False, 15.0, True, True, False)
-# run_model(True, False, False, False, False, True, True, False, False, True, False, 15.0, True, True, False)
-# run_model(True, True, True, True, False, True, True, False, False, True, False, 15.0, True, False, False)
+# # entrainment-only
+# run_model(False, False, False, True, False, False, False, False, False, True, False, 15.0, False, False, False, DATA_TO_2025=True)
+#
+# # entrainment + radiative air-sea
+# run_model(True, False, False, True, False, False, False, False, False, True, False, 15.0, True, True, False, DATA_TO_2025=True)
+#
+# # entrainment + radiative air-sea + Ekman anom.
+# run_model(True, True, False, True, False, False, False, False, False, True, False, 15.0, True, True, False, DATA_TO_2025=True)
+#
+# # entrainment + radiative air-sea + Ekman anom. + Ekman mean.
+# run_model(True, True, True, True, False, False, False, False, False, True, False, 15.0, True, True, False, DATA_TO_2025=True)
+#
+# # entrainment + radiative air-sea + Ekman anom. + Ekman mean. + turbulent air-sea
+# run_model(True, True, True, True, False, False, False, False, False, True, False, 15.0, True, True, True, DATA_TO_2025=True)
+#
+# # entrainment + radiative air-sea + Ekman anom. + Ekman mean. + turbulent air-sea + geostrophic anom.
+# run_model(True, True, True, True, False, True, True, False, False, True, False, 15.0, True, True, True, DATA_TO_2025=True)
+#
+# # entrainment + radiative air-sea + Ekman anom. + Ekman mean. + turbulent air-sea + geostrophic anom. + geostrophic mean. (== full model)
+# run_model(True, True, True, True, False, True, True, False, False, True, False, 15.0, True, True, True, DATA_TO_2025=True)
+
+
+
+# # models without some term:
+#
+# # -entrainment
+# run_model(True, True, True, False, False, True, True, False, False, True, False, 15.0, True, True, True, DATA_TO_2025=True)
+#
+# # -turbulent air-sea
+# run_model(True, True, True, True, False, True, True, False, False, True, False, 15.0, True, True, False, DATA_TO_2025=True)
+#
+# # -radiative air-sea
+# run_model(True, True, True, True, False, True, True, False, False, True, False, 15.0, True, False, True, DATA_TO_2025=True)
+#
+# # -geostrophic anom.
+# run_model(True, True, True, True, False, False, True, False, False, True, False, 15.0, True, True, True, DATA_TO_2025=True)
+#
+# # -geostrophic mean
+# run_model(True, True, True, True, False, True, False, False, False, True, False, 15.0, True, True, True, DATA_TO_2025=True)
+#
+# # -Ekman anom.
+# run_model(True, False, True, True, False, True, True, False, False, True, False, 15.0, True, True, True, DATA_TO_2025=True)
+#
+# # -Ekman mean
+# run_model(True, True, False, True, False, True, True, False, False, True, False, 15.0, True, True, True, DATA_TO_2025=True)
+#
+# # -(turbulent air-sea, Ekman anom., Ekman mean)
+# run_model(True, False, False, True, False, True, True, False, False, True, False, 15.0, True, True, False, DATA_TO_2025=True)
+#
+# # -mean advection
+# run_model(True, True, False, True, False, True, False, False, False, True, False, 15.0, True, True, True, DATA_TO_2025=True)

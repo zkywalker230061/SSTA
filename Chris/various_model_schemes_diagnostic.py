@@ -1,20 +1,16 @@
-import sklearn.metrics
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from eofs.tools.standard import correlation_map
 from scipy import stats
-from sklearn.metrics import mutual_info_score
-from sklearn.preprocessing import KBinsDiscretizer
 import cartopy.crs as ccrs
-from cartopy.mpl.ticker import (LongitudeFormatter, LatitudeFormatter, LatitudeLocator)
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
 from Chris.correlation_significance import get_significance
 from Chris.utils import make_movie, get_eof, get_eof_with_nan_consideration, get_eof_from_ppca_py, get_save_name, \
-    get_month_from_time, format_cartopy
+    get_month_from_time, format_cartopy, mask_dataset
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from correlation_significance import mutual_information
 
@@ -41,6 +37,8 @@ IMPLICIT_MODEL = True
 MASK_TROPICS = True
 MASK_TROPICS_LATITUDE = 15
 
+MASK_SOME_REGIONS = True
+
 CONSIDER_OBSERVATIONS = True
 USE_REYNOLDS = True
 NORTH_ATLANTIC = False
@@ -57,6 +55,11 @@ DATA_TO_2025 = True
 
 NA_LAT_BOUNDS = slice(0, 80)
 NA_LONG_BOUNDS = slice(-80, 10)
+
+# MASK_SOUTH_AMERICA_LAT_BOUNDS = slice(-60, -40)
+# MASK_SOUTH_AMERICA_LONG_BOUNDS = slice(-70, -30)
+
+MASK_REGIONS = [(slice(15, 25), slice(-75, -65)), (slice(-50, -30), slice(125, 150))]
 
 save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION,
                           USE_DOWNLOADED_SSH=USE_DOWNLOADED_SSH, gamma0=gamma_0,
@@ -102,12 +105,19 @@ if CONSIDER_OBSERVATIONS:
     if MASK_TROPICS:
         observed_anomaly = observed_anomaly.where((observed_anomaly.LATITUDE > MASK_TROPICS_LATITUDE) | (
                     observed_anomaly.LATITUDE < -1 * MASK_TROPICS_LATITUDE), np.nan)
+    if MASK_SOME_REGIONS:
+        observed_anomaly = mask_dataset(observed_anomaly, MASK_REGIONS)
 
 map_mask = argo_observations_ds['BATHYMETRY_MASK'].sel(PRESSURE=2.5).drop_vars("PRESSURE")
+if MASK_SOME_REGIONS:
+    map_mask = mask_dataset(map_mask, MASK_REGIONS)
 
 enso_indices_ds = xr.open_dataset(ENSO_DATA_PATH, decode_times=False)
 enso_indices_ds = enso_indices_ds.assign_coords(time=np.arange(len(enso_indices_ds.time)))
-enso_indices_ds = enso_indices_ds.sel(time=slice(672, 852))  # between 2004 and 2019
+if DATA_TO_2025:
+    enso_indices_ds = enso_indices_ds.sel(time=slice(672, 938))  # between 2004 and 2025
+else:
+    enso_indices_ds = enso_indices_ds.sel(time=slice(672, 852))  # between 2004 and 2019
 enso_indices_ds = enso_indices_ds.assign_coords(time=np.arange(len(enso_indices_ds.time)))
 
 """Plot results"""
@@ -141,6 +151,9 @@ start_mode = 0
 end_mode = 3
 to_plot_name = "IMPLICIT"
 to_plot = all_schemes_ds[to_plot_name]
+if MASK_SOME_REGIONS:
+    to_plot = mask_dataset(to_plot, MASK_REGIONS)
+
 
 if MASK_TROPICS:
     to_plot = to_plot.where(
@@ -220,7 +233,7 @@ def explained_variance_from_each_mode():  # plot explained variance from each mo
     ax4.plot(modes[:max_limit], cumulative_explained_variance[:max_limit], marker='x')
     ax4.set_xlabel("Mode")
     ax4.set_yscale("log")
-    plt.savefig("../results/explained_variance_" + to_plot_name + ".jpg", dpi=400)
+    # plt.savefig("../results/explained_variance_" + to_plot_name + ".jpg", dpi=400)
     plt.show()
 
 
@@ -283,7 +296,7 @@ def plot_PCs_over_time():
                 axs[k].set_xlabel("Time (years since January 2004)")
             axs[k].set_ylabel("PC")
             axs[k].legend()
-        plt.savefig("../results/pcs_" + to_plot_name + ".jpg", dpi=400)
+        # plt.savefig("../results/pcs_" + to_plot_name + ".jpg", dpi=400)
         plt.show()
 
         # plot difference in PCs over time
@@ -297,7 +310,7 @@ def plot_PCs_over_time():
                 axs[k].set_xlabel("Time (months since January 2004)")
             axs[k].set_ylabel("PC error")
             axs[k].legend()
-        plt.savefig("../results/pcs_difference_" + to_plot_name + ".jpg", dpi=400)
+        # plt.savefig("../results/pcs_difference_" + to_plot_name + ".jpg", dpi=400)
         plt.show()
     else:
         print("Requires `consider_observations`")
@@ -324,7 +337,7 @@ def regression_map():
         axs[k].set_ylabel("Latitude")
     cbar = fig.colorbar(pcolormesh, ax=axs, label="Temperature per PC from Regression (K)")
     #pcolormesh.set_clim(vmin=-2, vmax=2)
-    plt.savefig("../results/regression_map_" + to_plot_name + ".jpg", dpi=400)
+    # plt.savefig("../results/regression_map_" + to_plot_name + ".jpg", dpi=400)
     plt.show()
 
     if CONSIDER_OBSERVATIONS:
@@ -348,7 +361,7 @@ def regression_map():
             axs[k].set_ylabel("Latitude")
         cbar = fig.colorbar(pcolormesh, ax=axs, label="Temperature per PC from Regression (K)")
         #pcolormesh.set_clim(vmin=-5, vmax=5)
-        plt.savefig("../results/regression_map_obs.jpg", dpi=400)
+        # plt.savefig("../results/regression_map_obs.jpg", dpi=400)
         plt.show()
 
 """Plot mean anomaly over time to see if there are warming effects"""
@@ -517,15 +530,15 @@ def plot_significant_correlation():
 # plot_full_model(save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/" + save_name + ".mp4")
 # plot_full_model(obs=True, save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/Reynolds_observations.mp4")
 
-# plot_full_model(save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/total_movie.mp4")
+# plot_full_model()
 # plot_enso()
 # eof_movie()
 # explained_variance_from_each_mode()
-# plot_spatial_pattern_EOFs()
-# plot_PCs_over_time()
-# regression_map()
+plot_spatial_pattern_EOFs()
+plot_PCs_over_time()
+regression_map()
 # track_warming_effects()
 # track_anomaly_persistence(6, 9)
-plot_correlation()
+# plot_correlation()
 # plot_mutual_information()
 # plot_significant_correlation()
