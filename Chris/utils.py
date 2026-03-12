@@ -3,9 +3,13 @@ import pandas as pd
 #import eofs
 #import xeofs as xe
 import matplotlib.pyplot as plt
+from matplotlib import colors
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 import matplotlib
 import numpy as np
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+from cartopy.mpl.ticker import (LongitudeFormatter, LatitudeFormatter, LatitudeLocator)
 from scipy.linalg import svd
 #import wpca
 #from wpca import EMPCA
@@ -355,36 +359,36 @@ def get_eof_from_ppca_py(dataset, mask, modes, monthly_mean_ds=None, time_name="
     return reconstructed_ds, EOFs, model, explained_variance
 
 
-def get_eof(dataset, modes, mask=None, clean_nan=False):
-    if mask is not None:
-        ocean = mask.to_numpy().astype(bool)
-        dataset = dataset.where(ocean)
-    if clean_nan:
-        dataset = dataset.dropna(dim="LATITUDE", how="any").dropna(dim="LONGITUDE", how="any")
-        #dataset = dataset.fillna(dataset.mean(dim="TIME"))
-
-    model = xe.single.EOF(n_modes=modes)
-    model.fit(dataset, dim="TIME")
-    components = model.components()  # spatial EOFs
-    scores = model.scores()  # PC time series
-    explained_variance = model.explained_variance_ratio()
-
-    # bootstrapping for significant modes, from https://xeofs.readthedocs.io/en/latest/content/user_guide/auto_examples/4validation/plot_bootstrap.html#sphx-glr-content-user-guide-auto-examples-4validation-plot-bootstrap-py
-    # n_boot = 50
-    # bs = xe.validation.EOFBootstrapper(n_bootstraps=n_boot)
-    # bs.fit(model)
-    # bs_expvar = bs.explained_variance()
-    # ci_expvar = bs_expvar.quantile([0.025, 0.975], "n")  # 95% confidence intervals
-    # q025 = ci_expvar.sel(quantile=0.025)
-    # q975 = ci_expvar.sel(quantile=0.975)
-    # is_significant = q025 - q975.shift({"mode": -1}) > 0
-    # n_significant_modes = (
-    #     is_significant.where(is_significant is True).cumsum(skipna=False).max().fillna(0)
-    # )
-    # print("{:} modes are significant at alpha=0.05".format(n_significant_modes.values))
-
-    #reconstructed = model.inverse_transform(scores)
-    return components, explained_variance, scores
+# def get_eof(dataset, modes, mask=None, clean_nan=False):
+#     if mask is not None:
+#         ocean = mask.to_numpy().astype(bool)
+#         dataset = dataset.where(ocean)
+#     if clean_nan:
+#         dataset = dataset.dropna(dim="LATITUDE", how="any").dropna(dim="LONGITUDE", how="any")
+#         #dataset = dataset.fillna(dataset.mean(dim="TIME"))
+#
+#     model = xe.single.EOF(n_modes=modes)
+#     model.fit(dataset, dim="TIME")
+#     components = model.components()  # spatial EOFs
+#     scores = model.scores()  # PC time series
+#     explained_variance = model.explained_variance_ratio()
+#
+#     # bootstrapping for significant modes, from https://xeofs.readthedocs.io/en/latest/content/user_guide/auto_examples/4validation/plot_bootstrap.html#sphx-glr-content-user-guide-auto-examples-4validation-plot-bootstrap-py
+#     # n_boot = 50
+#     # bs = xe.validation.EOFBootstrapper(n_bootstraps=n_boot)
+#     # bs.fit(model)
+#     # bs_expvar = bs.explained_variance()
+#     # ci_expvar = bs_expvar.quantile([0.025, 0.975], "n")  # 95% confidence intervals
+#     # q025 = ci_expvar.sel(quantile=0.025)
+#     # q975 = ci_expvar.sel(quantile=0.975)
+#     # is_significant = q025 - q975.shift({"mode": -1}) > 0
+#     # n_significant_modes = (
+#     #     is_significant.where(is_significant is True).cumsum(skipna=False).max().fillna(0)
+#     # )
+#     # print("{:} modes are significant at alpha=0.05".format(n_significant_modes.values))
+#
+#     #reconstructed = model.inverse_transform(scores)
+#     return components, explained_variance, scores
 
 
 def make_movie(dataset, vmin, vmax, colorbar_label=None, ENSO_ds=None, savepath=None, cmap='RdBu_r'):
@@ -555,7 +559,7 @@ def compute_gradient_lon(
     return grad
 
 
-def get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH=False, gamma0=10, INCLUDE_GEOSTROPHIC_DISPLACEMENT=False, INCLUDE_EKMAN_MEAN_ADVECTION=False, OTHER_MLD=False, MAX_GRAD_TSUB=False, ENTRAINMENT_VEL_ANOM_FORC=False, LOG_ENTRAINMENT_VELOCITY=False, SPLIT_SURFACE=False, INCLUDE_RADIATIVE_SURFACE=False, INCLUDE_TURBULENT_SURFACE=False):
+def get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH=False, gamma0=10, INCLUDE_GEOSTROPHIC_DISPLACEMENT=False, INCLUDE_EKMAN_MEAN_ADVECTION=False, OTHER_MLD=False, MAX_GRAD_TSUB=False, ENTRAINMENT_VEL_ANOM_FORC=False, LOG_ENTRAINMENT_VELOCITY=False, SPLIT_SURFACE=False, INCLUDE_RADIATIVE_SURFACE=False, INCLUDE_TURBULENT_SURFACE=False, DATA_TO_2025=False):
     save_name = ""
     if INCLUDE_SURFACE:
         save_name = save_name + "1"
@@ -594,6 +598,8 @@ def get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_G
             save_name += "_radsurf"
         if INCLUDE_TURBULENT_SURFACE:
             save_name += "_turbsurf"
+    if DATA_TO_2025:
+        save_name += "_upto2025"
     return save_name
 
 
@@ -610,3 +616,106 @@ def get_month_from_time(time):
     if month == 0:
         month = 12.0
     return month
+
+
+def plot_eof_for_regional_analysis(EOFs, number, save_name=None):
+    fig, axs = plt.subplots(number, 1)
+    fig.tight_layout()
+    norm = colors.TwoSlopeNorm(vmin=-2, vcenter=0, vmax=2)
+    for k in range(number):
+        axs[k].grid()
+        pcolormesh = axs[k].pcolormesh(EOFs.LONGITUDE.values, EOFs.LATITUDE.values, EOFs.isel(MODE=k), cmap='RdBu_r', norm=norm)
+        if k == number - 1:
+            axs[k].set_xlabel("Longitude")
+        axs[k].set_ylabel("Latitude")
+    cbar = fig.colorbar(pcolormesh, ax=axs, label="EOF spatial pattern (standardised)")
+    if save_name is not None:
+        plt.savefig(save_name, dpi=400)
+    # plt.show()
+
+def get_eofs(model, start_mode, end_mode, map_mask, invert=True, standardise=True):
+    monthly_mean = get_monthly_mean(model)
+    eof_modes, explained_variance, PCs, EOFs = get_eof_with_nan_consideration(model, modes=end_mode, mask=map_mask,
+                                                                              tolerance=1e-15,
+                                                                              monthly_mean_ds=monthly_mean,
+                                                                              start_mode=start_mode, max_iterations=4)
+    if invert:
+        PCs = PCs * -1
+        EOFs = EOFs * -1
+    if standardise:
+        PCs = (PCs - PCs.mean(axis=0)) / PCs.std(axis=0)  # standardise
+        EOFs = (EOFs - EOFs.mean(dim=["LATITUDE", "LONGITUDE"])) / EOFs.std(dim=["LATITUDE", "LONGITUDE"])
+    return [EOFs, PCs, eof_modes, explained_variance]
+
+
+def get_eof(model, obs=False, obs_da=None, save_folder=None, map_mask=None):
+    if obs:
+        EOFsPCs = get_eofs(obs_da, 0, 3, map_mask)
+        save_name = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/" + save_folder + "EOFs_obs.jpg"
+    else:
+        EOFsPCs = get_eofs(model, 0, 3, map_mask)
+        save_name = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/" + save_folder + "EOFs.jpg"
+    EOFs = EOFsPCs[0]
+    PCs = EOFsPCs[1]
+    plot_eof_for_regional_analysis(EOFs, 2, save_name=save_name)
+
+
+def get_monthly_eof(model, obs=False, obs_da=None, save_folder=None, map_mask=None):
+    for month in range(1, 13):
+        if obs:
+            EOFsPCs = get_eofs(obs_da.sel(MONTH=month), 0, 3, map_mask)
+            save_name = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/" + save_folder + "EOFs_month" + str(month) + "_obs.jpg"
+        else:
+            EOFsPCs = get_eofs(model.sel(MONTH=month), 0, 3, map_mask)
+            save_name = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/" + save_folder + "EOFs_month" + str(month) + ".jpg"
+        EOFs = EOFsPCs[0]
+        PCs = EOFsPCs[1]
+        plot_eof_for_regional_analysis(EOFs, 2, save_name=save_name)
+
+def get_seasonal_eof(model, obs=False, obs_da=None, save_folder=None, map_mask=None):
+    for season in range(0, 4):
+        if obs:
+            EOFsPCs = get_eofs(obs_da.sel(SEASON=season), 0, 3, map_mask)
+            save_name = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/" + save_folder + "EOFs_season" + str(season) + "_obs.jpg"
+        else:
+            EOFsPCs = get_eofs(model.sel(SEASON=season), 0, 3, map_mask)
+            save_name = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/" + save_folder + "EOFs_season" + str(season) + ".jpg"
+        EOFs = EOFsPCs[0]
+        PCs = EOFsPCs[1]
+        plot_eof_for_regional_analysis(EOFs, 2, save_name=save_name)
+        if obs:
+            plot_explained_variance(EOFsPCs[3], start_mode=0, save_name="/Volumes/G-DRIVE ArmorATD/Extension/datasets/" + save_folder + "EOFs_explained_variance_season" + str(season) + "_obs.jpg")
+        else:
+            plot_explained_variance(EOFsPCs[3], start_mode=0, save_name="/Volumes/G-DRIVE ArmorATD/Extension/datasets/" + save_folder + "EOFs_explained_variance_season" + str(season) + ".jpg")
+
+
+def plot_explained_variance(explained_variance, start_mode, save_name):
+    modes = np.arange(start_mode, start_mode + len(explained_variance))
+    max_limit = start_mode + len(explained_variance)  # e.g. for explicit scheme, cap at some small number
+    plt.figure()
+    plt.grid()
+    plt.plot(modes[:max_limit], explained_variance[:max_limit], marker='x')
+    plt.xlabel("Mode")
+    plt.ylabel("Explained variance")
+    plt.savefig(save_name, dpi=400)
+    plt.show()
+
+
+def format_cartopy(ax):     # from Julia's code
+    ax.add_feature(cfeature.COASTLINE, linewidth=0.5)
+    ax.add_feature(cfeature.LAND, facecolor='gray', edgecolor='none', zorder=1)
+    gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, linewidth=0.5, color='darkgray', alpha=0.5)
+    gl.top_labels = False
+    gl.right_labels = False
+    gl.xlabel_style = {'size': 10}
+    gl.ylabel_style = {'size': 10}
+    return ax
+
+
+def mask_dataset(ds, regions):
+    for lat_bounds, long_bounds in regions:
+        lat_mask = (ds.LATITUDE >= lat_bounds.start) & (ds.LATITUDE <= lat_bounds.stop)
+        long_mask = (ds.LONGITUDE >= long_bounds.start) & (ds.LONGITUDE <= long_bounds.stop)
+        inside_bounds = lat_mask & long_mask
+        ds = ds.where(~inside_bounds)
+    return ds

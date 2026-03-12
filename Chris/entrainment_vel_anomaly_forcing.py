@@ -7,24 +7,43 @@ from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset, compu
 import matplotlib
 
 DOWNLOADED_SSH = False
+DATA_TO_2025 = True
 
-H_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/h.nc"
-H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/hbar.nc"
-ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Entrainment_Velocity-(2004-2018).nc"
-T_M_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/observed_anomaly_JJ.nc"
-T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub.nc"
+if DATA_TO_2025:
+    H_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Mixed_Layer_Depth-(2004-2025).nc"
+    ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Mixed_Layer_Entrainment_Velocity-(2004-2025).nc"
+    T_M_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Mixed_Layer_Temperature_Anomalies-(2004-2025).nc"
+    T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Sub_Layer_Temperature_Max_Gradient_Method-(2004-2025).nc"
+
+else:
+    H_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/h.nc"
+    H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/hbar.nc"
+    ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Entrainment_Velocity-(2004-2018).nc"
+    T_M_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/observed_anomaly_JJ.nc"
+    T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub.nc"
 
 h_ds = xr.open_dataset(H_DATA_PATH, decode_times=False)
-hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
+if not DATA_TO_2025:
+    hbar_ds = xr.open_dataset(H_BAR_DATA_PATH, decode_times=False)
 entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
 tm_ds = xr.open_dataset(T_M_DATA_PATH, decode_times=False)
 tsub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
 
+if DATA_TO_2025:
+    h_da = h_ds["MLD"]
+    hbar = get_monthly_mean(h_da)
+else:
+    hbar = hbar_ds["MONTHLY_MEAN_MLD"]
+
 h = h_ds["MLD"]
-hbar = hbar_ds["MONTHLY_MEAN_MLD"]
-entrainment_vel_monthly_mean = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
-entrainment_vel_ds = get_anomaly(entrainment_vel_ds, "ENTRAINMENT_VELOCITY", entrainment_vel_monthly_mean)
-entrainment_vel_anomaly = entrainment_vel_ds["ENTRAINMENT_VELOCITY_ANOMALY"]
+if DATA_TO_2025:
+    entrainment_vel_monthly_mean = get_monthly_mean(entrainment_vel_ds['w_e'])
+    entrainment_vel_ds = get_anomaly(entrainment_vel_ds, "w_e", entrainment_vel_monthly_mean)
+    entrainment_vel_anomaly = entrainment_vel_ds["w_e_ANOMALY"]
+else:
+    entrainment_vel_monthly_mean = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
+    entrainment_vel_ds = get_anomaly(entrainment_vel_ds, "ENTRAINMENT_VELOCITY", entrainment_vel_monthly_mean)
+    entrainment_vel_anomaly = entrainment_vel_ds["ENTRAINMENT_VELOCITY_ANOMALY"]
 tm = tm_ds["__xarray_dataarray_variable__"]
 tm_monthly_mean = get_monthly_mean(tm)
 tsub = tsub_ds["SUB_TEMPERATURE"]
@@ -45,7 +64,10 @@ for time in tm.TIME.values:
     entrainment_vel_anomaly_forcings.append(entrainment_vel_anomaly_forcing)
 entrainment_vel_anomaly_forcings = xr.concat(entrainment_vel_anomaly_forcings, "TIME")
 entrainment_vel_anomaly_forcings = entrainment_vel_anomaly_forcings.rename("ENTRAINMENT_VEL_ANOMALY_FORCING")
-entrainment_vel_anomaly_forcings.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment_velocity_anomaly_forcing.nc")
+if DATA_TO_2025:
+    entrainment_vel_anomaly_forcings.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/2025_entrainment_velocity_anomaly_forcing.nc")
+else:
+    entrainment_vel_anomaly_forcings.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment_velocity_anomaly_forcing.nc")
 
 # existing contribution:
 # cur_entrainment_vel * cur_tsub_anom * rho_0 * c_0
