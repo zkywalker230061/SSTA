@@ -272,17 +272,48 @@ plt.ylim(-1, 1)
 plt.show()
 
 # autocorrelation plot
-autocorr_simulated = acf(
-    s_m_a_simulated.mean(dim=['LONGITUDE', 'LATITUDE']),
-    # s_m_a_simulated.sel(LONGITUDE=-35.5, LATITUDE=53.5),
-    nlags=24
+autocorr_points_simulated = []
+autocorr_points_observed = []
+for lon, lat in zip(s_m_a_simulated['LONGITUDE'], s_m_a_simulated['LATITUDE']):
+    # if lat > 0:
+    #     continue  # only plot for southern hemisphere
+    # if lat < 0:
+    #     continue  # only plot for northern hemisphere
+    autocorr_point_simulated = acf(s_m_a_simulated.sel(LONGITUDE=lon, LATITUDE=lat), nlags=24)
+    autocorr_point_observed = acf(s_m_a.sel(LONGITUDE=lon, LATITUDE=lat), nlags=24)
+    if not np.isnan(autocorr_point_simulated).all():
+        autocorr_points_simulated.append(autocorr_point_simulated)
+    if not np.isnan(autocorr_point_observed).all():
+        autocorr_points_observed.append(autocorr_point_observed)
+autocorr_points_simulated = np.array(autocorr_points_simulated)
+autocorr_points_observed = np.array(autocorr_points_observed)
+plt.plot(autocorr_points_simulated.mean(axis=0), label='Simulated')
+plt.plot(autocorr_points_observed.mean(axis=0), label='Observed')
+plt.legend()
+plt.show()
+
+precipitation_a = -q_surface_ds['ANOMALY_avg_tprate'].where(
+    ~np.isnan(s_m_monthly_mean)
 )
-autocorr_observed = acf(
-    s_m_a.mean(dim=['LONGITUDE', 'LATITUDE']),
-    # s_m_a.sel(LONGITUDE=-35.5, LATITUDE=53.5),
-    nlags=24
+evaporation_a = -q_surface_ds['ANOMALY_avg_ie'].where(
+    ~np.isnan(s_m_monthly_mean)
 )
-plt.plot(autocorr_simulated, label='Simulated')
-plt.plot(autocorr_observed, label='Observed')
+plt.plot(precipitation_a.mean(dim=['LONGITUDE', 'LATITUDE']), label='Precipitation Anomaly')
+plt.plot(evaporation_a.mean(dim=['LONGITUDE', 'LATITUDE']), label='Evaporation Anomaly')
+plt.legend()
+plt.show()
+
+plt.plot(
+    evaporation_a.mean(dim=['LONGITUDE', 'LATITUDE']) + precipitation_a.mean(dim=['LONGITUDE', 'LATITUDE']),
+    label="E'-P'"
+)
+plt.legend()
+plt.show()
+
+# for each month, plot the range of SSSA: max-min
+s_m_a_simulated_range = s_m_a_simulated.max(dim=['LONGITUDE', 'LATITUDE']) - s_m_a_simulated.min(dim=['LONGITUDE', 'LATITUDE'])
+s_m_a_range = s_m_a.max(dim=['LONGITUDE', 'LATITUDE']) - s_m_a.min(dim=['LONGITUDE', 'LATITUDE'])
+plt.plot(s_m_a_simulated_range, label='Simulated SSSA Range')
+plt.plot(s_m_a_range, label='Observed SSSA Range')
 plt.legend()
 plt.show()
