@@ -41,10 +41,10 @@ USE_DOWNLOADED_SSH = False
 
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN_ANOM_ADVECTION = True
-INCLUDE_EKMAN_MEAN_ADVECTION = True
-INCLUDE_ENTRAINMENT = True
-INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
-INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
+INCLUDE_EKMAN_MEAN_ADVECTION = False
+INCLUDE_ENTRAINMENT = False
+INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = False
+INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = False
 
 
 # Display And/Or Save Simulation Settings 
@@ -54,7 +54,7 @@ SAVE_SIMULATIONS = False
 # Statistical Analysis Settings
 COMPUTE_NRMSE = False
 COMPUTE_PDF_ANALYSIS = False
-COMPUTE_MSE_DECOMPOSITION = True
+COMPUTE_MSE_DECOMPOSITION = False
 COMPUTE_PRINCIPAL_COMPONENT = True
 
 # ----------1. Defining Physical Parameters for Simulations ---------------------
@@ -75,35 +75,54 @@ delta_t = month_to_second(1)
 #---------- 2. Define File Paths -------------------------------------
 
 # Observed (ARGO & Reynolds) File Paths
-TEMP_DATA_PATH = r"C:\Users\jason\MSciProject\RG_ArgoClim_Temperature_2019.nc"
-observed_path = r"C:\Users\jason\MSciProject\Mixed_Layer_Datasets.nc"
-observed_T_path_Reynold_anom = r"C:\Users\jason\MSciProject\sst_anomalies-(2004-2018).nc"
-observed_T_path_Reynold = r"C:\Users\jason\MSciProject\sst_ltm.nc"
+# TEMP_DATA_PATH = r"C:\Users\jason\MSciProject\RG_ArgoClim_Temperature_2019.nc"
+TEMP_DATA_PATH = r"C:\Users\jason\MSciProject\Temperature-(2004-2025).nc"
+
+# observed_path = r"C:\Users\jason\MSciProject\Mixed_Layer_Datasets.nc"
+observed_path = r"C:\Users\jason\MSciProject\Mixed_Layer_Temperature_Anomalies-(2004-2025).nc"
+
+# observed_T_path_Reynold_anom = r"C:\Users\jason\MSciProject\sst_anomalies-(2004-2018).nc"
+# observed_T_path_Reynold = r"C:\Users\jason\MSciProject\sst_ltm.nc"
+
+
+observed_T_path_Reynold_anom = r"C:\Users\jason\MSciProject\reynolds_sst_Anomalies-(2004-2025).nc"
+observed_T_path_Reynold = r"C:\Users\jason\MSciProject\reynolds_sst-(2004-2025).nc"
 
 # Surface Heat Flux File Path 
-HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = r"C:\Users\jason\MSciProject\heat_flux_interpolated_all_contributions.nc"
+# HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = r"C:\Users\jason\MSciProject\heat_flux_interpolated_all_contributions.nc"
+HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = r"C:\Users\jason\MSciProject\Surface_Heat_Flux-(2004-2025).nc"
 
 # Ekman Heat Fluxes File Paths
-EKMAN_ANOMALY_DATA_PATH = r"C:\Users\jason\MSciProject\Ekman_Anomaly_Full_Datasets.nc"
-EKMAN_MEAN_ADVECTION_DATA_PATH = r"C:\Users\jason\MSciProject\ekman_mean_advection.nc"
+# EKMAN_ANOMALY_DATA_PATH = r"C:\Users\jason\MSciProject\Ekman_Anomaly_Full_Datasets.nc"
+# EKMAN_MEAN_ADVECTION_DATA_PATH = r"C:\Users\jason\MSciProject\ekman_mean_advection.nc"
+
+EKMAN_ANOMALY_DATA_PATH = r"C:\Users\jason\MSciProject\Simulation-Ekman_Heat_Flux-(2004-2025).nc"
+EKMAN_MEAN_ADVECTION_DATA_PATH = r"C:\Users\jason\MSciProject\2025_ekman_mean_advection.nc"
+
 
 # Entrainment Velocity File Path 
-ENTRAINMENT_VEL_DATA_PATH = r"C:\Users\jason\MSciProject\Entrainment_Vel_h.nc"
-#NEW_ENTRAINMENT_VEL_DATA_PATH = r"C:\Users\jason\MSciProject\Entrainment_Vel_New_h.nc"
+# ENTRAINMENT_VEL_DATA_PATH = r"C:\Users\jason\MSciProject\Entrainment_Vel_h.nc"
+ENTRAINMENT_VEL_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Entrainment_Velocity-(2004-2025).nc"
 
 # 
-T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\Tsub_Max_Gradient_Method_h.nc"
-NEW_T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\Tsub_Max_Gradient_Method_New_h.nc"
+# T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\Tsub_Max_Gradient_Method_h.nc"
+# NEW_T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\Tsub_Max_Gradient_Method_New_h.nc"
+T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\Sub_Layer_Temperature_Max_Gradient_Method-(2004-2025).nc"
+
 
 # MLD File Path 
-H_DATA_PATH = r"C:\Users\jason\MSciProject\h.nc"
+# H_DATA_PATH = r"C:\Users\jason\MSciProject\h.nc"
+H_DATA_PATH = r"C:\Users\jason\MSciProject\Mixed_Layer_Depth-(2004-2025).nc"
+
 
 # Geostrophic Anomaly File Path
-GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH = r"C:\Users\jason\MSciProject\geostrophic_anomaly_downloaded.nc"
-GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = r"C:\Users\jason\MSciProject\geostrophic_anomaly_calculated.nc"
-SEA_SURFACE_GRAD_DATA_PATH = r"C:\Users\jason\MSciProject\sea_surface_interpolated_grad.nc"
-SEA_SURFACE_MONTHLY_MEAN_DATA_PATH = r"C:\Users\jason\MSciProject\sea_surface_monthly_mean_calculated_grad.nc"
+# GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH = r"C:\Users\jason\MSciProject\geostrophic_anomaly_downloaded.nc"
+# GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = r"C:\Users\jason\MSciProject\geostrophic_anomaly_calculated.nc"
+GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = r"C:\Users\jason\MSciProject\Simulation-Geostrophic_Heat_Flux-(2004-2025).nc"
 
+# SEA_SURFACE_GRAD_DATA_PATH = r"C:\Users\jason\MSciProject\sea_surface_interpolated_grad.nc"
+# SEA_SURFACE_MONTHLY_MEAN_DATA_PATH = r"C:\Users\jason\MSciProject\sea_surface_monthly_mean_calculated_grad.nc"
+SEA_SURFACE_MONTHLY_MEAN_DATA_PATH = r"C:\Users\jason\MSciProject\2025_sea_surface_monthly_mean_calculated_grad.nc"
 
 #----------3. Loading Data and Defining Key Variables -----------------------------------
 
@@ -125,21 +144,22 @@ t_sub_da = t_sub_anom # (TIME=180, LAT=145, LON=360)
 
 # Observed Data (Tm) using ARGO
 observed_temp_ds_full = xr.open_dataset(observed_path, decode_times=False)
-observed_temp_ds = observed_temp_ds_full["MIXED_LAYER_TEMP"]
-obs_temp_mean = get_monthly_mean(observed_temp_ds)
-obs_temp_anom = get_anomaly(observed_temp_ds_full, "MIXED_LAYER_TEMP", obs_temp_mean)
-obs_temp_anom = obs_temp_anom["MIXED_LAYER_TEMP_ANOMALY"] # (TIME=180, LAT=145, LON=360)
+# observed_temp_ds = observed_temp_ds_full["MIXED_LAYER_TEMP"]
+# obs_temp_mean = get_monthly_mean(observed_temp_ds)
+# obs_temp_anom = get_anomaly(observed_temp_ds_full, "MIXED_LAYER_TEMP", obs_temp_mean)
+# obs_temp_anom = obs_temp_anom["MIXED_LAYER_TEMP_ANOMALY"] # (TIME=180, LAT=145, LON=360)
+obs_temp_anom = observed_temp_ds_full["ANOMALY_ML_TEMPERATURE"]
 
 # Reynolds SST mean and anom
 observed_temp_ds_reynold = xr.open_dataset(observed_T_path_Reynold_anom, decode_times=False)
-observed_temperature_anomaly_reynold = observed_temp_ds_reynold['anom']
+observed_temperature_anomaly_reynold = observed_temp_ds_reynold['ANOMALY_SST']
 
 observed_temp_ds_reynold = xr.open_dataset(observed_T_path_Reynold, decode_times=False)
-observed_temperature_mean_reynold = observed_temp_ds_reynold['sst']
+observed_temperature_mean_reynold = observed_temp_ds_reynold['SST']
 
 # Ekman Anomaly 
 ekman_anomaly_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
-ekman_anomaly_da = ekman_anomaly_ds["TEMP_EKMAN_ANOM"] # (TIME=180, LAT=145, LON=360)
+ekman_anomaly_da = ekman_anomaly_ds["ANOMALY_EKMAN_HEAT_FLUX"] # (TIME=180, LAT=145, LON=360)
 ekman_anomaly_da = ekman_anomaly_da.where(~np.isnan(ekman_anomaly_da), 0)
 
 # Ekman Mean Advection
@@ -147,7 +167,7 @@ ekman_mean_advection = xr.open_dataset(EKMAN_MEAN_ADVECTION_DATA_PATH, decode_ti
 
 # Entrainment Velocity 
 entrainment_vel_ds = xr.open_dataset(ENTRAINMENT_VEL_DATA_PATH, decode_times=False)
-entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['ENTRAINMENT_VELOCITY'])
+entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] = get_monthly_mean(entrainment_vel_ds['w_e'])
 entrainment_vel_da = entrainment_vel_ds['ENTRAINMENT_VELOCITY_MONTHLY_MEAN'] # (TIME=12, LAT=145, LON=360)
 print(entrainment_vel_da)
 
@@ -166,35 +186,36 @@ surface_flux_da = heat_flux_anomaly_ds['NET_HEAT_FLUX_ANOMALY'] # (TIME=180, LAT
 
 # Geostrophic Anomaly
 geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH, decode_times=False)
-geostrophic_anomaly_da = geostrophic_anomaly_ds["GEOSTROPHIC_ANOMALY"]
+geostrophic_anomaly_da = geostrophic_anomaly_ds["ANOMALY_GEOSTROPHIC_HEAT_FLUX"]
 
-if USE_DOWNLOADED_SSH:
-    geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH, decode_times=False)
-    SEA_SURFACE_GRAD_DATA_PATH = r"C:\Users\jason\MSciProject\sea_surface_interpolated_grad.nc"
-    ssh_var_name = "sla"
-else:
-    geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH, decode_times=False)
-    SEA_SURFACE_GRAD_DATA_PATH = r"C:\Users\jason\MSciProject\sea_surface_calculated_grad.nc"
-    ssh_var_name = "ssh"
-geostrophic_anomaly_da = geostrophic_anomaly_ds["GEOSTROPHIC_ANOMALY"]
+# if USE_DOWNLOADED_SSH:
+#     geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH, decode_times=False)
+#     SEA_SURFACE_GRAD_DATA_PATH = r"C:\Users\jason\MSciProject\sea_surface_interpolated_grad.nc"
+#     ssh_var_name = "sla"
+# else:
+#     geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH, decode_times=False)
+#     SEA_SURFACE_GRAD_DATA_PATH = r"C:\Users\jason\MSciProject\sea_surface_calculated_grad.nc"
+#     ssh_var_name = "ssh"
+# geostrophic_anomaly_da = geostrophic_anomaly_ds["GEOSTROPHIC_ANOMALY"]
 
-# Sea surface height
-sea_surface_grad_ds = xr.open_dataset(SEA_SURFACE_GRAD_DATA_PATH, decode_times=False)
+# # Sea surface height
+# sea_surface_grad_ds = xr.open_dataset(SEA_SURFACE_GRAD_DATA_PATH, decode_times=False)
+
 sea_surface_monthlymean_ds = xr.open_dataset(SEA_SURFACE_MONTHLY_MEAN_DATA_PATH, decode_times=False)
 
 
 # Preprocessing Reynolds Anomaly 
-mean_obs = repeat_monthly_field_array(observed_temperature_mean_reynold)
+# mean_obs = repeat_monthly_field_array(observed_temperature_mean_reynold)
 
-reynolds_sst = mean_obs + observed_temperature_anomaly_reynold
+# reynolds_sst = mean_obs + observed_temperature_anomaly_reynold
 # reynolds_sst_y = reynolds_sst.isel(TIME=slice(12,None))
 
-reynolds_mean = get_monthly_mean(reynolds_sst)
-reynolds_mean_stacked = repeat_monthly_field_array(reynolds_mean, n_repeats=15)
+# reynolds_mean = get_monthly_mean(reynolds_sst)
+# reynolds_mean_stacked = repeat_monthly_field_array(reynolds_mean, n_repeats=15)
 
-reynolds_anom = reynolds_sst - reynolds_mean_stacked # mean anomalies of order 1e-6
+# reynolds_anom = reynolds_sst - reynolds_mean_stacked # mean anomalies of order 1e-6
 
-
+reynolds_anom = observed_temperature_anomaly_reynold
 #----------4. Initialising Lists for Different Schemes for Simulations -----------------------------
 
 # initialise lists for temperature anomalies and entrainment fluxes for each model
@@ -284,8 +305,8 @@ if COMPUTE_SIM:
             pbar.set_description(f"Simulating Year {current_year} Month {month_in_year}") # Gemini aided (this line and previous 2 lines)
             month_in_year = get_month_from_time(month)
             if not added_baseline:  # just adds the baseline of a whole bunch of zero
-                base = temperature_ds.sel(PRESSURE=2.5, TIME=month)['ARGO_TEMPERATURE_ANOMALY'] - \
-                    temperature_ds.sel(PRESSURE=2.5, TIME=month)['ARGO_TEMPERATURE_ANOMALY']
+                base = temperature_ds.sel(PRESSURE=2.5, TIME=month)['TEMPERATURE'] - \
+                    temperature_ds.sel(PRESSURE=2.5, TIME=month)['TEMPERATURE']
                 base = base.expand_dims(TIME=[month])
                 implicit_model_anomalies.append(base) if COMPUTE_IMP == True else None
                 explicit_model_anomalies.append(base) if COMPUTE_EXP == True else None
@@ -400,7 +421,7 @@ if COMPUTE_SIM:
             
             # 3. Step B: Apply the shift using repeat_monthly_field_array
             # This aligns the model's 0 to the physical 0
-            climatology_stacked = repeat_monthly_field_array(model_climatology, n_repeats=15)
+            climatology_stacked = repeat_monthly_field_array(model_climatology, n_repeats=22)
             recentered_da = raw_ds - climatology_stacked
             
             # 4. Prepare for final merge
@@ -465,8 +486,10 @@ if not COMPUTE_SIM:
             else:
                 make_movie(data_array, -3, 3)
 
-
-
+# print(all_models.sizes)
+# print(f"Heat Flux Time: {len(surface_flux_da.TIME)}")
+# print(f"Ekman Time: {len(ekman_anomaly_da.TIME)}")
+# print(f"T-Sub Time: {len(t_sub_da.TIME)}")
 
 # --------------------------- Statistical Analysis ----------------------------
 
@@ -494,11 +517,11 @@ if COMPUTE_NRMSE:
             0.99, 0.01,
             f"Gamma = {gamma_0}\n"
             f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
-            f"INCLUDE_EKMAN = {INCLUDE_EKMAN_ANOM_ADVECTION}\n"
+            f"INCLUDE_EKMAN_ANOM = {INCLUDE_EKMAN_ANOM_ADVECTION}\n"
             f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
-            f"INCLUDE_GEOSTROPHIC = {INCLUDE_GEOSTROPHIC_ANOM_ADVECTION}\n"
-            f"INCLUDE_GEOSTROPHIC_DISPLACEMENT = {INCLUDE_GEOSTROPHIC_MEAN_ADVECTION}\n"
-            f"INCLUDE_EKMAN = {INCLUDE_EKMAN_MEAN_ADVECTION}",
+            f"INCLUDE_GEOSTROPHIC_ANOM = {INCLUDE_GEOSTROPHIC_ANOM_ADVECTION}\n"
+            f"INCLUDE_GEOSTROPHIC_MEAN_ADV = {INCLUDE_GEOSTROPHIC_MEAN_ADVECTION}\n"
+            f"INCLUDE_EKMAN_MEAN_ADV = {INCLUDE_EKMAN_MEAN_ADVECTION}",
             ha='right', va='bottom', fontsize=18
         )
         plt.show()
@@ -510,7 +533,7 @@ if COMPUTE_PDF_ANALYSIS:
     for scheme_name in all_models.data_vars:
         data = all_models[scheme_name]
         print(f"Processing {scheme_name}...")
-        error_distributions[scheme_name] = get_clean_error_distribution(data, reynolds_anom)
+        error_distributions[scheme_name] = get_clean_error_distribution(data, reynolds_anom, exclude_tropics=True)
 
     num_schemes = len(all_models.data_vars)
     cols = 2
@@ -571,10 +594,11 @@ if COMPUTE_PDF_ANALYSIS:
             0.99, 0.01,
             f"Gamma = {gamma_0}\n"
             f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
-            f"INCLUDE_EKMAN = {INCLUDE_EKMAN_ANOM_ADVECTION}\n"
+            f"INCLUDE_EKMAN_ANOM = {INCLUDE_EKMAN_ANOM_ADVECTION}\n"
             f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
-            f"INCLUDE_GEOSTROPHIC = {INCLUDE_GEOSTROPHIC_ANOM_ADVECTION}\n"
-            f"INCLUDE_GEOSTROPHIC_DISPLACEMENT = {INCLUDE_GEOSTROPHIC_MEAN_ADVECTION}\n",
+            f"INCLUDE_GEOSTROPHIC_ANOM = {INCLUDE_GEOSTROPHIC_ANOM_ADVECTION}\n"
+            f"INCLUDE_GEOSTROPHIC_MEAN_ADV = {INCLUDE_GEOSTROPHIC_MEAN_ADVECTION}\n"
+            f"INCLUDE_EKMAN_MEAN_ADV = {INCLUDE_EKMAN_MEAN_ADVECTION}",
             ha='right', va='bottom', fontsize=18
         )
     plt.show()
@@ -654,16 +678,17 @@ if COMPUTE_MSE_DECOMPOSITION:
 if COMPUTE_PRINCIPAL_COMPONENT:
     n_modes = 5
     ocean_mask = reynolds_anom.notnull().all(dim='TIME')
-    
+    lat_mask = (reynolds_anom.LATITUDE > 15) | (reynolds_anom.LATITUDE < -15)
+    combined_mask = ocean_mask & lat_mask
     print("Calculating EOFs for Reynolds Observations...")
+
     # Using Chris function to get the eof of the obs
     reconstructed_obs, exp_var_obs, pc_obs, eof_obs_da = get_eof_with_nan_consideration(
-        reynolds_anom, mask=ocean_mask, modes=n_modes
+        reynolds_anom, mask=combined_mask, modes=n_modes
     )
 
     for scheme_name in all_models.data_vars:
         data = all_models[scheme_name]
-        
         fig, axes = plt.subplots(n_modes, 1, figsize=(12, 4 * n_modes), sharex=True)
         if n_modes == 1:
             axes = [axes]
@@ -671,27 +696,27 @@ if COMPUTE_PRINCIPAL_COMPONENT:
         for m in range(n_modes):
             ax = axes[m]
             
-            # psuedo pc calculation (dot product)
+            # Psuedo pc calculation (dot product)
             model_pseudo_pc = xr.dot(
                 data.fillna(0), 
                 eof_obs_da.sel(MODE=m).fillna(0), 
                 dims=['LATITUDE', 'LONGITUDE']
             )
 
-            # observed pc 
+            # Observed pc 
             obs_pc_raw = pc_obs[:, m]
 
-            # 4. Normalise (Z-score)
+            # Normalise (Z-score)
             # model_pc_norm = (model_pseudo_pc - model_pseudo_pc.mean()) / model_pseudo_pc.std()
             # obs_pc_norm = (obs_pc_raw - obs_pc_raw.mean()) / obs_pc_raw.std()
 
-            # 5. Plotting
+            # Plotting
             time_coords = data.TIME.values 
             
             ax.plot(time_coords, obs_pc_raw, label="Observed (Reynolds)", color='black', alpha=0.6, linewidth=1.5)
             ax.plot(time_coords, model_pseudo_pc, label=f"Model ({scheme_name})", color='crimson', linestyle='--', linewidth=1.5)
             
-            # 6. Correlation Statistics
+            # Correlation Statistics
             correlation = np.corrcoef(obs_pc_raw, model_pseudo_pc)[0, 1] # Use pseudo_pc directly for corr
             ax.text(0.02, 0.9, f"Mode {m} | Correlation: {correlation:.2f}", transform=ax.transAxes, fontweight='bold')
             
@@ -701,7 +726,7 @@ if COMPUTE_PRINCIPAL_COMPONENT:
             nrmse_pc = raw_rmse / obs_rms
             ax.text(0.02, 0.8, f"PC-RMSE: {nrmse_pc:.3f}", transform=ax.transAxes)
             # Aesthetics
-            ax.set_ylabel("Amplitude (σ)")
+            ax.set_ylabel("Amplitude (σ)") # need to change
             ax.axhline(0, color='gray', linewidth=0.8, linestyle=':')
             ax.legend(loc='upper right', fontsize='small')
             ax.set_title(f"{scheme_name} | Principal Component Comparison: Mode {m}")
@@ -712,24 +737,20 @@ if COMPUTE_PRINCIPAL_COMPONENT:
 # print(observed_temperature_anomaly_reynold)
 # print(observed_temperature_mean_reynold)
 
-
-
-print(reynolds_sst.dims)
-print(reynolds_mean.dims)
-make_movie(reynolds_anom, -3,3)
+# make_movie(reynolds_anom, -3,3)
 # psuedo_mean = get_monthly_mean(observed_temperature_anomaly_reynold)
 # real_anom = get_anomaly(observed_temp_ds_reynold, "SST", psuedo_mean)
 # observed_temperature_anomaly_reynold = observed_temp_ds_reynold["SST_ANOMALY"]
-mean_obs = reynolds_anom.mean(dim="TIME")
-fig, axes = plt.subplots(1, 1, figsize=(8,5))
-cmap = plt.get_cmap('RdBu_r').copy()
-cmap.set_bad(color="black")
-mean_obs.plot(ax=axes, cmap=cmap, cbar_kwargs={'label': '(K)'}, vmin = -1e-7, vmax = 1e-7)
-axes.set_xlabel("Longitude")
-axes.set_ylabel("Lattitude")
-axes.set_title(f'Mean Reynolds Anomaly')
-plt.tight_layout()
-plt.show()
+# mean_obs = reynolds_anom.mean(dim="TIME")
+# fig, axes = plt.subplots(1, 1, figsize=(8,5))
+# cmap = plt.get_cmap('RdBu_r').copy()
+# cmap.set_bad(color="black")
+# mean_obs.plot(ax=axes, cmap=cmap, cbar_kwargs={'label': '(K)'}, vmin = -1e-7, vmax = 1e-7)
+# axes.set_xlabel("Longitude")
+# axes.set_ylabel("Lattitude")
+# axes.set_title(f'Mean Reynolds Anomaly')
+# plt.tight_layout()
+# plt.show()
 
 
 # mean_model = schemes["Implicit"].mean(dim="TIME")

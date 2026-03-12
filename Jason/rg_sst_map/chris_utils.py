@@ -639,8 +639,9 @@ def calculate_RMSE_normalised (obs, model, dim = 'TIME'):
     model = model.isel(TIME=slice(1,None))
     obs = obs.isel(TIME=slice(1,None))
 
-    model_mask = model.where(abs(model["LATITUDE"]) > 5)
-    obs_mask = obs.where(abs(obs["LATITUDE"]) > 5)
+    mask_condition = (abs(model["LATITUDE"]) > 15)
+    model_mask = model.where(mask_condition)
+    obs_mask = obs.where(mask_condition)
 
     # model_adjusted = model[model_mask]
     # obs_adjusted = obs[obs_mask]
@@ -656,6 +657,7 @@ def calculate_RMSE_normalised (obs, model, dim = 'TIME'):
     normal_rmse = np.sqrt(normal_mean_squared_error)
 
     weights = np.cos(np.deg2rad(mean_squared_error.LATITUDE))
+    weights = weights.where(mask_condition).fillna(0)
     weighted_mse = mean_squared_error.weighted(weights).mean(dim=("LATITUDE", "LONGITUDE"))
     global_weighted_rmse = float(np.sqrt(weighted_mse))
 
@@ -668,7 +670,7 @@ def calculate_RMSE_normalised (obs, model, dim = 'TIME'):
     global_rmse = global_weighted_rmse / global_weighted_rmse_obs
     return corrected_rmse, global_rmse
 
-def get_clean_error_distribution(test_da, obs_da):
+def get_clean_error_distribution(test_da, obs_da, exclude_tropics = True):
     """
     Calculates error (Test - Obs), slices time, and returns 
     a flattened numpy array with NaNs removed.
@@ -677,6 +679,11 @@ def get_clean_error_distribution(test_da, obs_da):
     test_sliced = test_da.isel(TIME=slice(1, None))
     obs_sliced = obs_da.isel(TIME=slice(1, None))
     
+    if exclude_tropics:
+        mask_condition = (test_sliced.LATITUDE > 15) | (test_sliced.LATITUDE < -15)
+        test_sliced = test_sliced.where(mask_condition)
+        obs_sliced = obs_sliced.where(mask_condition)
+
     # 2. Calculate Error (xarray handles alignment automatically)
     error_da = test_sliced - obs_sliced
     
@@ -685,6 +692,14 @@ def get_clean_error_distribution(test_da, obs_da):
     return flat_error[~np.isnan(flat_error)]
 
 def decompose_mse(obs, model, dim='TIME'):
+    model = model.isel(TIME=slice(1,None))
+    obs = obs.isel(TIME=slice(1,None))
+
+    mask_condition = (abs(model["LATITUDE"]) > 15)
+    model = model.where(mask_condition)
+    obs = obs.where(mask_condition)
+    
+    
     # 1. Basic Stats
     mean_obs = obs.mean(dim=dim)
     mean_mod = model.mean(dim=dim)
