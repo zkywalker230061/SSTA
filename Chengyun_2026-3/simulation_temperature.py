@@ -291,9 +291,18 @@ plt.ylim(-5, 5)
 plt.show()
 
 # autocorrelation plot
-autocorr_simulated = acf(t_m_a_simulated.mean(dim=['LONGITUDE', 'LATITUDE']), nlags=24)
-autocorr_observed = acf(t_m_a_reynolds.mean(dim=['LONGITUDE', 'LATITUDE']), nlags=24)
-plt.plot(autocorr_simulated, label='Simulated')
-plt.plot(autocorr_observed, label='Observed')
+autocorr_points_simulated = []
+autocorr_points_observed = []
+for lon, lat in zip(t_m_a_simulated['LONGITUDE'], t_m_a_simulated['LATITUDE']):
+    autocorr_point_simulated = acf(t_m_a_simulated.sel(LONGITUDE=lon, LATITUDE=lat), nlags=24)
+    autocorr_point_observed = acf(t_m_a_reynolds.sel(LONGITUDE=lon, LATITUDE=lat), nlags=24)
+    if not np.isnan(autocorr_point_simulated).all():
+        autocorr_points_simulated.append(autocorr_point_simulated)
+    if not np.isnan(autocorr_point_observed).all():
+        autocorr_points_observed.append(autocorr_point_observed)
+autocorr_points_simulated = np.array(autocorr_points_simulated)
+autocorr_points_observed = np.array(autocorr_points_observed)
+plt.plot(autocorr_points_simulated.mean(axis=0), label='Simulated')
+plt.plot(autocorr_points_observed.mean(axis=0), label='Observed')
 plt.legend()
 plt.show()
