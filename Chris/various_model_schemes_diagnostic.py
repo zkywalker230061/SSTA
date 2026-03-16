@@ -10,17 +10,17 @@ ssl._create_default_https_context = ssl._create_unverified_context
 
 from Chris.correlation_significance import get_significance
 from Chris.utils import make_movie, get_eof, get_eof_with_nan_consideration, get_eof_from_ppca_py, get_save_name, \
-    get_month_from_time, format_cartopy, mask_dataset
+    get_month_from_time, format_cartopy, mask_dataset, get_autocorrelation, start_at_month, plot_autocorrelation
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from correlation_significance import mutual_information
 
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN_ANOM_ADVECTION = True
-INCLUDE_EKMAN_MEAN_ADVECTION = True
+INCLUDE_EKMAN_MEAN_ADVECTION = False
 INCLUDE_ENTRAINMENT = True
 INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING = False
 INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
-INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
+INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = False
 
 SPLIT_SURFACE = True
 INCLUDE_RADIATIVE_SURFACE = True
@@ -412,49 +412,6 @@ def track_warming_effects():
 def track_anomaly_persistence(lag, start_month=None):
     to_plot_no_unchanging_cells = to_plot.where(to_plot.std("TIME") != 0)     # remove parts where there is no change to avoid spuriously strong autocorrelation signals
 
-    def get_autocorrelation(start_da, lag_da=None, max_lag=36):
-        if lag_da is None:      # the only reason they might differ is if start_da only contains results of a certain month
-            lag_da = start_da
-        autocorrelation_functions = []
-        for lag in range(1, max_lag + 1):
-            correlated_months = (xr.ufuncs.isfinite(start_da) & xr.ufuncs.isfinite(lag_da.shift(TIME=lag))).sum(dim="TIME")   # check that enough data have gone into the correlation calculation
-            autocorrelation_functions.append(xr.corr(start_da, lag_da.shift(TIME=lag).sel(TIME=start_da.TIME), dim='TIME').where(correlated_months >= max_lag/2))       # require certain amount of correlation data
-        autocorrelation_functions_ds = xr.concat(autocorrelation_functions, dim="LAG")
-        autocorrelation_functions_ds = autocorrelation_functions_ds.assign_coords(LAG=list(range(1, max_lag + 1)))
-        return autocorrelation_functions_ds
-
-    # get persistence given a particular starting month
-    def start_at_month(da, month):
-        data_at_this_month = []
-        for time in da.TIME.values:
-            month_of_this_time = get_month_from_time(time)
-            if month_of_this_time == month:
-                data_at_this_month.append(da.sel(TIME=time))
-        return xr.concat(data_at_this_month, dim="TIME")
-
-    def plot_autocorrelation(acf, lag, model_name, acf_obs=None):
-        plt.figure()
-        acf.sel(LAG=lag).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=-1, vmax=1)
-        plt.title("Autocorrelation with lag=" + str(lag) + " of " + str(model_name))
-        plt.show()
-
-        mean_autocorrelation = acf.mean(("LATITUDE", "LONGITUDE"))
-        print(mean_autocorrelation.sel(LAG=3).values)
-        print(mean_autocorrelation.sel(LAG=6).values)
-        plt.figure()
-        plt.grid()
-        plt.plot(mean_autocorrelation.LAG.values, mean_autocorrelation.values, label=model_name)
-        if acf_obs is not None:
-            mean_autocorrelation_obs = acf_obs.mean(("LATITUDE", "LONGITUDE"))
-            plt.plot(mean_autocorrelation_obs.LAG.values, mean_autocorrelation_obs.values, label="Observations")
-            plt.title("Autocorrelation Mean of " + str(model_name))
-            plt.legend()
-        else:
-            plt.title("Autocorrelation Mean of " + str(model_name))
-        plt.xlabel("Lag (months)")
-        plt.ylabel("Autocorrelation")
-        plt.show()
-
     if start_month is None:
         autocorrelation_functions_ds = get_autocorrelation(to_plot_no_unchanging_cells, max_lag=36)  # all time
     else:
@@ -514,17 +471,18 @@ def plot_mutual_information():
 
 def plot_significant_correlation():
     correlation, significant_correlation = get_significance(to_plot, observed_anomaly, resamples=1000, test_statistic="PEARSON")
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(subplot_kw={'projection': ccrs.PlateCarree()})
     correlation.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
     lons = significant_correlation.LONGITUDE.values
     lats = significant_correlation.LATITUDE.values
     lon_grid, lat_grid = np.meshgrid(lons, lats)
     ax.contourf(lon_grid, lat_grid, significant_correlation.values.astype(float), levels=[0.5, 1.5], hatches=['///'], colors='none')
+    ax = format_cartopy(ax)
     plt.title("")
-    plt.xlabel("Longitude (º)")
-    plt.ylabel("Latitude (º)")
     cbar = plt.gcf().axes[-1]
     cbar.set_ylabel('Pearson Correlation Coefficient', rotation=90)
+    ax.set_xlabel("Longitude (º)")
+    ax.set_ylabel("Latitude (º)")
     plt.show()
 
 # plot_full_model(save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/" + save_name + ".mp4")
@@ -534,11 +492,11 @@ def plot_significant_correlation():
 # plot_enso()
 # eof_movie()
 # explained_variance_from_each_mode()
-plot_spatial_pattern_EOFs()
-plot_PCs_over_time()
-regression_map()
+# plot_spatial_pattern_EOFs()
+# plot_PCs_over_time()
+# regression_map()
 # track_warming_effects()
-# track_anomaly_persistence(6, 9)
+track_anomaly_persistence(6, 9)
 # plot_correlation()
 # plot_mutual_information()
 # plot_significant_correlation()
