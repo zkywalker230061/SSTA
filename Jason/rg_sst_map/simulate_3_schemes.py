@@ -9,6 +9,7 @@ import pandas as pd
 from chris_utils import get_anomaly, coriolis_parameter, get_month_from_time, compute_upwind_advection
 from chris_utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from chris_utils import remove_empty_attributes, make_movie, get_eof_with_nan_consideration
+from chris_utils import format_cartopy_axis, make_movie_all_models
 # from utils_read_nc import get_monthly_mean, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
 from matplotlib.animation import FuncAnimation
@@ -16,6 +17,8 @@ from utils_ekman import repeat_monthly_field_array
 from tqdm import tqdm
 from chris_utils import calculate_RMSE_normalised, get_clean_error_distribution, decompose_mse
 from scipy.stats import skew, kurtosis, norm
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 
 
 plt.rcParams['animation.ffmpeg_path'] = r'C:\ffmpeg\bin\ffmpeg.exe'
@@ -34,28 +37,29 @@ testparam = False
 # Compute Simulation & Simulation Variable Settings 
 COMPUTE_SIM = True 
 COMPUTE_IMP = True 
-COMPUTE_EXP = False
-COMPUTE_SIMP = False
+COMPUTE_EXP = True
+COMPUTE_SIMP = True
 
 USE_DOWNLOADED_SSH = False
 
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN_ANOM_ADVECTION = True
 INCLUDE_EKMAN_MEAN_ADVECTION = False
-INCLUDE_ENTRAINMENT = False
+INCLUDE_ENTRAINMENT = True
 INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = False
 INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = False
 
 
 # Display And/Or Save Simulation Settings 
-SHOW_SIMULATIONS = False
+EQUATOR_MASK = True
+SHOW_SIMULATIONS = True
 SAVE_SIMULATIONS = False
 
 # Statistical Analysis Settings
 COMPUTE_NRMSE = False
 COMPUTE_PDF_ANALYSIS = False
 COMPUTE_MSE_DECOMPOSITION = False
-COMPUTE_PRINCIPAL_COMPONENT = True
+COMPUTE_PRINCIPAL_COMPONENT = False
 
 # ----------1. Defining Physical Parameters for Simulations ---------------------
 explicit_stability_limit = 1e-7
@@ -152,7 +156,8 @@ obs_temp_anom = observed_temp_ds_full["ANOMALY_ML_TEMPERATURE"]
 
 # Reynolds SST mean and anom
 observed_temp_ds_reynold = xr.open_dataset(observed_T_path_Reynold_anom, decode_times=False)
-observed_temperature_anomaly_reynold = observed_temp_ds_reynold['ANOMALY_SST']
+observed_temperature_anomaly_reynold = observed_temp_ds_reynold['ANOMALY_SST'].rename("Reynolds Anomaly SST Benchmark")
+observed_temperature_anomaly_reynold = observed_temperature_anomaly_reynold.where(obs_temp_anom.notnull()) # Masks extra Reynolds values 
 
 observed_temp_ds_reynold = xr.open_dataset(observed_T_path_Reynold, decode_times=False)
 observed_temperature_mean_reynold = observed_temp_ds_reynold['SST']
@@ -401,9 +406,9 @@ if COMPUTE_SIM:
     datasets_to_merge = []
     # Merge the 3 primary numerical schemes
     scheme_configs = [
-    (COMPUTE_IMP, implicit_model_anomalies, "IMPLICIT"),
-    (COMPUTE_EXP, explicit_model_anomalies, "EXPLICIT"),
-    (COMPUTE_SIMP, semi_implicit_model_anomalies, "SEMI_IMPLICIT")
+    (COMPUTE_IMP, implicit_model_anomalies, "Implicit Scheme"),
+    (COMPUTE_EXP, explicit_model_anomalies, "Explicit Scheme"),
+    (COMPUTE_SIMP, semi_implicit_model_anomalies, "Semi-Implicit Scheme")
 ]
 
     for active, anomaly_list, name in scheme_configs:
@@ -426,6 +431,10 @@ if COMPUTE_SIM:
             
             # 4. Prepare for final merge
             final_ds = recentered_da.rename(name).to_dataset()
+            if EQUATOR_MASK:
+                mask = abs(final_ds.LATITUDE) > 15
+                final_ds.where(mask)
+                
             datasets_to_merge.append(final_ds)
             
             # Free memory of temporary lists
@@ -445,21 +454,25 @@ if COMPUTE_SIM:
         print("Displaying Reynolds Benchmark...")
         if SAVE_SIMULATIONS:
             make_movie(observed_temperature_anomaly_reynold, -3, 3, 
-                    savepath=r"C:\Users\jason\MSciProject\Observed_Reynolds_Anomaly.mp4")
+                    savepath=r"C:\Users\jason\MSciProject\Viva\Observed_Reynolds_Anomaly.mp4",
+                    colorbar_label="Temperature Anomaly (K)")
         else:
-            make_movie(observed_temperature_anomaly_reynold, -3, 3)
+            make_movie(observed_temperature_anomaly_reynold, -3, 3, colorbar_label="Temperature Anomaly (K)")
 
         for scheme_name in all_models.data_vars:
             data_array = all_models[scheme_name]
             print(f"Processing video for: {scheme_name}")
             
             if SAVE_SIMULATIONS:
-                save_path = fr"C:\Users\jason\MSciProject\{scheme_name.capitalize()}_Scheme_Temp_Anomaly.mp4"
+                save_path = fr"C:\Users\jason\MSciProject\Viva\{scheme_name}_Scheme_Temp_Anomaly.mp4"
                 print(f"Saving to {save_path}...")
-                make_movie(data_array, -3, 3, savepath=save_path)
+                make_movie(data_array, -3, 3, savepath=save_path, colorbar_label="Temperature Anomaly (K)")
             else:
-                make_movie(data_array, -3, 3)
-            
+                make_movie(data_array, -3, 3, colorbar_label="Temperature Anomaly (K)")
+        
+        if len(all_models.data_vars) == 3:
+            path_to_save = r"C:\Users\jason\MSciProject\Viva\All_Schemes_Temp_Anomaly.mp4"
+            make_movie_all_models(reynolds_anom, all_models, -3, 3)
     # all_models.to_netcdf(r"C:\Users\jason\MSciProject\SSTA_All_Schemes_Final.nc")
 
 if not COMPUTE_SIM:
@@ -480,7 +493,7 @@ if not COMPUTE_SIM:
             print(f"Processing video for: {scheme_name}")
             
             if SAVE_SIMULATIONS:
-                save_path = fr"C:\Users\jason\MSciProject\{scheme_name.capitalize()}_Scheme_Temp_Anomaly_PreSaved_File.mp4"
+                save_path = fr"C:\Users\jason\MSciProject\{scheme_name}_Scheme_Temp_Anomaly_PreSaved_File.mp4"
                 print(f"Saving to {save_path}...")
                 make_movie(data_array, -3, 3, savepath=save_path)
             else:
@@ -503,27 +516,41 @@ if not COMPUTE_SIM:
 if COMPUTE_NRMSE:
     for scheme_name in all_models.data_vars:
         model_da = all_models[scheme_name]
-        fig, axes = plt.subplots(1, 1, figsize=(12,7))
+        # fig, axes = plt.subplots(1, 1, figsize=(12,7))
+        fig, axes = plt.subplots(subplot_kw={'projection': ccrs.PlateCarree()}, figsize=(10,6))
+        format_cartopy_axis(axes)
         rmse_map, global_score = calculate_RMSE_normalised(reynolds_anom, model_da, dim='TIME')
+        mesh = rmse_map.plot(
+            ax=axes,
+            transform=ccrs.PlateCarree(),
+            cmap='nipy_spectral',
+            vmin=0, vmax=2,
+            add_labels=False,
+            cbar_kwargs={'label': 'Normalised RMSE (a.u.)', 'pad': 0.05, 'shrink':0.7}
+        )
+
+        axes.set_title(f'{scheme_name}\nGlobal Score: {global_score:.4f}', fontsize=16)
         
         # Plotting
         # ax = plt.subplot(3, 2, i + 1)
-        rmse_map.plot(ax=axes, cmap='nipy_spectral', cbar_kwargs={'label': 'Arbitrary Units'}, vmin = 0, vmax = 2)
-        axes.set_xlabel("Longitude")
-        axes.set_ylabel("Lattitude")
-        axes.set_title(f'{scheme_name} Scheme - Normalised RMSE')
-        print(scheme_name, global_score)
-        fig.text(
-            0.99, 0.01,
+        # rmse_map.plot(ax=axes, cmap='nipy_spectral', cbar_kwargs={'label': 'Arbitrary Units'}, vmin = 0, vmax = 2)
+        # axes.set_xlabel("Longitude")
+        # axes.set_ylabel("Lattitude")
+        # axes.set_title(f'{scheme_name} Scheme - Normalised RMSE')
+        
+        metadata_str = (
             f"Gamma = {gamma_0}\n"
             f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
             f"INCLUDE_EKMAN_ANOM = {INCLUDE_EKMAN_ANOM_ADVECTION}\n"
             f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
             f"INCLUDE_GEOSTROPHIC_ANOM = {INCLUDE_GEOSTROPHIC_ANOM_ADVECTION}\n"
             f"INCLUDE_GEOSTROPHIC_MEAN_ADV = {INCLUDE_GEOSTROPHIC_MEAN_ADVECTION}\n"
-            f"INCLUDE_EKMAN_MEAN_ADV = {INCLUDE_EKMAN_MEAN_ADVECTION}",
-            ha='right', va='bottom', fontsize=18
+            f"INCLUDE_EKMAN_MEAN_ADV = {INCLUDE_EKMAN_MEAN_ADVECTION}"
         )
+
+        fig.text(0.98, 0.02, metadata_str, ha='right', va='bottom',
+                 fontsize=10, bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
+        plt.tight_layout()
         plt.show()
 
 if COMPUTE_PDF_ANALYSIS:

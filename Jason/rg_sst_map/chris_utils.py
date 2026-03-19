@@ -11,6 +11,8 @@ from scipy.linalg import svd
 #from wpca import EMPCA
 #import wpca
 #from ppca import PPCA
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 
 matplotlib.use('TkAgg')
 
@@ -386,41 +388,137 @@ def get_eof(dataset, modes, mask=None, clean_nan=False):
     #reconstructed = model.inverse_transform(scores)
     return components, explained_variance, scores
 
+def format_cartopy_axis(ax):
+    """
+    Adds coastlines, land features, and gridlines to a Cartopy axis
+    """
+    ax.add_feature(cfeature.COASTLINE, linewidth=0.5)
+    ax.add_feature(cfeature.LAND, facecolor="lightgrey", edgecolor='none', zorder=1)
 
-def make_movie(dataset, vmin, vmax, colorbar_label=None, ENSO_ds=None, savepath=None):
+    gl = ax.gridlines(crs = ccrs.PlateCarree(), draw_labels=True,
+                      linewidth=0.5, color='grey', alpha=0.5, linestyle='--')
+    gl.top_labels = False
+    gl.right_labels = False
+    gl.xlabel_style = {'size': 10}
+    gl.ylabel_style = {'size': 10}
+    return ax
+
+def make_movie(dataset, vmin, vmax, colorbar_label=None, ENSO_ds=None, savepath=None, cart_axes=True):
     times = dataset.TIME.values
+    dataset_name = dataset.name
 
-    fig, ax = plt.subplots()
+    if cart_axes:
+        fig, ax = plt.subplots(subplot_kw={'projection': ccrs.PlateCarree()}, figsize=(10,6))
+        format_cartopy_axis(ax)
+    else:
+        fig, ax = plt.subplots(figsize=(10,6))
+        ax.set_xlabel('Longitude')
+        ax.set_ylabel('Latitude')
     # ax = plt.axes(projection=ccrs.PlateCarree())
     # ax.coastlines()
     pcolormesh = ax.pcolormesh(dataset.LONGITUDE.values, dataset.LATITUDE.values,
-                               dataset.isel(TIME=0), cmap='RdBu_r')
+                               dataset.isel(TIME=0), cmap='RdBu_r', vmin=vmin, vmax=vmax,
+                               transform=ccrs.PlateCarree() if cart_axes else None)
     title = ax.set_title(f'Time = {times[0]}')
 
-    cbar = plt.colorbar(pcolormesh, ax=ax, label=colorbar_label)
-    ax.set_xlabel('Longitude')
-    ax.set_ylabel('Latitude')
+    cbar = plt.colorbar(pcolormesh, ax=ax, label=colorbar_label, orientation='horizontal', pad=0.08)
+    
 
     def update(frame):
-        month = int((times[frame] + 0.5) % 12)
-        if month == 0:
-            month = 12
-        year = 2004 + int((times[frame]) / 12)
+        total_months = int(times[frame])
+        year = 2004 + (total_months // 12)
+        month = (total_months % 12) + 1
+
         pcolormesh.set_array(dataset.isel(TIME=frame).values.ravel())
-        #pcolormesh.set_clim(vmin=float(model_anomaly_ds.isel(TIME=frame).min()), vmax=float(model_anomaly_ds.isel(TIME=frame).max()))
-        pcolormesh.set_clim(vmin=vmin, vmax=vmax)
-        cbar.update_normal(pcolormesh)
         if (ENSO_ds is not None):
             enso_index = ENSO_ds.isel(time=frame).value.values.item()
-            title.set_text(f'Year: {year}; Month: {month}; ENSO index: {round(enso_index, 4)}')
+            title.set_text(f'{dataset_name}; Year: {year}; Month: {month}; ENSO index: {round(enso_index, 4)}')
         else:
-            title.set_text(f'Year: {year}; Month: {month}')
+            title.set_text(f'{dataset_name}; Year: {year}; Month: {month}')
         return [pcolormesh, title]
 
     animation = FuncAnimation(fig, update, frames=len(times), interval=300, blit=False)
     if savepath is not None:
         animation.save(savepath, writer='ffmpeg', fps=2, dpi=200)
     plt.show()
+
+
+def make_movie_all_models(obs_ds, data_ds, vmin, vmax, savepath=None):
+    fig, axes = plt.subplots(2, 2, subplot_kw={'projection': ccrs.PlateCarree()}, 
+                             figsize=(15, 10), constrained_layout=True)
+    axes_flat = axes.flatten()
+    times = obs_ds.TIME.values
+    scheme_names = list(data_ds.data_vars)
+
+    quads = []
+    rmse_labels = [] # To store the text objects
+
+    # --- Initialization ---
+    # Panel 0: Observation (No RMSE needed here)
+    format_cartopy_axis(axes_flat[0])
+    q0 = axes_flat[0].pcolormesh(obs_ds.LONGITUDE, obs_ds.LATITUDE, obs_ds.isel(TIME=0), 
+                                 transform=ccrs.PlateCarree(), cmap='RdBu_r', vmin=vmin, vmax=vmax)
+    axes_flat[0].set_title(f"{obs_ds.name}", fontsize=16, fontweight='bold')
+    quads.append(q0)
+
+    # Panels 1-3: Models
+    for i, name in enumerate(scheme_names):
+        ax = axes_flat[i+1]
+        format_cartopy_axis(ax)
+        q = ax.pcolormesh(data_ds.LONGITUDE, data_ds.LATITUDE, data_ds[name].isel(TIME=0), 
+                          transform=ccrs.PlateCarree(), cmap='RdBu_r', vmin=vmin, vmax=vmax)
+        ax.set_title(f"{name}", fontsize=16)
+        quads.append(q)
+
+        # Create the RMSE text placeholder in the corner of each axis
+        # transform=ax.transAxes allows us to use coordinates from 0 to 1
+        txt = ax.text(0.02, 0.05, '', transform=ax.transAxes, fontsize=14, 
+                      fontweight='bold', bbox=dict(facecolor='white', alpha=0.7))
+        rmse_labels.append(txt)
+
+    cbar = fig.colorbar(quads[0], ax=axes, orientation='horizontal', 
+                        fraction=0.05, pad=0.07, aspect=40)
+    cbar.set_label("Temperature Anomaly (K)", fontsize=14, fontweight='bold')
+    # --- Animation Update ---
+    def update(frame):
+        # Time logic
+        t_val = int(times[frame])
+        year = 2004 + (t_val // 12)
+        month = (t_val % 12) + 1
+        
+        # Get Obs data for this frame to calculate RMSE
+        obs_frame = obs_ds.isel(TIME=frame)
+
+        # Update Benchmark Plot
+        quads[0].set_array(obs_frame.values.ravel())
+        
+        # Update Model Plots and RMSE Texts
+        for i, name in enumerate(scheme_names):
+            model_frame = data_ds[name].isel(TIME=frame)
+            
+            # Update Mesh
+            quads[i+1].set_array(model_frame.values.ravel())
+            
+            # Calculate Instantaneous RMSE
+            # Formula: sqrt(mean((model - obs)^2))
+            error = model_frame - obs_frame
+            rmse_val = np.sqrt((error**2).mean()).values.item()
+            
+            # Update the specific text object
+            rmse_labels[i].set_text(f"RMSE: {rmse_val:.4f}")
+
+        fig.suptitle(f"Date: {year}-{month:02d}", fontsize=22, fontweight='bold')
+        
+        # Return all objects that changed
+        return quads + rmse_labels
+
+    ani = FuncAnimation(fig, update, frames=len(times), interval=200, blit=False)
+    
+    if savepath:
+        ani.save(savepath, writer='ffmpeg', fps=5, dpi=150)
+    
+    plt.show()
+
 
 
 def remove_empty_attributes(dataset):
@@ -731,3 +829,4 @@ def decompose_mse(obs, model, dim='TIME'):
         "phase": phase_err,
         "total": total_mse
     }
+
