@@ -7,8 +7,8 @@ Chengyun Zhu
 
 import xarray as xr
 import numpy as np
-import matplotlib.pyplot as plt
 from statsmodels.tsa.stattools import acf
+import matplotlib.pyplot as plt
 
 from utilities import load_and_prepare_dataset
 from utilities import get_monthly_mean, get_anomaly
@@ -235,11 +235,11 @@ plt.show()
 
 # spatial mean plot
 t_m_a_simulated = t_m_a_simulated.where(
-    (t_m_a_simulated['LATITUDE'] > 20) | (t_m_a_simulated['LATITUDE'] < -20), 0
+    (t_m_a_simulated['LATITUDE'] > 15) | (t_m_a_simulated['LATITUDE'] < -15), 0
 )
 t_m_a_simulated_spatial_mean = t_m_a_simulated.mean(dim=['LONGITUDE', 'LATITUDE'])
 t_m_a_reynolds = t_m_a_reynolds.where(
-    (t_m_a_reynolds['LATITUDE'] > 20) | (t_m_a_reynolds['LATITUDE'] < -20), 0
+    (t_m_a_reynolds['LATITUDE'] > 15) | (t_m_a_reynolds['LATITUDE'] < -15), 0
 )
 t_m_a_reynolds_spatial_mean = t_m_a_reynolds.mean(dim=['LONGITUDE', 'LATITUDE'])
 plt.plot(t_m_a_simulated_spatial_mean['TIME'], t_m_a_simulated_spatial_mean, label='Simulated')
@@ -294,8 +294,8 @@ plt.show()
 autocorr_points_simulated = []
 autocorr_points_observed = []
 for lon, lat in zip(t_m_a_simulated['LONGITUDE'], t_m_a_simulated['LATITUDE']):
-    autocorr_point_simulated = acf(t_m_a_simulated.sel(LONGITUDE=lon, LATITUDE=lat), nlags=24)
-    autocorr_point_observed = acf(t_m_a_reynolds.sel(LONGITUDE=lon, LATITUDE=lat), nlags=24)
+    autocorr_point_simulated = acf(t_m_a_simulated.sel(LONGITUDE=lon, LATITUDE=lat), nlags=36)
+    autocorr_point_observed = acf(t_m_a_reynolds.sel(LONGITUDE=lon, LATITUDE=lat), nlags=36)
     if not np.isnan(autocorr_point_simulated).all():
         autocorr_points_simulated.append(autocorr_point_simulated)
     if not np.isnan(autocorr_point_observed).all():

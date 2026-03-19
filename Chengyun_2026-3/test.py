@@ -1,6 +1,7 @@
 import xarray as xr
 import pandas as pd
 import numpy as np
+from statsmodels.tsa.stattools import acf
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 

@@ -7,8 +7,8 @@ Chengyun Zhu
 
 import xarray as xr
 import numpy as np
-import matplotlib.pyplot as plt
 from statsmodels.tsa.stattools import acf
+import matplotlib.pyplot as plt
 
 from utilities import load_and_prepare_dataset
 from utilities import get_monthly_mean, get_anomaly
@@ -279,8 +279,8 @@ for lon, lat in zip(s_m_a_simulated['LONGITUDE'], s_m_a_simulated['LATITUDE']):
     #     continue  # only plot for southern hemisphere
     # if lat < 0:
     #     continue  # only plot for northern hemisphere
-    autocorr_point_simulated = acf(s_m_a_simulated.sel(LONGITUDE=lon, LATITUDE=lat), nlags=24)
-    autocorr_point_observed = acf(s_m_a.sel(LONGITUDE=lon, LATITUDE=lat), nlags=24)
+    autocorr_point_simulated = acf(s_m_a_simulated.sel(LONGITUDE=lon, LATITUDE=lat), nlags=36)
+    autocorr_point_observed = acf(s_m_a.sel(LONGITUDE=lon, LATITUDE=lat), nlags=36)
     if not np.isnan(autocorr_point_simulated).all():
         autocorr_points_simulated.append(autocorr_point_simulated)
     if not np.isnan(autocorr_point_observed).all():
