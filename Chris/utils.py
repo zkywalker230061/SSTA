@@ -703,8 +703,8 @@ def plot_explained_variance(explained_variance, start_mode, save_name):
 
 def format_cartopy(ax):     # from Julia's code
     ax.add_feature(cfeature.COASTLINE, linewidth=0.5)
-    ax.add_feature(cfeature.LAND, facecolor='gray', edgecolor='none', zorder=1)
-    gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, linewidth=0.5, color='darkgray', alpha=0.5)
+    ax.add_feature(cfeature.LAND, facecolor='lightgray', edgecolor='none', zorder=1)
+    gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, linewidth=0.5, color='gray', alpha=0.5)
     gl.top_labels = False
     gl.right_labels = False
     gl.xlabel_style = {'size': 10}
@@ -719,3 +719,49 @@ def mask_dataset(ds, regions):
         inside_bounds = lat_mask & long_mask
         ds = ds.where(~inside_bounds)
     return ds
+
+
+def get_autocorrelation(start_da, lag_da=None, min_lag=1, max_lag=36):
+    if lag_da is None:      # the only reason they might differ is if start_da only contains results of a certain month
+        lag_da = start_da
+    autocorrelation_functions = []
+    for lag in range(min_lag, max_lag + 1):
+        correlated_months = (xr.ufuncs.isfinite(start_da) & xr.ufuncs.isfinite(lag_da.shift(TIME=lag))).sum(dim="TIME")   # check that enough data have gone into the correlation calculation
+        autocorrelation_functions.append(xr.corr(start_da, lag_da.shift(TIME=lag).sel(TIME=start_da.TIME), dim='TIME').where(correlated_months >= (max_lag+min_lag)/2))       # require certain amount of correlation data
+    autocorrelation_functions_ds = xr.concat(autocorrelation_functions, dim="LAG")
+    autocorrelation_functions_ds = autocorrelation_functions_ds.assign_coords(LAG=list(range(min_lag, max_lag + 1)))
+    return autocorrelation_functions_ds
+
+# get persistence given a particular starting month
+def start_at_month(da, month):
+    data_at_this_month = []
+    for time in da.TIME.values:
+        month_of_this_time = get_month_from_time(time)
+        if month_of_this_time == month:
+            data_at_this_month.append(da.sel(TIME=time))
+    return xr.concat(data_at_this_month, dim="TIME")
+
+def plot_autocorrelation(acf, lag, model_name, acf_obs=None, show=True, label=None):
+    if lag is not None:
+        plt.figure()
+        acf.sel(LAG=lag).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=-1, vmax=1)
+        plt.title("Autocorrelation with lag=" + str(lag) + " of " + str(model_name))
+        plt.show()
+
+    mean_autocorrelation = acf.mean(("LATITUDE", "LONGITUDE"))
+    # print(mean_autocorrelation.sel(LAG=3).values)
+    # print(mean_autocorrelation.sel(LAG=6).values)
+    # plt.figure()
+    plt.grid()
+    plt.plot(mean_autocorrelation.LAG.values, mean_autocorrelation.values, label=label)
+    if acf_obs is not None:
+        mean_autocorrelation_obs = acf_obs.mean(("LATITUDE", "LONGITUDE"))
+        plt.plot(mean_autocorrelation_obs.LAG.values, mean_autocorrelation_obs.values, label="Observations")
+        plt.title("Autocorrelation Mean of " + str(model_name))
+        plt.legend()
+    # else:
+    #     plt.title("Autocorrelation Mean of " + str(model_name))
+    plt.xlabel("Lag (months)")
+    plt.ylabel("Autocorrelation")
+    if show:
+        plt.show()
