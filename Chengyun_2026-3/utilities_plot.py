@@ -82,7 +82,7 @@ def make_movie_2(
     dataset1, dataset2,
     vmin, vmax,
     cmap='nipy_spectral',
-    title=None,
+    title=None, unit=None,
     save_path=None
 ):
     """
@@ -101,19 +101,21 @@ def make_movie_2(
     cmap : str, optional
         The colormap to use for the plot. Default is 'nipy_spectral'.
     title : list of str, optional
-        The titles to display on the plots. Default is ['Reynolds SSTA', 'Simulated SSTA'].
+        The titles to display on the plots. Default is ['Observed', 'Simulated'].
+    unit : str, optional
+        The unit to display on the colorbar. Default is None.
     save_path : str, optional
         The path to save the animation as a video file. Default is None.
         If None, the animation will not be saved.
     """
     if title is None:
-        title = ['Reynolds SSTA', 'Simulated SSTA']
+        title = ['Observed', 'Simulated']
 
     times = dataset1.TIME.values
 
     fig, axes = plt.subplots(
         nrows=1, ncols=2,
-        figsize=(40, 10),
+        figsize=(15, 10), dpi=120,
         subplot_kw={'projection': ccrs.PlateCarree()}
     )
     plt.subplots_adjust(wspace=0.1, hspace=0)
@@ -128,7 +130,7 @@ def make_movie_2(
     ax1.coastlines()
     ax1.set_xlim(-180, 180)
     ax1.set_ylim(-90, 90)
-    ax1.set_title(f'{title[0]}, Time = 0.5', fontsize=20)
+    ax1.set_title(f'{title[0]}, 2004-01', fontsize=20)
 
     ax2 = axes[1]
     plot2 = ax2.pcolormesh(
@@ -140,9 +142,12 @@ def make_movie_2(
     ax2.coastlines()
     ax2.set_xlim(-180, 180)
     ax2.set_ylim(-90, 90)
-    ax2.set_title(f'{title[1]}, Time = 0.5', fontsize=20)
+    ax2.set_title(f'{title[1]}, 2004-01', fontsize=20)
 
-    fig.colorbar(plot2, ax=axes.ravel().tolist())
+    fig.colorbar(
+        plot2, ax=axes.ravel().tolist(), label=f"{unit}",
+        orientation='horizontal', aspect=40, pad=0.05
+    )
 
     def update(frame):
         data1 = dataset1.isel(TIME=frame).values
@@ -151,8 +156,11 @@ def make_movie_2(
         plot1.set_array(data1.ravel())
         plot2.set_array(data2.ravel())
 
-        ax1.set_title(f'{title[0]}, Time = {times[frame]}', fontsize=20)
-        ax2.set_title(f'{title[1]}, Time = {times[frame]}', fontsize=20)
+        print(frame)
+        year = 2004 + frame // 12
+        month = frame % 12 + 1
+        ax1.set_title(f'{title[0]}, {year}-{month:02d}', fontsize=20)
+        ax2.set_title(f'{title[1]}, {year}-{month:02d}', fontsize=20)
 
         return plot1, plot2
 
