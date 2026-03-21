@@ -441,6 +441,7 @@ plt.title('North Atlantic', fontsize=15, loc='left')
 plt.show()
 
 # # spatial mean plot
+# # ----------------------------------------------------------------------------
 # s_m_a_simulated = s_m_a_simulated.where(
 #     (s_m_a_simulated['LATITUDE'] > 20) | (s_m_a_simulated['LATITUDE'] < -20), 0
 # )

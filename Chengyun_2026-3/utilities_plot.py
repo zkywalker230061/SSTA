@@ -18,7 +18,7 @@ def make_movie(
     dataset,
     vmin, vmax,
     cmap='nipy_spectral',
-    title='SSTA',
+    title=None,
     save_path=None
 ):
     """
@@ -35,7 +35,7 @@ def make_movie(
     cmap : str, optional
         The colormap to use for the plot. Default is 'nipy_spectral'.
     title : str, optional
-        The title to display on the plot. Default is 'SSTA'.
+        The title to display on the plot. Default is None.
     save_path : str, optional
         The path to save the animation as a video file. Default is None.
         If None, the animation will not be saved.
@@ -156,7 +156,6 @@ def make_movie_2(
         plot1.set_array(data1.ravel())
         plot2.set_array(data2.ravel())
 
-        print(frame)
         year = 2004 + frame // 12
         month = frame % 12 + 1
         ax1.set_title(f'{title[0]}, {year}-{month:02d}', fontsize=20)

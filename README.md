@@ -21,13 +21,20 @@ The Slab Mixed Layer Model:
 ![image](_readme_archive/sml.png)
 
 
-Observed Sea Surface Temperature Anomaly (SSTA) from RG-ARGO climatology:
-
-[![Watch the video](_readme_archive/SSTA.gif)](_readme_archive/SSTA.gif)
-
-
 Results for Monthly Mean Mixed Layer Depth ($\bar{h}$) from RG-ARGO climatology:
 
 [![Watch the video](_readme_archive/hbar_jan.png)](_readme_archive/hbar.mp4)
 
 <video src="_readme_archive/hbar.mp4" loop="loop" controls preload></video>
+
+
+Sea Surface Temperature Anomaly (SSTA):
+Observed: Reynolds SSTA (LTM 2005-2025), Simulated: RGARGO mixed layer TA (LTM 2005-2025)
+
+[![Watch the video](_readme_archive/SSTA-compare.gif)](_readme_archive/SSTA-compare.gif)
+
+
+Sea Surface Salinity Anomaly (SSSA):
+Observed: RGARGO mixed layer SA (LTM 2005-2025), Simulated: RGARGO mixed layer SA (LTM 2005-2025)
+
+[![Watch the video](_readme_archive/SSSA-compare.gif)](_readme_archive/SSSA-compare.gif)
