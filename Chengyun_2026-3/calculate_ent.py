@@ -397,6 +397,43 @@ def save_entrainment_anomaly_salinity():
     )
 
 
+def save_entrainment_anomaly_temperature_maxgrad():
+    """Save the Q_Entrainment dataset for temperature."""
+
+    with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
+        if "datasets/Simulation-Entrainment_Heat_Flux_Max_Gradient-(2004-2025).nc" in logs_datasets.read():
+            return
+
+    t_sub_a = load_and_prepare_dataset(
+        "datasets/Sub_Layer_Temperature_Max_Gradient_Method_Anomalies-(2004-2025).nc"
+    )['ANOMALY_SUB_TEMPERATURE']
+    t_m_a = load_and_prepare_dataset(
+        "datasets/Mixed_Layer_Temperature_Anomalies-(2004-2025).nc"
+    )['ANOMALY_ML_TEMPERATURE']
+    w_e_monthly_mean = load_and_prepare_dataset(
+        "datasets/Mixed_Layer_Entrainment_Velocity-Clim_Mean.nc"
+    )['MONTHLY_MEAN_w_e']
+
+    w_e_monthly_mean = xr.concat([w_e_monthly_mean] * 22, dim='MONTH').reset_coords(drop=True)
+    w_e_monthly_mean = w_e_monthly_mean.rename({'MONTH': 'TIME'})
+    w_e_monthly_mean['TIME'] = t_m_a.TIME
+
+    q_entrainment_a = RHO_O * C_O * w_e_monthly_mean * (t_sub_a - t_m_a)
+
+    q_entrainment_a = q_entrainment_a.drop_vars('MONTH')
+
+    q_entrainment_a.attrs['units'] = 'W/m^2'
+    q_entrainment_a.attrs['long_name'] = (
+        'Monthly Q_Entrainment Anomaly Jan 2004 - Dec 2025 (22.0 year)'
+    )
+    q_entrainment_a.name = 'ANOMALY_ENTRAINMENT_HEAT_FLUX'
+
+    save_file(
+        q_entrainment_a,
+        "datasets/Simulation-Entrainment_Heat_Flux_Max_Gradient-(2004-2025).nc"
+    )
+
+
 def main():
     """Main function to calcuate entrainment term."""
 
@@ -412,6 +449,8 @@ def main():
 
     save_entrainment_anomaly_temperature()
     save_entrainment_anomaly_salinity()
+
+    save_entrainment_anomaly_temperature_maxgrad()
 
 
 if __name__ == "__main__":

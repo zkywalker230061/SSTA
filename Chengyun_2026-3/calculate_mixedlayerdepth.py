@@ -14,7 +14,6 @@ from utilities import get_monthly_mean  # , get_anomaly
 from utilities import save_file
 
 HBAR_DDIFF = 0.03
-MAX_DEPTH = float(2000)
 
 
 def _find_half_depth(density_anomaly_profile, pressure, density_anomaly_surface_mean):
@@ -74,16 +73,18 @@ def _find_half_depth(density_anomaly_profile, pressure, density_anomaly_surface_
             index1 = index2 - 1
             sigma_mld = sigma_mld_min
     else:
-        return MAX_DEPTH
+        valid_index = np.where(np.isfinite(density_anomaly_profile))[0]
+        return pressure[valid_index[-1]]
 
     mld = np.interp(
         sigma_mld,
         [density_anomaly_profile[index1], density_anomaly_profile[index2]],
         [pressure[index1], pressure[index2]]
     )
-    if mld <= MAX_DEPTH:
+    valid_index = np.where(np.isfinite(density_anomaly_profile))[0]
+    if mld <= pressure[valid_index[-1]]:
         return mld
-    return MAX_DEPTH
+    return pressure[valid_index[-1]]
 
 
 def _find_surface_density_anomaly_mean(ds: xr.Dataset) -> None:
