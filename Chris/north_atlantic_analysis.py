@@ -9,7 +9,7 @@ import pandas as pd
 from Chris.correlation_significance import get_significance
 from Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, get_save_name, \
     coriolis_parameter, get_month_from_time, plot_eof_for_regional_analysis, get_eofs, get_eof, get_monthly_eof, \
-    get_seasonal_eof
+    get_seasonal_eof, plot_lagged_correlation
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
 import matplotlib
@@ -35,8 +35,10 @@ gamma_0 = 15.0
 
 IMPLICIT_MODEL = True
 
-NA_LAT_BOUNDS = slice(0, 80)
-NA_LONG_BOUNDS = slice(-80, 10)
+NA_LAT_BOUNDS = slice(10, 60)
+NA_LONG_BOUNDS = slice(-75, -5)
+# NA_LAT_BOUNDS = slice(0, 80)
+# NA_LONG_BOUNDS = slice(-80, 10)
 
 NAO_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/nao.txt"
 save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION,
@@ -45,13 +47,13 @@ save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE
 IMPLICIT_SCHEME_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/" + save_name + ".nc"
 ARGO_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/RG_ArgoClim_Temperature_2019.nc"
 REYNOLDS_OBS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sst_anomalies-(2004-2018).nc"
-OBSERVATIONS_2025_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Mixed_Layer_Temperature_Anomalies-(2004-2025).nc"
+OBSERVATIONS_2025_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/reynolds_sst_Anomalies-(2004-2025)_no_2004.nc"
 
 model_da = xr.open_dataset(IMPLICIT_SCHEME_DATA_PATH, decode_times=False)["IMPLICIT"]
 model_da = model_da.sel(LATITUDE=NA_LAT_BOUNDS).sel(LONGITUDE=NA_LONG_BOUNDS)   # only take north atlantic
 
 if DATA_TO_2025:
-    obs_da = xr.open_dataset(OBSERVATIONS_2025_DATA_PATH, decode_times=False)['ANOMALY_ML_TEMPERATURE']
+    obs_da = xr.open_dataset(OBSERVATIONS_2025_DATA_PATH, decode_times=False)['ANOMALY_SST']
 else:
     obs_da = xr.open_dataset(REYNOLDS_OBS_DATA_PATH, decode_times=False)['anom']
 obs_da = obs_da.sel(LATITUDE=NA_LAT_BOUNDS).sel(LONGITUDE=NA_LONG_BOUNDS)
@@ -63,22 +65,22 @@ seasons = []
 for time in times:
     month = get_month_from_time(time)
     months.append(month)
-    # if month == 11 or month == 12 or month == 1:
-    #     seasons.append(0)
-    # if month == 2 or month == 3 or month == 4:
-    #     seasons.append(1)
-    # if month == 5 or month == 6 or month == 7:
-    #     seasons.append(2)
-    # if month == 8 or month == 9 or month == 10:
-    #     seasons.append(3)
-    if month == 2 or month == 12 or month == 1:
+    if month == 11 or month == 12 or month == 1:
         seasons.append(0)
-    if month == 5 or month == 3 or month == 4:
+    if month == 2 or month == 3 or month == 4:
         seasons.append(1)
-    if month == 8 or month == 6 or month == 7:
+    if month == 5 or month == 6 or month == 7:
         seasons.append(2)
-    if month == 11 or month == 9 or month == 10:
+    if month == 8 or month == 9 or month == 10:
         seasons.append(3)
+    # if month == 2 or month == 12 or month == 1:
+    #     seasons.append(0)
+    # if month == 5 or month == 3 or month == 4:
+    #     seasons.append(1)
+    # if month == 8 or month == 6 or month == 7:
+    #     seasons.append(2)
+    # if month == 11 or month == 9 or month == 10:
+    #     seasons.append(3)
 model_da = model_da.assign_coords(MONTH=("TIME", months))
 model_da = model_da.assign_coords(SEASON=("TIME", seasons))
 obs_da = obs_da.assign_coords(MONTH=("TIME", months))
@@ -124,8 +126,8 @@ def get_nat_index(model, is_obs=False):
     first_eof = get_eofs(model, 0, 1, map_mask=map_mask)[2]
     second_eof = get_eofs(model, 1, 2, map_mask=map_mask)[2]
     # make_movie(first_eof, -2, 2)
-    upper_long_range = slice(-45, -25)
-    upper_lat_range = slice(40, 60)
+    upper_long_range = slice(-45, -30)
+    upper_lat_range = slice(40, 52)
     lower_long_range = slice(-70, -50)
     lower_lat_range = slice(20, 40)
     # if is_obs:
@@ -171,7 +173,7 @@ def compare_nat(time, model_nat, obs_nat):
     plt.legend()
     plt.show()
 
-def compare_nat_nao(time, nat, nao):
+def compare_nat_nao(nat, nao, savepath):
     # plt.grid()
     # plt.plot(time, nat, label="NA Tripole Index")
     # plt.plot(time, nao, label="NA Oscillation Index")
@@ -183,6 +185,8 @@ def compare_nat_nao(time, nat, nao):
     dates = pd.date_range('2004-01', periods=len(nat), freq='MS')   # use datetime format for lags
     df = pd.DataFrame({'nat': nat, 'nao': nao}, index=dates)
     df = df.rolling(2, center=True).mean().dropna()     # smooth with rolling mean
+
+    # plot_lagged_correlation(df['nao'], df['nat'])
 
     month_name_list = {1: 'January', 2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June', 7: 'July', 8: 'August', 9: 'September', 10: 'October', 11: 'November', 12: 'December'}
 
@@ -210,18 +214,21 @@ def compare_nat_nao(time, nat, nao):
 
     fig.supxlabel('Lag (months)')
     fig.supylabel('Pearson Correlation Coefficient')
-    plt.suptitle('North Atlantic Tripole Index Correlation to North Atlantic Oscillation Index')
+    plt.suptitle("")
     plt.tight_layout()
+    plt.savefig(savepath, dpi=400)
     plt.show()
 
 nao_list = read_nao(NAO_DATA_PATH)
-# get_eof(model_da, obs=False, save_folder="north_atlantic_analysis/", map_mask=map_mask)
-# get_monthly_eof(model_da, obs=False, save_folder="north_atlantic_analysis/", map_mask=map_mask)
-# get_seasonal_eof(model_da, obs=False, save_folder="north_atlantic_analysis/", map_mask=map_mask)
+# get_eof(model_da, obs=False, obs_da=obs_da, save_folder="final_results/north_atlantic_analysis/", map_mask=map_mask)
+# get_eof(model_da, obs=True, obs_da=obs_da, save_folder="final_results/north_atlantic_analysis/", map_mask=map_mask)
+# get_monthly_eof(model_da, obs=False, obs_da=obs_da, save_folder="final_results/north_atlantic_analysis/", map_mask=map_mask)
+# get_seasonal_eof(model_da, obs=False, obs_da=obs_da, save_folder="final_results/north_atlantic_analysis/", map_mask=map_mask)
 nat_list = get_nat_index(model_da)
 nat_list_obs = get_nat_index(obs_da, is_obs=True)
 compare_nat((model_da.TIME.values / 12) + 2004, nat_list, nat_list_obs)
-compare_nat_nao((model_da.TIME.values / 12) + 2004, nat_list, nao_list)
+compare_nat_nao(nat_list, nao_list, "/Volumes/G-DRIVE ArmorATD/Extension/datasets/final_results/north_atlantic_analysis/nat_nao_corr.jpg")
+compare_nat_nao(nat_list, nat_list_obs, "/Volumes/G-DRIVE ArmorATD/Extension/datasets/final_results/north_atlantic_analysis/nat_nao_corr_obs.jpg")
 
 
 
