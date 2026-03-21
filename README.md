@@ -1,5 +1,5 @@
-# SSTA
-Sea Surface Temperature Anomalies - slab mixed layer model
+# SSTA & SSSA
+Sea Surface Temperature (Salinity) Anomalies - slab mixed layer model, component based
 
 MSci Project - Imperial College London, SPC-Czaja-1
 
@@ -17,7 +17,10 @@ This work is licensed under a
 [cc-by-nc-sa-shield]: https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg
 
 
-The Slab Mixed Layer Model:
+datasets used: Roemmich-Gilson Argo Climatology, ERA5, Reynolds SST (OISST)
+
+
+### The Slab Mixed Layer Model:
 ![image](_readme_archive/sml.png)
 
 
@@ -28,13 +31,15 @@ Results for Monthly Mean Mixed Layer Depth ($\bar{h}$) from RG-ARGO climatology:
 <video src="_readme_archive/hbar.mp4" loop="loop" controls preload></video>
 
 
-Sea Surface Temperature Anomaly (SSTA):
+### Sea Surface Temperature Anomaly (SSTA):
+
 Observed: Reynolds SSTA (LTM 2005-2025), Simulated: RGARGO mixed layer TA (LTM 2005-2025)
 
 [![Watch the video](_readme_archive/SSTA-compare.gif)](_readme_archive/SSTA-compare.gif)
 
 
-Sea Surface Salinity Anomaly (SSSA):
+### Sea Surface Salinity Anomaly (SSSA):
+
 Observed: RGARGO mixed layer SA (LTM 2005-2025), Simulated: RGARGO mixed layer SA (LTM 2005-2025)
 
 [![Watch the video](_readme_archive/SSSA-compare.gif)](_readme_archive/SSSA-compare.gif)
