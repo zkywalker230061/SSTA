@@ -453,7 +453,7 @@ plt.ylim(0, 0.5)
 plt.ylabel('Fractional Contribution')
 plt.ylim(0)
 plt.legend(frameon=False, ncols=3, fontsize=8)
-plt.title(r'$\gamma = 15$, Spatially Weighted', fontsize=15, loc='left')
+plt.title(r'$\gamma$'+f' = {LAMBDA_A}, Spatially Weighted', fontsize=15, loc='left')
 plt.show()
 
 surface_rad_fraction_monthly_mean = [np.mean(surface_rad_fraction[i::12]) for i in range(12)]
@@ -464,31 +464,31 @@ geo_fraction_monthly_mean = [np.mean(geo_fraction[i::12]) for i in range(12)]
 wind_fraction_monthly_mean = [np.mean(wind_fraction[i::12]) for i in range(12)]
 
 plt.figure(figsize=(5, 5), dpi=600)
-x = np.arange(1, 13)
+months = np.arange(1, 13)
 plt.plot(
-    x, surface_rad_fraction_monthly_mean,
+    months, surface_rad_fraction_monthly_mean,
     label='Radiation', color='#d8031c', alpha=0.8
 )
 plt.plot(
-    x, entrainment_fraction_monthly_mean,
+    months, entrainment_fraction_monthly_mean,
     label='Entrainment', color='#66CCFF', alpha=0.8
 )
 plt.plot(
-    x, geo_fraction_monthly_mean,
+    months, geo_fraction_monthly_mean,
     label='Geostrophic', color='#ffb703', alpha=0.8
 )
 if wind:
     plt.plot(
-        x, wind_fraction_monthly_mean,
+        months, wind_fraction_monthly_mean,
         label='Wind (Turbulence + Ekman)', color='#39C5BB', alpha=0.8
     )
 else:
     plt.plot(
-        x, surface_turb_fraction_monthly_mean,
+        months, surface_turb_fraction_monthly_mean,
         label='Turbulence', color='#006400', alpha=0.8
     )
     plt.plot(
-        x, ekman_fraction_monthly_mean,
+        months, ekman_fraction_monthly_mean,
         label='Ekman', color='#39C5BB', alpha=0.8
     )
 plt.xlabel('Month', loc='right')
@@ -500,7 +500,6 @@ plt.show()
 
 
 # # spatial mean plot
-# # ----------------------------------------------------------------------------
 # t_m_a_simulated = t_m_a_simulated.where(
 #     (t_m_a_simulated['LATITUDE'] > 15) | (t_m_a_simulated['LATITUDE'] < -15), 0
 # )
@@ -557,19 +556,67 @@ plt.show()
 # # plt.xscale('log', base=2)
 # plt.show()
 
-# # autocorrelation plot
-# autocorr_points_simulated = []
-# autocorr_points_observed = []
-# for lon, lat in zip(t_m_a_simulated['LONGITUDE'], t_m_a_simulated['LATITUDE']):
-#     autocorr_point_simulated = acf(t_m_a_simulated.sel(LONGITUDE=lon, LATITUDE=lat), nlags=36)
-#     autocorr_point_observed = acf(t_m_a_reynolds.sel(LONGITUDE=lon, LATITUDE=lat), nlags=36)
-#     if not np.isnan(autocorr_point_simulated).all():
-#         autocorr_points_simulated.append(autocorr_point_simulated)
-#     if not np.isnan(autocorr_point_observed).all():
-#         autocorr_points_observed.append(autocorr_point_observed)
-# autocorr_points_simulated = np.array(autocorr_points_simulated)
-# autocorr_points_observed = np.array(autocorr_points_observed)
-# plt.plot(autocorr_points_simulated.mean(axis=0), label='Simulated')
-# plt.plot(autocorr_points_observed.mean(axis=0), label='Observed')
-# plt.legend()
-# plt.show()
+# autocorrelation plot
+# ----------------------------------------------------------------------------
+reynolds_raw = load_and_prepare_dataset(
+    "datasets/Reynolds/sst.mon.anom.2004-2025.nc"
+)['anom']
+
+t_m_a_simulated = t_m_a_simulated.where(
+    (t_m_a_simulated['LATITUDE'] > 15) | (t_m_a_simulated['LATITUDE'] < -15), 0
+)
+t_m_a_reynolds = t_m_a_reynolds.where(
+    (t_m_a_reynolds['LATITUDE'] > 15) | (t_m_a_reynolds['LATITUDE'] < -15), 0
+)
+reynolds_raw = reynolds_raw.where(
+    (reynolds_raw['LATITUDE'] > 15) | (reynolds_raw['LATITUDE'] < -15), 0
+)
+
+basins = regionmask.defined_regions.natural_earth_v5_1_2.ocean_basins_50
+mask = basins.mask(t_m_a['LONGITUDE'], t_m_a['LATITUDE'])
+mask_numer = 2
+test_region = t_m_a_simulated.where(mask == mask_numer)
+
+autocorr_points_simulated = []
+autocorr_points_observed = []
+autocorr_points_observed_raw = []
+# for lon, lat in zip(test_region['LONGITUDE'], test_region['LATITUDE']):
+for lon, lat in zip(t_m_a_simulated['LONGITUDE'], t_m_a_simulated['LATITUDE']):
+    autocorr_point_simulated = acf(t_m_a_simulated.sel(LONGITUDE=lon, LATITUDE=lat), nlags=25)
+    autocorr_point_observed = acf(t_m_a_reynolds.sel(LONGITUDE=lon, LATITUDE=lat), nlags=25)
+    autocorr_point_observed_raw = acf(reynolds_raw.sel(LONGITUDE=lon, LATITUDE=lat), nlags=25)
+    if not np.isnan(autocorr_point_simulated).all():
+        autocorr_points_simulated.append(autocorr_point_simulated)
+    if not np.isnan(autocorr_point_observed).all():
+        autocorr_points_observed.append(autocorr_point_observed)
+    if not np.isnan(autocorr_point_observed_raw).all():
+        autocorr_points_observed_raw.append(autocorr_point_observed_raw)
+autocorr_points_simulated = np.array(autocorr_points_simulated)
+autocorr_points_observed = np.array(autocorr_points_observed)
+autocorr_points_observed_raw = np.array(autocorr_points_observed_raw)
+
+plt.figure(figsize=(5, 5), dpi=600)
+plt.plot(
+    autocorr_points_simulated.mean(axis=0),
+    label='Simulated (2005-2025 LTM)',
+    color='#EE0000', alpha=0.8
+)
+plt.plot(
+    autocorr_points_observed.mean(axis=0),
+    label='Observed - Reynolds SSTA (2005-2025 LTM)',
+    color='#66CCFF', alpha=0.8
+)
+plt.plot(
+    autocorr_points_observed_raw.mean(axis=0),
+    label='Observed - Reynolds SSTA (1971-2020 LTM)',
+    color='#66CCFF', alpha=0.5, linestyle='--'
+)
+
+plt.xlim(0, 25)
+plt.xlabel('lag (months)', loc='right')
+plt.ylim(-0.2, 1)
+
+plt.legend(frameon=False)
+plt.title(r'$\gamma$'+f' = {LAMBDA_A}, 15°N-15°S Excluded', fontsize=15, loc='left')
+
+plt.show()

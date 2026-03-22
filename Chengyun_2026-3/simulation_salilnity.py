@@ -416,21 +416,21 @@ geo_fraction_monthly_mean = [np.mean(geo_fraction[i::12]) for i in range(12)]
 wind_fraction_monthly_mean = [np.mean(wind_fraction[i::12]) for i in range(12)]
 
 plt.figure(figsize=(5, 5), dpi=600)
-x = np.arange(1, 13)
+months = np.arange(1, 13)
 plt.plot(
-    x, surface_fraction_monthly_mean,
+    months, surface_fraction_monthly_mean,
     label='Surface', color='#d8031c', alpha=0.8
 )
 plt.plot(
-    x, entrainment_fraction_monthly_mean,
+    months, entrainment_fraction_monthly_mean,
     label='Entrainment', color='#66CCFF', alpha=0.8
 )
 plt.plot(
-    x, ekman_fraction_monthly_mean,
+    months, ekman_fraction_monthly_mean,
     label='Ekman', color='#39C5BB', alpha=0.8
 )
 plt.plot(
-    x, geo_fraction_monthly_mean,
+    months, geo_fraction_monthly_mean,
     label='Geostrophic', color='#ffb703', alpha=0.8
 )
 plt.xlabel('Month', loc='right')
@@ -441,7 +441,6 @@ plt.title('North Atlantic', fontsize=15, loc='left')
 plt.show()
 
 # # spatial mean plot
-# # ----------------------------------------------------------------------------
 # s_m_a_simulated = s_m_a_simulated.where(
 #     (s_m_a_simulated['LATITUDE'] > 20) | (s_m_a_simulated['LATITUDE'] < -20), 0
 # )
@@ -498,27 +497,56 @@ plt.show()
 # # plt.xscale('log', base=2)
 # plt.show()
 
-# # autocorrelation plot
-# autocorr_points_simulated = []
-# autocorr_points_observed = []
-# for lon, lat in zip(s_m_a_simulated['LONGITUDE'], s_m_a_simulated['LATITUDE']):
-#     # if lat > 0:
-#     #     continue  # only plot for southern hemisphere
-#     # if lat < 0:
-#     #     continue  # only plot for northern hemisphere
-#     autocorr_point_simulated = acf(s_m_a_simulated.sel(LONGITUDE=lon, LATITUDE=lat), nlags=36)
-#     autocorr_point_observed = acf(s_m_a.sel(LONGITUDE=lon, LATITUDE=lat), nlags=36)
-#     if not np.isnan(autocorr_point_simulated).all():
-#         autocorr_points_simulated.append(autocorr_point_simulated)
-#     if not np.isnan(autocorr_point_observed).all():
-#         autocorr_points_observed.append(autocorr_point_observed)
-# autocorr_points_simulated = np.array(autocorr_points_simulated)
-# autocorr_points_observed = np.array(autocorr_points_observed)
-# plt.plot(autocorr_points_simulated.mean(axis=0), label='Simulated')
-# plt.plot(autocorr_points_observed.mean(axis=0), label='Observed')
-# plt.legend()
-# plt.show()
+# autocorrelation plot
+# ----------------------------------------------------------------------------
+s_m_a_simulated = s_m_a_simulated.where(
+    (s_m_a_simulated['LATITUDE'] > 15) | (s_m_a_simulated['LATITUDE'] < -15), 0
+)
+s_m_a_ = s_m_a.where(
+    (s_m_a['LATITUDE'] > 15) | (s_m_a['LATITUDE'] < -15), 0
+)
 
+basins = regionmask.defined_regions.natural_earth_v5_1_2.ocean_basins_50
+mask = basins.mask(s_m_a['LONGITUDE'], s_m_a['LATITUDE'])
+mask_numer = 2
+test_region = s_m_a_simulated.where(mask == mask_numer)
+
+autocorr_points_simulated = []
+autocorr_points_observed = []
+# for lon, lat in zip(test_region['LONGITUDE'], test_region['LATITUDE']):
+for lon, lat in zip(s_m_a_simulated['LONGITUDE'], s_m_a_simulated['LATITUDE']):
+    autocorr_point_simulated = acf(s_m_a_simulated.sel(LONGITUDE=lon, LATITUDE=lat), nlags=25)
+    autocorr_point_observed = acf(s_m_a_.sel(LONGITUDE=lon, LATITUDE=lat), nlags=25)
+    if not np.isnan(autocorr_point_simulated).all():
+        autocorr_points_simulated.append(autocorr_point_simulated)
+    if not np.isnan(autocorr_point_observed).all():
+        autocorr_points_observed.append(autocorr_point_observed)
+autocorr_points_simulated = np.array(autocorr_points_simulated)
+autocorr_points_observed = np.array(autocorr_points_observed)
+
+plt.figure(figsize=(5, 5), dpi=600)
+plt.plot(
+    autocorr_points_simulated.mean(axis=0),
+    label='Simulated (2005-2025 LTM)',
+    color='#EE0000', alpha=0.8
+)
+plt.plot(
+    autocorr_points_observed.mean(axis=0),
+    label='Observed (2005-2025 LTM)',
+    color='#66CCFF', alpha=0.8
+)
+
+plt.xlim(0, 25)
+plt.xlabel('lag (months)', loc='right')
+plt.ylim(-0.2, 1)
+
+plt.legend(frameon=False)
+plt.title(r'$\gamma$'+f' = {GAMMA}, 15°N-15°S Excluded', fontsize=15, loc='left')
+
+plt.show()
+
+
+# something todo
 # precipitation_a = -q_surface_ds['ANOMALY_avg_tprate'].where(
 #     ~np.isnan(s_m_monthly_mean)
 # )
