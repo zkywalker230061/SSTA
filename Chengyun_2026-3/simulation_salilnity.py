@@ -442,11 +442,11 @@ plt.show()
 
 # # spatial mean plot
 # s_m_a_simulated = s_m_a_simulated.where(
-#     (s_m_a_simulated['LATITUDE'] > 20) | (s_m_a_simulated['LATITUDE'] < -20), 0
+#     (s_m_a_simulated['LATITUDE'] > 15) | (s_m_a_simulated['LATITUDE'] < -15), 0
 # )
 # s_m_a_simulated_spatial_mean = s_m_a_simulated.mean(dim=['LONGITUDE', 'LATITUDE'])
 # s_m_a = s_m_a.where(
-#     (s_m_a['LATITUDE'] > 20) | (s_m_a['LATITUDE'] < -20), 0
+#     (s_m_a['LATITUDE'] > 15) | (s_m_a['LATITUDE'] < -15), 0
 # )
 # s_m_a_spatial_mean = s_m_a.mean(dim=['LONGITUDE', 'LATITUDE'])
 # plt.plot(s_m_a_simulated_spatial_mean['TIME'], s_m_a_simulated_spatial_mean, label='Simulated')
