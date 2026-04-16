@@ -34,18 +34,36 @@ q_surface_ds = load_and_prepare_dataset(
     "datasets/Simulation-Surface_Water_Rate-(2004-2025).nc"
 )  # negative for evaporation, positive for precipitation
 
+q_surface_monthly_mean_ds = load_and_prepare_dataset(
+    "datasets/Surface_Water_Rate-Clim_Mean.nc"
+)
+
+q_surface_monthly_mean = xr.concat(
+    [q_surface_monthly_mean_ds] * 22, dim='MONTH'
+).reset_coords(drop=True)
+q_surface_monthly_mean = q_surface_monthly_mean.rename({'MONTH': 'TIME'})
+q_surface_monthly_mean['TIME'] = q_surface_ds.TIME
+
+s_m_a = load_and_prepare_dataset(
+    "datasets/Mixed_Layer_Salinity_Anomalies-(2004-2025).nc"
+)['ANOMALY_ML_SALINITY']
+s_m_a = s_m_a.drop_vars('MONTH')
+
 s_m_monthly_mean = load_and_prepare_dataset(
     'datasets/Mixed_Layer_Salinity-Clim_Mean.nc'
 )['MONTHLY_MEAN_ML_SALINITY']
 
 s_m_monthly_mean = xr.concat([s_m_monthly_mean] * 22, dim='MONTH').reset_coords(drop=True)
 s_m_monthly_mean = s_m_monthly_mean.rename({'MONTH': 'TIME'})
-s_m_monthly_mean['TIME'] = q_surface_ds.TIME
+s_m_monthly_mean['TIME'] = s_m_a.TIME
 
-q_surface = (
-    - q_surface_ds['ANOMALY_avg_ie']  # negative sign to retrive E'
-    - q_surface_ds['ANOMALY_avg_tprate']  # negative to subtract P'
-) * s_m_monthly_mean  # (E' - P') * S_bar
+q_surface = -(
+    (q_surface_ds['ANOMALY_avg_ie'] + q_surface_ds['ANOMALY_avg_tprate'])
+    * s_m_monthly_mean  # (E' + P') * S_bar
+    + (q_surface_monthly_mean['MONTHLY_MEAN_avg_ie']
+       + q_surface_monthly_mean['MONTHLY_MEAN_avg_tprate'])
+    * s_m_a  # (E + P) * S'
+)
 
 q_surface = q_surface.drop_vars('MONTH')
 q_surface.name = 'ANOMALY_SURFACE_WATER_RATE'
@@ -79,11 +97,6 @@ w_e_monthly_mean = load_and_prepare_dataset(
 if not ENTRAINMENT:
     q_entrainment = q_entrainment - q_entrainment
     w_e_monthly_mean = w_e_monthly_mean - w_e_monthly_mean
-
-s_m_a = load_and_prepare_dataset(
-    "datasets/Mixed_Layer_Salinity_Anomalies-(2004-2025).nc"
-)['ANOMALY_ML_SALINITY']
-s_m_a = s_m_a.drop_vars('MONTH')
 
 s_sub_a = load_and_prepare_dataset(
     "datasets/Sub_Layer_Salinity_Anomalies-(2004-2025).nc"
