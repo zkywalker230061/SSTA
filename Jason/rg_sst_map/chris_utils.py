@@ -13,6 +13,7 @@ from scipy.linalg import svd
 #from ppca import PPCA
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+from scipy.stats import kurtosis
 
 matplotlib.use('TkAgg')
 
@@ -392,7 +393,7 @@ def format_cartopy_axis(ax):
     """
     Adds coastlines, land features, and gridlines to a Cartopy axis
     """
-    ax.add_feature(cfeature.COASTLINE, linewidth=0.5)
+    ax.add_feature(cfeature.COASTLINE, linewidth=0.7)
     ax.add_feature(cfeature.LAND, facecolor="lightgrey", edgecolor='none', zorder=1)
 
     gl = ax.gridlines(crs = ccrs.PlateCarree(), draw_labels=True,
@@ -501,16 +502,16 @@ def make_movie_all_models(obs_ds, data_ds, vmin, vmax, savepath=None):
             
             # Calculate Instantaneous RMSE
             # Formula: sqrt(mean((model - obs)^2))
-            error = model_frame - obs_frame
-            rmse_val = np.sqrt((error**2).mean()).values.item()
+            # error = model_frame - obs_frame
+            # rmse_val = np.sqrt((error**2).mean()).values.item()
             
-            # Update the specific text object
-            rmse_labels[i].set_text(f"RMSE: {rmse_val:.4f}")
+            # # Update the specific text object
+            # rmse_labels[i].set_text(f"RMSE: {rmse_val:.4f}")
 
         fig.suptitle(f"Date: {year}-{month:02d}", fontsize=22, fontweight='bold')
         
         # Return all objects that changed
-        return quads + rmse_labels
+        return quads 
 
     ani = FuncAnimation(fig, update, frames=len(times), interval=200, blit=False)
     
@@ -726,7 +727,7 @@ def compute_upwind_advection(working_anom, u, v, dx, dy, delta_t):
 
     return div_total / substeps
 
-def calculate_RMSE_normalised (obs, model, dim = 'TIME'):
+def calculate_RMSE_normalised (obs, model, dim = 'TIME', ENSO_mask =False):
     """
     Calculates Root Mean Square Error.
     Formula: sqrt( mean( (obs - model)^2 ) )
@@ -737,12 +738,17 @@ def calculate_RMSE_normalised (obs, model, dim = 'TIME'):
     model = model.isel(TIME=slice(1,None))
     obs = obs.isel(TIME=slice(1,None))
 
-    mask_condition = (abs(model["LATITUDE"]) > 15)
-    model_mask = model.where(mask_condition)
-    obs_mask = obs.where(mask_condition)
+    #Keep variables the same
+    model_mask = model
+    obs_mask = obs
 
-    # model_adjusted = model[model_mask]
-    # obs_adjusted = obs[obs_mask]
+
+    if ENSO_mask:
+        mask_condition = (abs(model["LATITUDE"]) > 15)
+        model_mask = model.where(mask_condition)
+        obs_mask = obs.where(mask_condition)
+
+    
 
 
     error = model_mask - obs_mask
@@ -755,7 +761,9 @@ def calculate_RMSE_normalised (obs, model, dim = 'TIME'):
     normal_rmse = np.sqrt(normal_mean_squared_error)
 
     weights = np.cos(np.deg2rad(mean_squared_error.LATITUDE))
-    weights = weights.where(mask_condition).fillna(0)
+    if ENSO_mask:
+        weights = weights.where(mask_condition).fillna(0)
+
     weighted_mse = mean_squared_error.weighted(weights).mean(dim=("LATITUDE", "LONGITUDE"))
     global_weighted_rmse = float(np.sqrt(weighted_mse))
 
@@ -829,4 +837,58 @@ def decompose_mse(obs, model, dim='TIME'):
         "phase": phase_err,
         "total": total_mse
     }
+
+
+def block_bootstrap_kurtosis(data, block_size=1000, n_iterations=1000):
+    """
+    Performs block bootstrapping to estimate the distribution of kurtosis.
+    data: 1D array of errors
+    block_size: Number of contiguous points per block (to preserve local correlation)
+    n_iterations: Number of bootstrap samples
+    """
+    n = len(data)
+    n_blocks = n // block_size
+    boot_kurtosis = []
+
+    print(f"Starting bootstrap with {n_iterations} iterations...")
+    for _ in range(n_iterations):
+        # Randomly select starting indices for blocks
+        start_indices = np.random.randint(0, n - block_size, size=n_blocks)
+        
+        # Create the bootstrap sample by concatenating blocks
+        sample = np.concatenate([data[i:i + block_size] for i in start_indices])
+        
+        # Calculate kurtosis (Fisher’s definition: normal = 0)
+        # Use fisher=False if you want the Pearson definition (normal = 3)
+        boot_kurtosis.append(kurtosis(sample, fisher=True))
+        
+    return np.array(boot_kurtosis)
+
+def autocorrelation_map(da, max_lag=36):
+    # 1. Calculate weights based on latitude
+    # This assumes your latitude dimension is named 'LATITUDE'
+    weights = np.cos(np.deg2rad(da.LATITUDE))
+    
+    # 2. Center the data and calculate variance across TIME
+    da_centered = da - da.mean('TIME')
+    variance = (da_centered**2).sum('TIME')
+    
+    avg_acf = []
+    lags = np.arange(max_lag + 1)
+    
+    for lag in lags:
+        # Calculate covariance map for this lag
+        covariance_map = (da_centered * da_centered.shift(TIME=lag)).sum('TIME')
+        
+        # Calculate correlation map (Pearson r at every grid point)
+        correlation_map = covariance_map / variance
+        
+        # 3. Compute the AREA-WEIGHTED spatial mean
+        # We apply weights to the correlation map, masking where data is NaN
+        weighted_map = correlation_map.weighted(weights.fillna(0))
+        global_mean_cor = weighted_map.mean(dim=['LATITUDE', 'LONGITUDE'], skipna=True).values
+        
+        avg_acf.append(global_mean_cor)
+    
+    return lags, avg_acf
 

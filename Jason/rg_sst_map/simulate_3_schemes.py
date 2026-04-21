@@ -19,7 +19,8 @@ from chris_utils import calculate_RMSE_normalised, get_clean_error_distribution,
 from scipy.stats import skew, kurtosis, norm
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-
+from chris_utils import block_bootstrap_kurtosis, autocorrelation_map
+import matplotlib.colors as mcolors
 
 plt.rcParams['animation.ffmpeg_path'] = r'C:\ffmpeg\bin\ffmpeg.exe'
 
@@ -44,15 +45,15 @@ USE_DOWNLOADED_SSH = False
 
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN_ANOM_ADVECTION = True
-INCLUDE_EKMAN_MEAN_ADVECTION = False
+INCLUDE_EKMAN_MEAN_ADVECTION = True
 INCLUDE_ENTRAINMENT = True
-INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = False
-INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = False
+INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
+INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
 
 
 # Display And/Or Save Simulation Settings 
-EQUATOR_MASK = True
-SHOW_SIMULATIONS = True
+EQUATOR_MASK = False
+SHOW_SIMULATIONS = False
 SAVE_SIMULATIONS = False
 
 # Statistical Analysis Settings
@@ -60,6 +61,8 @@ COMPUTE_NRMSE = False
 COMPUTE_PDF_ANALYSIS = False
 COMPUTE_MSE_DECOMPOSITION = False
 COMPUTE_PRINCIPAL_COMPONENT = False
+COMPUTE_SPIN_UP_PERIOD = False
+COMPUTE_PDF_ANALYSIS_REPORT = True
 
 # ----------1. Defining Physical Parameters for Simulations ---------------------
 explicit_stability_limit = 1e-7
@@ -291,13 +294,13 @@ if INCLUDE_EKMAN_MEAN_ADVECTION:
                    ekman_mean_advection["ekman_beta_grad_lat"])
 
 
-print(f"Stability Limit for Explicit (0.9/dt): {0.9/delta_t:.2e} s^-1")
-print("Testing how many points will be too fast for the implicit scheme")
-stable_lim = 0.9 / delta_t
-test_a = (gamma_0 / (rho_0 * c_0 * hbar_da)) + div_v_mean
-exceeded_points = test_a.where((test_a > stable_lim) & (hbar_da >0)).count().values
-total_points = hbar_da.where(hbar_da > 0).count().values
-print(f"Percentage of Unstable Ocean: {(exceeded_points/total_points) * 100:2f}%")
+# print(f"Stability Limit for Explicit (0.9/dt): {0.9/delta_t:.2e} s^-1")
+# print("Testing how many points will be too fast for the implicit scheme")
+# stable_lim = 0.9 / delta_t
+# test_a = (gamma_0 / (rho_0 * c_0 * hbar_da)) + div_v_mean
+# exceeded_points = test_a.where((test_a > stable_lim) & (hbar_da >0)).count().values
+# total_points = hbar_da.where(hbar_da > 0).count().values
+# print(f"Percentage of Unstable Ocean: {(exceeded_points/total_points) * 100:2f}%")
 
 #----------7. Time Stepping (Actual Running of Simulations)----------------
 if COMPUTE_SIM:
@@ -406,10 +409,10 @@ if COMPUTE_SIM:
     datasets_to_merge = []
     # Merge the 3 primary numerical schemes
     scheme_configs = [
-    (COMPUTE_IMP, implicit_model_anomalies, "Implicit Scheme"),
     (COMPUTE_EXP, explicit_model_anomalies, "Explicit Scheme"),
-    (COMPUTE_SIMP, semi_implicit_model_anomalies, "Semi-Implicit Scheme")
-]
+    (COMPUTE_SIMP, semi_implicit_model_anomalies, "Semi-Implicit Scheme"),
+    (COMPUTE_IMP, implicit_model_anomalies, "Implicit Scheme")
+    ]
 
     for active, anomaly_list, name in scheme_configs:
         if active and anomaly_list:
@@ -431,10 +434,11 @@ if COMPUTE_SIM:
             
             # 4. Prepare for final merge
             final_ds = recentered_da.rename(name).to_dataset()
+
             if EQUATOR_MASK:
                 mask = abs(final_ds.LATITUDE) > 15
-                final_ds.where(mask)
-                
+                final_ds = final_ds.where(mask)
+
             datasets_to_merge.append(final_ds)
             
             # Free memory of temporary lists
@@ -470,9 +474,11 @@ if COMPUTE_SIM:
             else:
                 make_movie(data_array, -3, 3, colorbar_label="Temperature Anomaly (K)")
         
-        if len(all_models.data_vars) == 3:
-            path_to_save = r"C:\Users\jason\MSciProject\Viva\All_Schemes_Temp_Anomaly.mp4"
-            make_movie_all_models(reynolds_anom, all_models, -3, 3)
+
+        # if len(all_models.data_vars) == 3:
+        #     path_to_save = r"C:\Users\jason\MSciProject\Viva\All_Schemes_Temp_Anomaly_Mask.mp4"
+        #     reynolds_anom = reynolds_anom.where(abs(reynolds_anom.LATITUDE) > 15)
+        #     make_movie_all_models(reynolds_anom, all_models, -3, 3, savepath=path_to_save)
     # all_models.to_netcdf(r"C:\Users\jason\MSciProject\SSTA_All_Schemes_Final.nc")
 
 if not COMPUTE_SIM:
@@ -514,22 +520,47 @@ if not COMPUTE_SIM:
 #     }
 
 if COMPUTE_NRMSE:
-    for scheme_name in all_models.data_vars:
-        model_da = all_models[scheme_name]
-        # fig, axes = plt.subplots(1, 1, figsize=(12,7))
-        fig, axes = plt.subplots(subplot_kw={'projection': ccrs.PlateCarree()}, figsize=(10,6))
-        format_cartopy_axis(axes)
-        rmse_map, global_score = calculate_RMSE_normalised(reynolds_anom, model_da, dim='TIME')
-        mesh = rmse_map.plot(
-            ax=axes,
-            transform=ccrs.PlateCarree(),
-            cmap='nipy_spectral',
-            vmin=0, vmax=2,
-            add_labels=False,
-            cbar_kwargs={'label': 'Normalised RMSE (a.u.)', 'pad': 0.05, 'shrink':0.7}
-        )
+    num_schemes = len(all_models.data_vars)
+    fig, axes = plt.subplots(num_schemes, 1,
+                             subplot_kw={'projection': ccrs.PlateCarree()},
+                             figsize=(10,12), constrained_layout=True, dpi=300)
+    
+    div_norm = mcolors.TwoSlopeNorm(vmin=0.0, vcenter=1.0, vmax=2.0)
 
-        axes.set_title(f'{scheme_name}\nGlobal Score: {global_score:.4f}', fontsize=16)
+    for i, scheme_name in enumerate(all_models.data_vars):
+        model_da = all_models[scheme_name]
+        ax = axes[i]
+        # fig, axes = plt.subplots(1, 1, figsize=(12,7))
+        # fig, axes = plt.subplots(subplot_kw={'projection': ccrs.PlateCarree()}, figsize=(10,6))
+        format_cartopy_axis(ax)
+        ax.add_feature(cfeature.LAND, facecolor='lightgray', zorder=2)
+        ax.set_facecolor('#dcdcdc')
+        ax.coastlines(resolution='110m', color='black', linewidth=0.8, zorder=3)
+        rmse_map, global_score = calculate_RMSE_normalised(reynolds_anom, model_da, dim='TIME', ENSO_mask=False)
+        mesh = rmse_map.plot(
+            ax=ax,
+            transform=ccrs.PlateCarree(),
+            cmap='RdBu_r',
+            norm=div_norm,
+            add_labels=False,
+            add_colorbar=False
+            )
+        ax.tick_params(axis='both', labelsize=12)
+        ax.set_title(f'{scheme_name}', fontsize=18, fontweight='bold', pad=10)
+        # Stack 2D into 1D to find the global index
+        stacked = rmse_map.stack(point=['LATITUDE', 'LONGITUDE'])
+
+        # Find the point index for min and max
+        min_point = stacked.idxmin().item()
+        max_point = stacked.idxmax().item()
+
+        # min_point and max_point are now tuples: (lat_val, lon_val)
+        min_lat, min_lon = min_point
+        max_lat, max_lon = max_point
+
+        print(f"Min RMSE: {rmse_map.min().item():.4f} at Lat: {min_lat}, Lon: {min_lon}")
+        print(f"Max RMSE: {rmse_map.max().item():.4f} at Lat: {max_lat}, Lon: {max_lon}")
+        print(global_score)
         
         # Plotting
         # ax = plt.subplot(3, 2, i + 1)
@@ -538,21 +569,31 @@ if COMPUTE_NRMSE:
         # axes.set_ylabel("Lattitude")
         # axes.set_title(f'{scheme_name} Scheme - Normalised RMSE')
         
-        metadata_str = (
-            f"Gamma = {gamma_0}\n"
-            f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
-            f"INCLUDE_EKMAN_ANOM = {INCLUDE_EKMAN_ANOM_ADVECTION}\n"
-            f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
-            f"INCLUDE_GEOSTROPHIC_ANOM = {INCLUDE_GEOSTROPHIC_ANOM_ADVECTION}\n"
-            f"INCLUDE_GEOSTROPHIC_MEAN_ADV = {INCLUDE_GEOSTROPHIC_MEAN_ADVECTION}\n"
-            f"INCLUDE_EKMAN_MEAN_ADV = {INCLUDE_EKMAN_MEAN_ADVECTION}"
-        )
+        # metadata_str = (
+        #     f"Gamma = {gamma_0}\n"
+        #     f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
+        #     f"INCLUDE_EKMAN_ANOM = {INCLUDE_EKMAN_ANOM_ADVECTION}\n"
+        #     f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
+        #     f"INCLUDE_GEOSTROPHIC_ANOM = {INCLUDE_GEOSTROPHIC_ANOM_ADVECTION}\n"
+        #     f"INCLUDE_GEOSTROPHIC_MEAN_ADV = {INCLUDE_GEOSTROPHIC_MEAN_ADVECTION}\n"
+        #     f"INCLUDE_EKMAN_MEAN_ADV = {INCLUDE_EKMAN_MEAN_ADVECTION}"
+        # )
 
-        fig.text(0.98, 0.02, metadata_str, ha='right', va='bottom',
-                 fontsize=10, bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
-        plt.tight_layout()
-        plt.show()
+        # fig.text(0.98, 0.02, metadata_str, ha='right', va='bottom',
+        #          fontsize=10, bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
 
+    # cbar_ax = fig.add_axes([0.85, 0.15, 0.03, 0.7]) # [left, bottom, width, height]
+    # cbar = fig.colorbar(mesh, cax=cbar_ax)
+    # cbar.set_label('Normalised RMSE (a.u.)', fontsize=12, fontweight='bold')
+
+    cbar = fig.colorbar(mesh, ax=axes, orientation='vertical', 
+                        fraction=0.046, pad=0.04, shrink=0.8, extend='max')
+    cbar.set_label('Normalised RMSE (a.u.)', fontsize=14, fontweight='bold')
+    #plt.savefig(r'C:\Users\jason\MSciProject\Viva\Centered_NRMSE_Maps_2.png', dpi=300, bbox_inches='tight', transparent=True)
+    plt.savefig(r'C:\Users\jason\MSciProject\Report Figures\NRMSE_All_Terms_Autosave_Border_Adjusted_2.png', bbox_inches='tight')
+    plt.show()
+
+        
 if COMPUTE_PDF_ANALYSIS:
     error_distributions = {}
     print("Calculating errors for all schemes...")
@@ -563,60 +604,160 @@ if COMPUTE_PDF_ANALYSIS:
         error_distributions[scheme_name] = get_clean_error_distribution(data, reynolds_anom, exclude_tropics=True)
 
     num_schemes = len(all_models.data_vars)
-    cols = 2
+    cols = 1
     rows = int(np.ceil(num_schemes / cols))
 
-    fig, axes = plt.subplots(rows, cols, figsize=(15, 6 * rows), constrained_layout=True)
+    fig, axes = plt.subplots(rows, cols, figsize=(18, 3 * rows), sharex=True, constrained_layout=True)
     axes_flat = axes.flatten()
 
     for i, (name, err_data) in enumerate(error_distributions.items()):
         ax = axes_flat[i]
         
-        # 1. Plot Histogram
-        sns.kdeplot(err_data, bw_adjust=1.0, label=name, ax=ax)
-        
-        # 2. Calculate Percentiles
-        # The middle 50% lies between the 25th and 75th percentiles
-        q25, q75 = np.percentile(err_data, [25, 75])
-        
-        # 3. Add Shaded Region for Middle 50%
-        # axvspan draws a vertical span (rectangle) across the plot
-        ax.axvspan(q25, q75, color='green', alpha=0.2, label='Middle 50% (IQR)')
-        ax.axvline(q25, color='green', linestyle=':', linewidth=1.5)
-        ax.axvline(q75, color='green', linestyle=':', linewidth=1.5)
+        # 1. High-resolution KDE
+        sns.kdeplot(err_data, bw_adjust=1.5, gridsize=1000, 
+                    color='royalblue', fill=True, alpha=0.2, ax=ax, label='Error PDF')
 
-        ax.axvline(np.min(err_data), color='firebrick', linestyle='--', alpha=0.6, label=f'Min: {np.min(err_data):.2e}')
-        ax.axvline(np.max(err_data), color='darkorange', linestyle='--', alpha=0.6, label=f'Max: {np.max(err_data):.2e}')
-        
-        # 4. Add Reference Lines
-        ax.axvline(0, color='black', linewidth=1, alpha=0.5)
+        mean, std = np.mean(err_data), np.std(err_data)
+        x_range = np.linspace(-3, 3, 200)
+        ax.plot(x_range, norm.pdf(x_range, mean, std), color='black', linestyle='--', alpha=0.6, label='Normal Distrubution Fit')
+        # 2. Statistics
+        q10, q90 = np.percentile(err_data, [10, 90])
+        width = q90 - q10
 
-        # 5. Formatting & Annotations
-        ax.set_title(f"{name} Scheme Error Distribution")
-        ax.set_xlabel("Error (K)")
-        ax.set_ylabel("Frequency")
+        # 3. Shading and Labeling
+        ax.axvspan(q10, q90, color='forestgreen', alpha=0.15, label=f'90% Range ({width:.3f} K)')
+        ax.axvline(q10, color='forestgreen', linestyle='--', linewidth=1)
+        ax.axvline(q90, color='forestgreen', linestyle='--', linewidth=1)
 
-        # Add text annotation to show the width of this region
-        iqr_width = q75 - q25
-        # Place text near the top of the range
-        y_limits = ax.get_ylim()
-        ax.text(5, y_limits[1]*0.5, f"IQR Width:\n{iqr_width:.3f} K", 
-                horizontalalignment='center', color='darkgreen', fontweight='bold')
-        ax.legend(loc='upper right', fontsize = 'x-small')
+        # 4. Center the text horizontally between q10 and q90
+        # Placing it slightly above the x-axis for visibility
+        ax.text((q10 + q90) / 2, ax.get_ylim()[1] * 0.05, f"Range: {width:.3f} K", 
+                ha='center', va='bottom', color='forestgreen', fontweight='bold', fontsize=12)
 
-        #skewness and kurtosis
-        err_data_skew = skew(err_data, axis=0, bias=True)
-        err_data_kurt = kurtosis(err_data, axis=0, bias=True)
-        mean, std = norm.fit(err_data) 
-        print(name, mean, std)
-        ax.text(0.9,0.01, f"Skewness = {err_data_skew:.3f} \n Kurtosis = {err_data_kurt:.3f}")
+        ax.legend(loc='upper right', fontsize='small')
+        ax.set_xlim(-3, 3) # Zooming in helps show off that high kurtosis!
+        ax.set_title(f"Error Distribution: {name} Scheme", fontsize=16, fontweight='bold')
+        ax.tick_params(axis='both', which='major', labelsize=16)
+        #ax.grid(axis='y', alpha=0.3)
+        stats_text = (
+        f"$\mu$: {mean:.3f} K\n"
+        f"$\sigma$: {std:.3f} K\n"
+        f"Skew: {skew(err_data):.3f}\n"
+        f"Kurtosis: {kurtosis(err_data):.3f}"
+        )
+        print(stats_text)
 
-
+    axes_flat[-1].set_xlabel("Error (K)", fontsize=16)
     # Turn off unused subplots
     if len(axes_flat) > num_schemes:
         for j in range(num_schemes, len(axes_flat)):
             axes_flat[j].axis('off')
 
+    # fig.text(
+    #         0.99, 0.01,
+    #         f"Gamma = {gamma_0}\n"
+    #         f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
+    #         f"INCLUDE_EKMAN_ANOM = {INCLUDE_EKMAN_ANOM_ADVECTION}\n"
+    #         f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
+    #         f"INCLUDE_GEOSTROPHIC_ANOM = {INCLUDE_GEOSTROPHIC_ANOM_ADVECTION}\n"
+    #         f"INCLUDE_GEOSTROPHIC_MEAN_ADV = {INCLUDE_GEOSTROPHIC_MEAN_ADVECTION}\n"
+    #         f"INCLUDE_EKMAN_MEAN_ADV = {INCLUDE_EKMAN_MEAN_ADVECTION}",
+    #         ha='right', va='bottom', fontsize=18
+    #     )
+    plt.show()
+
+    bootstrap_results = {}
+    
+    for scheme_name, err_data in error_distributions.items():
+        print(f"\nBootstrapping {scheme_name}...")
+        # We flatten the data and remove NaNs to ensure a clean 1D array
+        clean_data = err_data[~np.isnan(err_data)]
+        
+        # Run the bootstrap
+        bootstrap_results[scheme_name] = block_bootstrap_kurtosis(
+            clean_data, 
+            block_size=5000,  # Larger blocks for 14M points
+            n_iterations=500
+        )
+
+    # --- Visualization of Significance ---
+    plt.figure(figsize=(10, 6))
+    for name, boots in bootstrap_results.items():
+        sns.kdeplot(boots, label=f"{name} (Mean K: {np.mean(boots):.1f})", fill=True)
+        
+        # Calculate 95% Confidence Interval
+        ci_low, ci_high = np.percentile(boots, [2.5, 97.5])
+        print(f"{name} 95% CI: [{ci_low:.2f}, {ci_high:.2f}]")
+
+    plt.title("Bootstrap Distribution of Kurtosis")
+    plt.xlabel("Excess Kurtosis")
+    plt.ylabel("Density")
+    plt.legend()
+    plt.show()
+
+    # --- Statistical Significance Test ---
+    # Difference between Semi-Implicit (90) and Implicit (67)
+    if "Semi-Implicit Scheme" in bootstrap_results and "Implicit Scheme" in bootstrap_results:
+        diff = bootstrap_results["Semi-Implicit Scheme"] - bootstrap_results["Implicit Scheme"]
+        p_val = np.mean(diff <= 0)
+        print(f"\n--- Significance Result ---")
+        print(f"Empirical P-value for (Semi-Imp > Imp): {p_val}")
+        if p_val < 0.05:
+            print("The difference in Kurtosis is Statistically Significant.")
+
+    # plt.figure(figsize=(12, 7))
+
+    # for name, err_data in error_distributions.items():
+    #     # KDE plot
+    #     sns.kdeplot(err_data, bw_adjust=5.0, label=name)
+
+    # # Formatting
+    # plt.xlim(-3, 3)        
+    # plt.yscale("log")      
+    # plt.ylim(1e-4, 1e2)
+    # plt.title("Comparison of Temporal Error Distributions (Log-Scale)")
+    # plt.xlabel("Error (K)")
+    # plt.ylabel("Probability Density (Log Scale)")
+    # plt.legend()
+    # plt.grid(True, which="both", ls="--", alpha=0.3)
+    # fig.text(
+    #         0.99, 0.01,
+    #         f"Gamma = {gamma_0}\n"
+    #         f"INCLUDE_SURFACE = {INCLUDE_SURFACE}\n"
+    #         f"INCLUDE_EKMAN_ANOM = {INCLUDE_EKMAN_ANOM_ADVECTION}\n"
+    #         f"INCLUDE_ENTRAINMENT = {INCLUDE_ENTRAINMENT}\n"
+    #         f"INCLUDE_GEOSTROPHIC_ANOM = {INCLUDE_GEOSTROPHIC_ANOM_ADVECTION}\n"
+    #         f"INCLUDE_GEOSTROPHIC_MEAN_ADV = {INCLUDE_GEOSTROPHIC_MEAN_ADVECTION}\n"
+    #         f"INCLUDE_EKMAN_MEAN_ADV = {INCLUDE_EKMAN_MEAN_ADVECTION}",
+    #         ha='right', va='bottom', fontsize=18
+    #     )
+    # plt.show()
+
+    plt.figure(figsize=(12, 7))
+
+    # Iterate through schemes and plot their CDF
+    for name, err_data in error_distributions.items():
+        sns.ecdfplot(data=err_data, label=name, linewidth=2, alpha=0.5)
+
+    # Add reference lines
+    plt.axvline(0, color='black', linestyle='--', alpha=0.5, linewidth=1, label="Zero Error")
+    plt.axhline(0.5, color='black', linestyle=':', alpha=0.5, label="50% Probability")
+
+    # Add Guidelines for the 25% - 75% probability zone
+    plt.axhline(0.25, color='gray', linestyle=':', alpha=0.5)
+    plt.axhline(0.75, color='gray', linestyle=':', alpha=0.5)
+    plt.text(plt.xlim()[0], 0.25, " 25%", verticalalignment='bottom', color='gray')
+    plt.text(plt.xlim()[0], 0.75, " 75%", verticalalignment='bottom', color='gray')
+
+    plt.axhspan(0.25, 0.75, color='grey' , alpha=0.2)
+
+    # Formatting
+    plt.title("Cumulative Distribution Function (CDF) of Errors")
+    plt.xlabel("Error (K)")
+    plt.ylabel("Proportion")
+    plt.xlim(-3, 3) # Adjust this limit based on your data range
+    plt.grid(True, alpha=0.3)
+    plt.legend()
     fig.text(
             0.99, 0.01,
             f"Gamma = {gamma_0}\n"
@@ -703,20 +844,20 @@ if COMPUTE_MSE_DECOMPOSITION:
 
 
 if COMPUTE_PRINCIPAL_COMPONENT:
-    n_modes = 5
+    n_modes = 1
     ocean_mask = reynolds_anom.notnull().all(dim='TIME')
-    lat_mask = (reynolds_anom.LATITUDE > 15) | (reynolds_anom.LATITUDE < -15)
-    combined_mask = ocean_mask & lat_mask
+    # lat_mask = (reynolds_anom.LATITUDE > 15) | (reynolds_anom.LATITUDE < -15)
+    # combined_mask = ocean_mask & lat_mask
     print("Calculating EOFs for Reynolds Observations...")
 
     # Using Chris function to get the eof of the obs
     reconstructed_obs, exp_var_obs, pc_obs, eof_obs_da = get_eof_with_nan_consideration(
-        reynolds_anom, mask=combined_mask, modes=n_modes
+        reynolds_anom, mask=ocean_mask, modes=n_modes
     )
 
     for scheme_name in all_models.data_vars:
         data = all_models[scheme_name]
-        fig, axes = plt.subplots(n_modes, 1, figsize=(12, 4 * n_modes), sharex=True)
+        fig, axes = plt.subplots(n_modes, 1, figsize=(16, 8), sharex=True)
         if n_modes == 1:
             axes = [axes]
 
@@ -739,54 +880,149 @@ if COMPUTE_PRINCIPAL_COMPONENT:
 
             # Plotting
             time_coords = data.TIME.values 
+            decimal_years = 2004 + (data.TIME.values / 12)
             
-            ax.plot(time_coords, obs_pc_raw, label="Observed (Reynolds)", color='black', alpha=0.6, linewidth=1.5)
-            ax.plot(time_coords, model_pseudo_pc, label=f"Model ({scheme_name})", color='crimson', linestyle='--', linewidth=1.5)
-            
+            ax.plot(decimal_years, obs_pc_raw, label="Observed (Reynolds)", color='black', alpha=0.6, linewidth=2)
+            ax.plot(decimal_years, model_pseudo_pc, label=f"Model ({scheme_name})", color='crimson', linestyle='--', linewidth=2)
+            ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
             # Correlation Statistics
             correlation = np.corrcoef(obs_pc_raw, model_pseudo_pc)[0, 1] # Use pseudo_pc directly for corr
-            ax.text(0.02, 0.9, f"Mode {m} | Correlation: {correlation:.2f}", transform=ax.transAxes, fontweight='bold')
+            ax.text(0.02, 0.15, f"Correlation: {correlation:.2f}", transform=ax.transAxes, fontweight='bold', fontsize=16)
             
             # RMSE Statistics 
             raw_rmse = np.sqrt(np.mean((obs_pc_raw - model_pseudo_pc)**2))
             obs_rms = np.sqrt(np.mean(obs_pc_raw**2))
             nrmse_pc = raw_rmse / obs_rms
-            ax.text(0.02, 0.8, f"PC-RMSE: {nrmse_pc:.3f}", transform=ax.transAxes)
+            ax.text(0.02, 0.1, f"PC-NRMSE: {nrmse_pc:.3f}", transform=ax.transAxes, fontsize=16)
             # Aesthetics
-            ax.set_ylabel("Amplitude (σ)") # need to change
-            ax.axhline(0, color='gray', linewidth=0.8, linestyle=':')
-            ax.legend(loc='upper right', fontsize='small')
-            ax.set_title(f"{scheme_name} | Principal Component Comparison: Mode {m}")
-
-        axes[-1].set_xlabel("Time (Months from 2004)")
+            ax.set_ylabel("Projected Anomaly (K)", fontsize=16) # need to change
+            ax.axhline(0, color='gray', linewidth=1, linestyle=':')
+            ax.legend(loc='upper right', fontsize=16)
+            ax.set_title(f"{scheme_name} | Principal Component Comparison: Mode {m+1}", fontsize=20)
+            ax.tick_params(axis='both', which='major', labelsize=14)
+        axes[-1].set_xlabel("Year", fontsize=16)
         plt.tight_layout()
+        output_path = fr"C:\Users\jason\MSciProject\Viva\{scheme_name}_PC_Anomaly_Test.jpg"
+        #plt.savefig(output_path)
+
+        # if len(all_models.data_vars) ==3:
+        #     fig, axes = plt.subplots(1, 1, figsize=(16, 8))
+
         plt.show()
-# print(observed_temperature_anomaly_reynold)
-# print(observed_temperature_mean_reynold)
-
-# make_movie(reynolds_anom, -3,3)
-# psuedo_mean = get_monthly_mean(observed_temperature_anomaly_reynold)
-# real_anom = get_anomaly(observed_temp_ds_reynold, "SST", psuedo_mean)
-# observed_temperature_anomaly_reynold = observed_temp_ds_reynold["SST_ANOMALY"]
-# mean_obs = reynolds_anom.mean(dim="TIME")
-# fig, axes = plt.subplots(1, 1, figsize=(8,5))
-# cmap = plt.get_cmap('RdBu_r').copy()
-# cmap.set_bad(color="black")
-# mean_obs.plot(ax=axes, cmap=cmap, cbar_kwargs={'label': '(K)'}, vmin = -1e-7, vmax = 1e-7)
-# axes.set_xlabel("Longitude")
-# axes.set_ylabel("Lattitude")
-# axes.set_title(f'Mean Reynolds Anomaly')
-# plt.tight_layout()
-# plt.show()
 
 
-# mean_model = schemes["Implicit"].mean(dim="TIME")
-# fig, axes = plt.subplots(1, 1, figsize=(8,5))
-# cmap = plt.get_cmap('RdBu_r').copy()
-# cmap.set_bad(color="black")
-# mean_model.plot(ax=axes, cmap=cmap, cbar_kwargs={'label': '(K)'}, vmin = -0.05, vmax = 0.05)
-# axes.set_xlabel("Longitude")
-# axes.set_ylabel("Lattitude")
-# axes.set_title(f'Implicit Scheme Anomaly')
-# plt.tight_layout()
-# plt.show()
+if COMPUTE_SPIN_UP_PERIOD:
+    
+    for scheme_name in all_models.data_vars:
+        data = all_models[scheme_name]
+
+        print(f"Computing Autocorrelation for {scheme_name}")
+        lags, avg_acf = autocorrelation_map(data)
+        plt.figure(figsize=(10, 5))
+        plt.plot(lags, avg_acf, marker='o', color='navy', linewidth=2)
+        
+        # Threshold lines
+        plt.axhline(0.368, color='red', linestyle='--', label='e-folding (1/e)')
+        plt.axhline(0.05, color='green', linestyle='--', label='95% Decorrelation')
+        
+        plt.title(f"{scheme_name} Global Average Autocorrelation of Temperature Anomalies", fontsize=14)
+        plt.xlabel("Lag (Months)", fontsize=12)
+        plt.ylabel("Correlation Coefficient", fontsize=12)
+        plt.grid(alpha=0.3)
+        plt.legend()
+        plt.show()
+        
+
+if COMPUTE_PDF_ANALYSIS_REPORT:
+    # 1. Exact color mapping from your Bootstrap plot
+    colors = {'Explicit': 'C0', 'Semi-Implicit': 'C1', 'Implicit': 'C2'}
+    
+    # Update global font sizes for high-res output
+    plt.rcParams.update({'font.size': 14})
+    fig, ax = plt.subplots(figsize=(12, 6), dpi=300)
+
+    error_distributions = {}
+    print("Calculating errors for all schemes...")
+
+    for scheme_name in all_models.data_vars:
+        data = all_models[scheme_name]
+        print(f"Processing {scheme_name}...")
+        error_distributions[scheme_name] = get_clean_error_distribution(data, reynolds_anom, exclude_tropics=True)
+
+    for name, err_data in error_distributions.items():
+        # Match color based on substring
+        plot_color = 'black'
+        for key, val in colors.items():
+            if key in name:
+                plot_color = val
+                break
+
+        sns.kdeplot(
+            err_data, bw_adjust=1.5, gridsize=1000, 
+            color=plot_color, fill=False, linewidth=3, ax=ax, 
+            label=f'{name})'
+        )
+
+    # 2. FINAL FIX FOR THE GREEN LINE: Force spines to black
+    # We do this AFTER all plotting calls to override the loop color
+    # ax.spines['bottom'].set_visible(True)
+    # ax.spines['bottom'].set_color('black')
+    # ax.spines['bottom'].set_linewidth(2.0)
+    # ax.spines['left'].set_color('black')
+    # ax.spines['left'].set_linewidth(2.0)
+
+    # 3. Formatting
+    ax.set_xlim(-2.5, 2.5) 
+    ax.axvline(0, color='black', linestyle='-', linewidth=1, alpha=0.5)
+    
+    ax.set_title("Global Error Distribution (Residuals)", fontsize=22, fontweight='bold', pad=20)
+    ax.set_xlabel("Error (K)", fontsize=18)
+    ax.set_ylabel("Density", fontsize=18)
+    ax.tick_params(axis='both', which='major', labelsize=16, colors='black')
+    
+    # Legend formatting
+    ax.legend(fontsize=14, frameon=True, loc='upper right', borderpad=1)
+    
+    sns.despine() # Removes top and right
+    plt.savefig(r'C:\Users\jason\MSciProject\Report Figures\Error_Distribution_No_Fill_All_Terms.png', dpi=300, bbox_inches='tight')
+    plt.show()
+
+    bootstrap_results = {}
+    
+    for scheme_name, err_data in error_distributions.items():
+        print(f"\nBootstrapping {scheme_name}...")
+        # We flatten the data and remove NaNs to ensure a clean 1D array
+        clean_data = err_data[~np.isnan(err_data)]
+        
+        # Run the bootstrap
+        bootstrap_results[scheme_name] = block_bootstrap_kurtosis(
+            clean_data, 
+            block_size=5000,  # Larger blocks for 14M points
+            n_iterations=500
+        )
+
+    # --- Visualization of Significance ---
+    plt.figure(figsize=(10, 6))
+    for name, boots in bootstrap_results.items():
+        sns.kdeplot(boots, label=f"{name} (Mean Kurtosis: {np.mean(boots):.1f})", fill=True)
+        
+        # Calculate 95% Confidence Interval
+        ci_low, ci_high = np.percentile(boots, [2.5, 97.5])
+        print(f"{name} 95% CI: [{ci_low:.2f}, {ci_high:.2f}]")
+
+    plt.title("Bootstrap Distribution of Kurtosis")
+    plt.xlabel("Excess Kurtosis")
+    plt.ylabel("Density")
+    plt.legend()
+    plt.savefig(r'C:\Users\jason\MSciProject\Report Figures\Error_Distribution_Bootstrap_All_Terms.png', dpi=300, bbox_inches='tight')
+    plt.show()
+
+    # --- Statistical Significance Test ---
+    # Difference between Semi-Implicit (90) and Implicit (67)
+    if "Semi-Implicit Scheme" in bootstrap_results and "Implicit Scheme" in bootstrap_results:
+        diff = bootstrap_results["Semi-Implicit Scheme"] - bootstrap_results["Implicit Scheme"]
+        p_val = np.mean(diff <= 0)
+        print(f"\n--- Significance Result ---")
+        print(f"Empirical P-value for (Semi-Imp > Imp): {p_val}")
+        if p_val < 0.05:
+            print("The difference in Kurtosis is Statistically Significant.")

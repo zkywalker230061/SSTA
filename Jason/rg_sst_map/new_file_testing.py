@@ -25,6 +25,7 @@ NEW_T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\new_T_sub_prime.nc"
 GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH = r"C:\Users\jason\MSciProject\geostrophic_anomaly_downloaded.nc"
 GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = r"C:\Users\jason\MSciProject\geostrophic_anomaly_calculated.nc"
 SEA_SURFACE_GRAD_DATA_PATH = r"C:\Users\jason\MSciProject\sea_surface_interpolated_grad.nc"
+GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = r"C:\Users\jason\MSciProject\Simulation-Geostrophic_Heat_Flux-(2004-2025).nc"
 
 
 T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\Sub_Layer_Temperature-(2004-2025).nc"
@@ -35,7 +36,7 @@ T_SUB_DATA_PATH = r"C:\Users\jason\MSciProject\Sub_Layer_Temperature-(2004-2025)
 # tsub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)["SUB_TEMPERATURE"]
 # new_tsub_ds = xr.open_dataset(NEW_T_SUB_DATA_PATH, decode_times=False)
 
-ekman_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
+# ekman_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
 
 # observed_temp_ds_full = xr.open_dataset(observed_path, decode_times=False)
 # observed_temp_ds = observed_temp_ds_full["UPDATED_MIXED_LAYER_TEMP"]
@@ -45,10 +46,17 @@ ekman_ds = xr.open_dataset(EKMAN_ANOMALY_DATA_PATH, decode_times=False)
 # obs_temp_anom = obs_temp_anom["UPDATED_MIXED_LAYER_TEMP_ANOMALY"]
 # print(obs_temp_anom)
 
-
+geo_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH, decode_times=False)["ANOMALY_GEOSTROPHIC_HEAT_FLUX"]
 # print(hbar_ds)
 # print(new_hbar_ds)
 # print(tsub_ds)
 # print(new_tsub_ds)
-print(ekman_ds)
+#print(ekman_ds)
 # print(obs)
+print(geo_ds)
+geostrophic_anomaly_da = geo_ds
+neg_count = (geostrophic_anomaly_da < 0).sum().values
+total_count = geostrophic_anomaly_da.size
+percentage_neg = (neg_count / total_count) * 100
+
+print(f"Negative points: {neg_count} out of {total_count} ({percentage_neg:.2f}%)")
