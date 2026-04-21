@@ -54,7 +54,8 @@ INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
 # Display And/Or Save Simulation Settings 
 EQUATOR_MASK = False
 SHOW_SIMULATIONS = False
-SAVE_SIMULATIONS = False
+SAVE_VIDEO_SIMULATIONS = False
+SAVE_SIMULATION_DATA = True
 
 # Statistical Analysis Settings
 COMPUTE_NRMSE = False
@@ -62,7 +63,7 @@ COMPUTE_PDF_ANALYSIS = False
 COMPUTE_MSE_DECOMPOSITION = False
 COMPUTE_PRINCIPAL_COMPONENT = False
 COMPUTE_SPIN_UP_PERIOD = False
-COMPUTE_PDF_ANALYSIS_REPORT = True
+COMPUTE_PDF_ANALYSIS_REPORT = False
 
 # ----------1. Defining Physical Parameters for Simulations ---------------------
 explicit_stability_limit = 1e-7
@@ -454,9 +455,13 @@ if COMPUTE_SIM:
 
     # End of Gemini aided code
 
+    if SAVE_SIMULATION_DATA:
+        file_path = r"C:\Users\jason\MSciProject\All_Schemes_Final.nc"
+        all_models.to_netcdf(path=file_path)
+
     if SHOW_SIMULATIONS:
         print("Displaying Reynolds Benchmark...")
-        if SAVE_SIMULATIONS:
+        if SAVE_VIDEO_SIMULATIONS:
             make_movie(observed_temperature_anomaly_reynold, -3, 3, 
                     savepath=r"C:\Users\jason\MSciProject\Viva\Observed_Reynolds_Anomaly.mp4",
                     colorbar_label="Temperature Anomaly (K)")
@@ -467,7 +472,7 @@ if COMPUTE_SIM:
             data_array = all_models[scheme_name]
             print(f"Processing video for: {scheme_name}")
             
-            if SAVE_SIMULATIONS:
+            if SAVE_VIDEO_SIMULATIONS:
                 save_path = fr"C:\Users\jason\MSciProject\Viva\{scheme_name}_Scheme_Temp_Anomaly.mp4"
                 print(f"Saving to {save_path}...")
                 make_movie(data_array, -3, 3, savepath=save_path, colorbar_label="Temperature Anomaly (K)")
@@ -482,13 +487,13 @@ if COMPUTE_SIM:
     # all_models.to_netcdf(r"C:\Users\jason\MSciProject\SSTA_All_Schemes_Final.nc")
 
 if not COMPUTE_SIM:
-    test_file_path = r"C:\Users\jason\MSciProject\SSTA_All_Schemes_Final.nc"
+    test_file_path = r"C:\Users\jason\MSciProject\All_Schemes_Final.nc"
 
     all_models = xr.open_dataset(test_file_path, decode_times=False)
 
     if SHOW_SIMULATIONS:
         print("Displaying Reynolds Benchmark...")
-        if SAVE_SIMULATIONS:
+        if SAVE_VIDEO_SIMULATIONS:
             make_movie(observed_temperature_anomaly_reynold, -3, 3, 
                     savepath=r"C:\Users\jason\MSciProject\Observed_Reynolds_Anomaly.mp4")
         else:
@@ -498,7 +503,7 @@ if not COMPUTE_SIM:
             data_array = all_models[scheme_name]
             print(f"Processing video for: {scheme_name}")
             
-            if SAVE_SIMULATIONS:
+            if SAVE_VIDEO_SIMULATIONS:
                 save_path = fr"C:\Users\jason\MSciProject\{scheme_name}_Scheme_Temp_Anomaly_PreSaved_File.mp4"
                 print(f"Saving to {save_path}...")
                 make_movie(data_array, -3, 3, savepath=save_path)
