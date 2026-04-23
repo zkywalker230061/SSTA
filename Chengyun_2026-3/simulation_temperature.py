@@ -351,7 +351,7 @@ plt.show()
 
 # fraction plot
 # ----------------------------------------------------------------------------
-wind = False
+wind = True
 surface_rad_fraction = []
 surface_turb_fraction = []
 entrainment_fraction = []
@@ -435,7 +435,7 @@ plt.plot(
 if wind:
     plt.plot(
         t_m_a['TIME'], wind_fraction,
-        label='Wind (Turbulence + Ekman)', color='#39C5BB', alpha=0.8
+        label='Wind (Turbulence + Ekman)', color='#006400', alpha=0.8
     )
 else:
     plt.plot(
@@ -452,7 +452,7 @@ plt.xlabel('Year', loc='right')
 plt.ylim(0, 0.5)
 plt.ylabel('Fractional Contribution')
 plt.ylim(0)
-plt.legend(frameon=False, ncols=3, fontsize=8)
+plt.legend(frameon=False, ncols=(3-int(wind)), fontsize=8)
 plt.title(r'$\gamma$'+f' = {LAMBDA_A}, Spatially Weighted', fontsize=15, loc='left')
 plt.show()
 
@@ -480,7 +480,7 @@ plt.plot(
 if wind:
     plt.plot(
         months, wind_fraction_monthly_mean,
-        label='Wind (Turbulence + Ekman)', color='#39C5BB', alpha=0.8
+        label='Wind (Turbulence + Ekman)', color='#006400', alpha=0.8
     )
 else:
     plt.plot(
@@ -492,9 +492,9 @@ else:
         label='Ekman', color='#39C5BB', alpha=0.8
     )
 plt.xlabel('Month', loc='right')
-plt.ylim(0, 0.5)
+plt.ylim(0, 0.7)
 plt.ylabel('Fractional Contribution')
-plt.legend(frameon=False, ncols=3, fontsize=8)
+plt.legend(frameon=False, ncols=(3-int(wind)), fontsize=8)
 plt.title('North Atlantic', fontsize=15, loc='left')
 plt.show()
 

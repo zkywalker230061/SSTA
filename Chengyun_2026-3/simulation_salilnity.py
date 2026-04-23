@@ -447,7 +447,7 @@ plt.plot(
     label='Geostrophic', color='#ffb703', alpha=0.8
 )
 plt.xlabel('Month', loc='right')
-plt.ylim(0, 0.5)
+plt.ylim(0, 0.7)
 plt.ylabel('Fractional Contribution')
 plt.legend(frameon=False, ncols=2, fontsize=8)
 plt.title('North Atlantic', fontsize=15, loc='left')
