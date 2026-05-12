@@ -1,16 +1,19 @@
 import xarray as xr
 import pandas as pd
 #import eofs
-import xeofs as xe
+#import xeofs as xe
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
+from matplotlib.animation import FuncAnimation, FFMpegWriter
 import matplotlib
 import numpy as np
 from scipy.linalg import svd
-import wpca
-from wpca import EMPCA
-import wpca
-from ppca import PPCA
+#import wpca
+#from wpca import EMPCA
+#import wpca
+#from ppca import PPCA
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+from scipy.stats import kurtosis
 
 matplotlib.use('TkAgg')
 
@@ -246,7 +249,6 @@ def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, t
         #X_reconstructed = X_weighted_reconstructed / weight_map[None, :] + X_mean[None, :]  # remove weight, readd mean
 
         k_opt = modes  # TODO: choose the actual optimum; this is just a placeholder for now; see paper
-        # initial observation suggests this doesn't actually do much... but decent practice I suppose.
         U_k = U[:, :k_opt]
         s_k = s[:k_opt]
         Vt_k = Vt[:k_opt, :]
@@ -277,13 +279,25 @@ def get_eof_with_nan_consideration(dataset, mask, modes, monthly_mean_ds=None, t
     X_weighted_reconstructed = (U_modes * s_modes) @ Vt_modes
     X_reconstructed = X_weighted_reconstructed / weight_map[None, :] + X_mean[None, :]
     PCs = U[:, start_mode:modes] * s[start_mode:modes]
+    EOFs = np.full((modes - start_mode, lat_size, long_size), np.nan)
+
+    # reshape EOFs to have the right latitude/longitude coordinates
+    all_positions = np.arange(lat_size * long_size).reshape(lat_size, long_size)
+    valid_positions = all_positions[ocean].reshape(-1)[valid_cols]
+
+    for k in range(modes - start_mode):
+        eof_k = Vt_modes[k, :]
+        eof_reshape = np.full((lat_size * long_size), np.nan)
+        eof_reshape[valid_positions] = eof_k
+        EOFs[k] = eof_reshape.reshape(lat_size, long_size)
 
     reconstructed_ds = np.full((time_size, lat_size, long_size), np.nan)
     reconstructed_ds[:, ocean_valid] = X_reconstructed
     smoothed_ds = xr.DataArray(reconstructed_ds, dims=dataset.dims, coords=dataset.coords)
-
     explained_variance = (s ** 2) / (s ** 2).sum()
-    return smoothed_ds, explained_variance, PCs
+    EOFs_da = xr.DataArray(EOFs, dims=("MODE", lat_name, long_name), coords={"MODE": np.arange(start_mode, modes), lat_name: dataset.coords[lat_name], long_name: dataset.coords[long_name]})
+
+    return smoothed_ds, explained_variance, PCs, EOFs_da
 
 
 def get_eof_from_ppca_py(dataset, mask, modes, monthly_mean_ds=None, time_name="TIME", lat_name="LATITUDE",
@@ -375,35 +389,137 @@ def get_eof(dataset, modes, mask=None, clean_nan=False):
     #reconstructed = model.inverse_transform(scores)
     return components, explained_variance, scores
 
+def format_cartopy_axis(ax):
+    """
+    Adds coastlines, land features, and gridlines to a Cartopy axis
+    """
+    ax.add_feature(cfeature.COASTLINE, linewidth=0.7)
+    ax.add_feature(cfeature.LAND, facecolor="lightgrey", edgecolor='none', zorder=1)
 
-def make_movie(dataset, vmin, vmax, colorbar_label=None):
+    gl = ax.gridlines(crs = ccrs.PlateCarree(), draw_labels=True,
+                      linewidth=0.5, color='grey', alpha=0.5, linestyle='--')
+    gl.top_labels = False
+    gl.right_labels = False
+    gl.xlabel_style = {'size': 10}
+    gl.ylabel_style = {'size': 10}
+    return ax
+
+def make_movie(dataset, vmin, vmax, colorbar_label=None, ENSO_ds=None, savepath=None, cart_axes=True):
     times = dataset.TIME.values
+    dataset_name = dataset.name
 
-    fig, ax = plt.subplots()
+    if cart_axes:
+        fig, ax = plt.subplots(subplot_kw={'projection': ccrs.PlateCarree()}, figsize=(10,6))
+        format_cartopy_axis(ax)
+    else:
+        fig, ax = plt.subplots(figsize=(10,6))
+        ax.set_xlabel('Longitude')
+        ax.set_ylabel('Latitude')
     # ax = plt.axes(projection=ccrs.PlateCarree())
     # ax.coastlines()
     pcolormesh = ax.pcolormesh(dataset.LONGITUDE.values, dataset.LATITUDE.values,
-                               dataset.isel(TIME=0), cmap='RdBu_r')
+                               dataset.isel(TIME=0), cmap='RdBu_r', vmin=vmin, vmax=vmax,
+                               transform=ccrs.PlateCarree() if cart_axes else None)
     title = ax.set_title(f'Time = {times[0]}')
 
-    cbar = plt.colorbar(pcolormesh, ax=ax, label=colorbar_label)
-    ax.set_xlabel('Longitude')
-    ax.set_ylabel('Latitude')
+    cbar = plt.colorbar(pcolormesh, ax=ax, label=colorbar_label, orientation='horizontal', pad=0.08)
+    
 
     def update(frame):
-        month = int((times[frame] + 0.5) % 12)
-        if month == 0:
-            month = 12
-        year = 2004 + int((times[frame]) / 12)
+        total_months = int(times[frame])
+        year = 2004 + (total_months // 12)
+        month = (total_months % 12) + 1
+
         pcolormesh.set_array(dataset.isel(TIME=frame).values.ravel())
-        #pcolormesh.set_clim(vmin=float(model_anomaly_ds.isel(TIME=frame).min()), vmax=float(model_anomaly_ds.isel(TIME=frame).max()))
-        pcolormesh.set_clim(vmin=vmin, vmax=vmax)
-        cbar.update_normal(pcolormesh)
-        title.set_text(f'Year: {year}; Month: {month}')
+        if (ENSO_ds is not None):
+            enso_index = ENSO_ds.isel(time=frame).value.values.item()
+            title.set_text(f'{dataset_name}; Year: {year}; Month: {month}; ENSO index: {round(enso_index, 4)}')
+        else:
+            title.set_text(f'{dataset_name}; Year: {year}; Month: {month}')
         return [pcolormesh, title]
 
     animation = FuncAnimation(fig, update, frames=len(times), interval=300, blit=False)
+    if savepath is not None:
+        animation.save(savepath, writer='ffmpeg', fps=2, dpi=200)
     plt.show()
+
+
+def make_movie_all_models(obs_ds, data_ds, vmin, vmax, savepath=None):
+    fig, axes = plt.subplots(2, 2, subplot_kw={'projection': ccrs.PlateCarree()}, 
+                             figsize=(15, 10), constrained_layout=True)
+    axes_flat = axes.flatten()
+    times = obs_ds.TIME.values
+    scheme_names = list(data_ds.data_vars)
+
+    quads = []
+    rmse_labels = [] # To store the text objects
+
+    # --- Initialization ---
+    # Panel 0: Observation (No RMSE needed here)
+    format_cartopy_axis(axes_flat[0])
+    q0 = axes_flat[0].pcolormesh(obs_ds.LONGITUDE, obs_ds.LATITUDE, obs_ds.isel(TIME=0), 
+                                 transform=ccrs.PlateCarree(), cmap='RdBu_r', vmin=vmin, vmax=vmax)
+    axes_flat[0].set_title(f"{obs_ds.name}", fontsize=16, fontweight='bold')
+    quads.append(q0)
+
+    # Panels 1-3: Models
+    for i, name in enumerate(scheme_names):
+        ax = axes_flat[i+1]
+        format_cartopy_axis(ax)
+        q = ax.pcolormesh(data_ds.LONGITUDE, data_ds.LATITUDE, data_ds[name].isel(TIME=0), 
+                          transform=ccrs.PlateCarree(), cmap='RdBu_r', vmin=vmin, vmax=vmax)
+        ax.set_title(f"{name}", fontsize=16)
+        quads.append(q)
+
+        # Create the RMSE text placeholder in the corner of each axis
+        # transform=ax.transAxes allows us to use coordinates from 0 to 1
+        txt = ax.text(0.02, 0.05, '', transform=ax.transAxes, fontsize=14, 
+                      fontweight='bold', bbox=dict(facecolor='white', alpha=0.7))
+        rmse_labels.append(txt)
+
+    cbar = fig.colorbar(quads[0], ax=axes, orientation='horizontal', 
+                        fraction=0.05, pad=0.07, aspect=40)
+    cbar.set_label("Temperature Anomaly (K)", fontsize=14, fontweight='bold')
+    # --- Animation Update ---
+    def update(frame):
+        # Time logic
+        t_val = int(times[frame])
+        year = 2004 + (t_val // 12)
+        month = (t_val % 12) + 1
+        
+        # Get Obs data for this frame to calculate RMSE
+        obs_frame = obs_ds.isel(TIME=frame)
+
+        # Update Benchmark Plot
+        quads[0].set_array(obs_frame.values.ravel())
+        
+        # Update Model Plots and RMSE Texts
+        for i, name in enumerate(scheme_names):
+            model_frame = data_ds[name].isel(TIME=frame)
+            
+            # Update Mesh
+            quads[i+1].set_array(model_frame.values.ravel())
+            
+            # Calculate Instantaneous RMSE
+            # Formula: sqrt(mean((model - obs)^2))
+            # error = model_frame - obs_frame
+            # rmse_val = np.sqrt((error**2).mean()).values.item()
+            
+            # # Update the specific text object
+            # rmse_labels[i].set_text(f"RMSE: {rmse_val:.4f}")
+
+        fig.suptitle(f"Date: {year}-{month:02d}", fontsize=22, fontweight='bold')
+        
+        # Return all objects that changed
+        return quads 
+
+    ani = FuncAnimation(fig, update, frames=len(times), interval=200, blit=False)
+    
+    if savepath:
+        ani.save(savepath, writer='ffmpeg', fps=5, dpi=150)
+    
+    plt.show()
+
 
 
 def remove_empty_attributes(dataset):
@@ -413,3 +529,366 @@ def remove_empty_attributes(dataset):
             if value is None:
                 attributes[key] = ""
     return dataset
+
+
+def compute_gradient_lat(
+        field: xr.DataArray,
+        R=6.4e6) -> xr.DataArray:
+    """
+    Compute the gradient of the field with respect to latitude and longitude
+    > taken directly from Jason/Julia's repository
+    """
+
+    # Convert degrees to radians for calculation
+    lat_rad = np.deg2rad(field['LATITUDE'])
+    # lon_rad = np.deg2rad(field['Longitude'])
+
+    # Calculate the spacing in meters
+    dlat = (np.pi / 180) * R
+
+    # Focusing on lat for now
+
+    # Masks for neighbouring points
+    # This is needed to identify valid neighbouring points for gradient calculation
+    valid = field.notnull()  # Creates a BOOL array where valid data (ocean) is set to True
+    has_prev = valid.shift(LATITUDE=1, fill_value=False)  # Cell above is ocean
+    has_next = valid.shift(LATITUDE=-1, fill_value=False)  # Cell below is ocean
+    has_prev2 = valid.shift(LATITUDE=2, fill_value=False)  # Two cells above is ocean
+    has_next2 = valid.shift(LATITUDE=-2, fill_value=False)  # Two cells below is ocean
+
+    # We can then define our interior points
+    interior = valid & has_prev & has_next  # Maps out the interior points
+    # Define the edge points of our interior
+    start = valid & ~has_prev
+    end = valid & ~has_next
+
+    # Now we define start/end by how many valid neighbours exist ahead/behind them
+    start_run_3pt = start & has_next & has_next2  # Starting point for 2nd order forward difference
+    end_run_3pt = end & has_prev & has_prev2  # End point for 2nd order backward difference
+    start_run_2pt = start & has_next & ~has_next2  # Starting point for 1st order forward difference
+    end_run_2pt = end & has_prev & ~has_prev2  # End point for 1st order backward difference
+    single = start & ~has_next  # Point with no valid neighbours (will leave as NaN)
+
+    # Precompute shifted fields for vectorised operations
+    f_prev = field.shift(LATITUDE=1)
+    f_next = field.shift(LATITUDE=-1)
+    f_prev2 = field.shift(LATITUDE=2)
+    f_next2 = field.shift(LATITUDE=-2)
+
+    # Initialise gradient array with NaNs
+    grad = xr.full_like(field, np.nan)
+
+    # Central difference for interior points (2nd order)
+    grad = grad.where(~interior, ((f_next - f_prev) / (2 * dlat)))
+
+    # Start of runs (forward differences)
+    grad = grad.where(~start_run_3pt, ((-3 * field + 4 * f_next - f_next2) / (2 * dlat)))
+    grad = grad.where(~start_run_2pt, ((f_next - field) / dlat))
+
+    # End of runs (backward differences)
+    grad = grad.where(~end_run_3pt, ((3 * field - 4 * f_prev + f_prev2) / (2 * dlat)))
+    grad = grad.where(~end_run_2pt, ((field - f_prev) / dlat))
+
+    # Single points left as NaN
+    return grad
+
+
+def compute_gradient_lon(
+        field: xr.DataArray,
+        R=6.4e6) -> xr.DataArray:
+    """
+    Compute the gradient of the field with respect to latitude and longitude
+    > taken directly from Jason/Julia's repository
+    """
+
+    # Convert degrees to radians for calculation
+    lat_rad = np.deg2rad(field['LATITUDE'])
+    # lon_rad = np.deg2rad(field['Longitude'])
+
+    # Calculate the spacing in meters
+    dlon = (np.pi / 180) * R * np.cos(lat_rad)
+    dlon = xr.DataArray(dlon, coords=field['LATITUDE'].coords, dims=['LATITUDE'])
+
+    # Masks for neighbouring points
+    # This is needed to identify valid neighbouring points for gradient calculation
+    valid = field.notnull()  # Creates a BOOL array where valid data (ocean) is set to True
+    has_west = valid.roll(LONGITUDE=1, roll_coords=False)  # Cell above is ocean
+    has_east = valid.roll(LONGITUDE=-1, roll_coords=False)  # Cell below is ocean
+    has_west2 = valid.roll(LONGITUDE=2, roll_coords=False)  # Two cells above is ocean
+    has_east2 = valid.roll(LONGITUDE=-2, roll_coords=False)  # Two cells below is ocean
+
+    # We can then define our interior points
+    interior = valid & has_west & has_east  # Maps out the interior points
+    # Define the edge points of our interior
+    start = valid & ~has_west
+    end = valid & ~has_east
+
+    # Now we define start/end by how many valid neighbours exist ahead/behind them
+    start_run_3pt = start & has_east & has_east2  # Starting point for 2nd order forward difference
+    end_run_3pt = end & has_west & has_west2  # End point for 2nd order backward difference
+    start_run_2pt = start & has_east & ~has_east2  # Starting point for 1st order forward difference
+    end_run_2pt = end & has_west & ~has_west2  # End point for 1st order backward difference
+    single = start & ~has_east  # Point with no valid neighbours (will leave as NaN)
+
+    # Precompute shifted fields for vectorised operations
+    f_prev = field.roll(LONGITUDE=1, roll_coords=False)
+    f_next = field.roll(LONGITUDE=-1, roll_coords=False)
+    f_prev2 = field.roll(LONGITUDE=2, roll_coords=False)
+    f_next2 = field.roll(LONGITUDE=-2, roll_coords=False)
+
+    # Initialise gradient array with NaNs
+    grad = xr.full_like(field, np.nan)
+
+    # Central difference for interior points (2nd order)
+    grad = grad.where(~interior, ((f_next - f_prev) / (2 * dlon)))
+
+    # Start of runs (forward differences)
+    grad = grad.where(~start_run_3pt, ((-3 * field + 4 * f_next - f_next2) / (2 * dlon)))
+    grad = grad.where(~start_run_2pt, ((f_next - field) / dlon))
+
+    # End of runs (backward differences)
+    grad = grad.where(~end_run_3pt, ((3 * field - 4 * f_prev + f_prev2) / (2 * dlon)))
+    grad = grad.where(~end_run_2pt, ((field - f_prev) / dlon))
+
+    # Single points left as NaN
+    return grad
+
+
+def get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH=False, gamma0=10, INCLUDE_GEOSTROPHIC_DISPLACEMENT=False):
+    save_name = ""
+    if INCLUDE_SURFACE:
+        save_name = save_name + "1"
+    else:
+        save_name = save_name + "0"
+    if INCLUDE_EKMAN:
+        save_name = save_name + "1"
+    else:
+        save_name = save_name + "0"
+    if INCLUDE_ENTRAINMENT:
+        save_name = save_name + "1"
+    else:
+        save_name = save_name + "0"
+    if INCLUDE_GEOSTROPHIC:
+        save_name = save_name + "1"
+        if INCLUDE_GEOSTROPHIC_DISPLACEMENT:
+            save_name = save_name + "_geostrophiccurrent"
+        if USE_DOWNLOADED_SSH:
+            save_name = save_name + "_downloadedSSH"
+    else:
+        save_name = save_name + "0"
+    if gamma0 != 10.0:
+        save_name += "_gamma" + str(gamma0)
+    return save_name
+
+
+def coriolis_parameter(lat):
+    omega = 2 * np.pi / (24 * 3600)
+    phi_rad = np.deg2rad(lat)
+    f = 2 * omega * np.sin(phi_rad)
+    f = xr.DataArray(f, coords={'LATITUDE': lat}, dims=['LATITUDE'])
+    f.attrs['units'] = 's^-1'
+    return f
+
+def get_month_from_time(time):
+    month = (time + 0.5) % 12
+    if month == 0:
+        month = 12.0
+    return month
+
+def compute_upwind_advection(working_anom, u, v, dx, dy, delta_t):
+
+    inv_dx = 1.0 / dx 
+    inv_dy = 1.0 / dy
+
+    CFL_x_freq = (abs(u) * inv_dx).max()
+    CFL_y_freq = (abs(v) * inv_dy).max()
+
+    substeps = int(np.ceil(max(float(CFL_x_freq), float(CFL_y_freq)) * delta_t)) + 1
+    sub_dt = delta_t / substeps
+
+    temp_iter = working_anom.copy()
+    div_total = xr.zeros_like(temp_iter)
+    
+    negative_u = (u < 0)
+    positive_v = (v > 0)
+    for _ in range(substeps):
+        # Flux enters from neighbor
+        F_east = xr.where(negative_u, -u * temp_iter, -u * temp_iter.shift(LONGITUDE=-1))
+        F_west = xr.where(negative_u, -u * temp_iter.shift(LONGITUDE=1), -u * temp_iter)
+        G_north = xr.where(positive_v, v * temp_iter, v * temp_iter.shift(LATITUDE=-1))
+        G_south = xr.where(positive_v, v * temp_iter.shift(LATITUDE=1), v * temp_iter)
+
+        # Net divergence
+        div_step = (F_east.fillna(0) - F_west.fillna(0)) * inv_dx + \
+                   (G_north.fillna(0) - G_south.fillna(0)) * inv_dy
+        
+        div_total += div_step
+        temp_iter -= sub_dt * div_step
+
+    return div_total / substeps
+
+def calculate_RMSE_normalised (obs, model, dim = 'TIME', ENSO_mask =False):
+    """
+    Calculates Root Mean Square Error.
+    Formula: sqrt( mean( (obs - model)^2 ) )
+    """
+    # First Datapoint was set to 0 in the sim
+    # We removed it from rmse analysis 
+
+    model = model.isel(TIME=slice(1,None))
+    obs = obs.isel(TIME=slice(1,None))
+
+    #Keep variables the same
+    model_mask = model
+    obs_mask = obs
+
+
+    if ENSO_mask:
+        mask_condition = (abs(model["LATITUDE"]) > 15)
+        model_mask = model.where(mask_condition)
+        obs_mask = obs.where(mask_condition)
+
+    
+
+
+    error = model_mask - obs_mask
+    squared_error = error ** 2
+    mean_squared_error = squared_error.mean(dim=dim)
+    rmse = np.sqrt(mean_squared_error)
+
+    normal_squared_error = obs**2
+    normal_mean_squared_error = normal_squared_error.mean(dim=dim)
+    normal_rmse = np.sqrt(normal_mean_squared_error)
+
+    weights = np.cos(np.deg2rad(mean_squared_error.LATITUDE))
+    if ENSO_mask:
+        weights = weights.where(mask_condition).fillna(0)
+
+    weighted_mse = mean_squared_error.weighted(weights).mean(dim=("LATITUDE", "LONGITUDE"))
+    global_weighted_rmse = float(np.sqrt(weighted_mse))
+
+    weights_obs = np.cos(np.deg2rad(normal_mean_squared_error.LATITUDE))
+    weighted_mse_obs = normal_mean_squared_error.weighted(weights_obs).mean(dim=("LATITUDE", "LONGITUDE"))
+    global_weighted_rmse_obs = float(np.sqrt(weighted_mse_obs))
+
+    corrected_rmse = rmse / normal_rmse
+
+    global_rmse = global_weighted_rmse / global_weighted_rmse_obs
+    return corrected_rmse, global_rmse
+
+def get_clean_error_distribution(test_da, obs_da, exclude_tropics = True):
+    """
+    Calculates error (Test - Obs), slices time, and returns 
+    a flattened numpy array with NaNs removed.
+    """
+    # 1. Align and Slice (Time slice 1:end)
+    test_sliced = test_da.isel(TIME=slice(1, None))
+    obs_sliced = obs_da.isel(TIME=slice(1, None))
+    
+    if exclude_tropics:
+        mask_condition = (test_sliced.LATITUDE > 15) | (test_sliced.LATITUDE < -15)
+        test_sliced = test_sliced.where(mask_condition)
+        obs_sliced = obs_sliced.where(mask_condition)
+
+    # 2. Calculate Error (xarray handles alignment automatically)
+    error_da = test_sliced - obs_sliced
+    
+    # 3. Flatten and drop NaNs
+    flat_error = error_da.values.flatten()
+    return flat_error[~np.isnan(flat_error)]
+
+def decompose_mse(obs, model, dim='TIME'):
+    model = model.isel(TIME=slice(1,None))
+    obs = obs.isel(TIME=slice(1,None))
+
+    mask_condition = (abs(model["LATITUDE"]) > 15)
+    model = model.where(mask_condition)
+    obs = obs.where(mask_condition)
+    
+    
+    # 1. Basic Stats
+    mean_obs = obs.mean(dim=dim)
+    mean_mod = model.mean(dim=dim)
+    std_obs = obs.std(dim=dim)
+    std_mod = model.std(dim=dim)
+    
+    # 2. Correlation (r)
+    correlation = xr.corr(obs, model, dim=dim)
+    
+    # 3. Calculate Components
+    bias_sq = (mean_mod - mean_obs)**2
+    var_err = (std_mod - std_obs)**2
+    phase_err = 2 * std_mod * std_obs * (1 - correlation)
+    
+    total_mse = bias_sq + var_err + phase_err
+    
+    
+    bias_pct = (bias_sq / total_mse) * 100
+    variance_pct = (var_err / total_mse) * 100
+    phase_pct = (phase_err / total_mse) * 100
+    
+    
+    return {
+        "bias_pct": bias_pct,
+        "bias": bias_sq,
+        "variance_pct": variance_pct,
+        "variance": var_err,
+        "phase_pct": phase_pct,
+        "phase": phase_err,
+        "total": total_mse
+    }
+
+
+def block_bootstrap_kurtosis(data, block_size=1000, n_iterations=1000):
+    """
+    Performs block bootstrapping to estimate the distribution of kurtosis.
+    data: 1D array of errors
+    block_size: Number of contiguous points per block (to preserve local correlation)
+    n_iterations: Number of bootstrap samples
+    """
+    n = len(data)
+    n_blocks = n // block_size
+    boot_kurtosis = []
+
+    print(f"Starting bootstrap with {n_iterations} iterations...")
+    for _ in range(n_iterations):
+        # Randomly select starting indices for blocks
+        start_indices = np.random.randint(0, n - block_size, size=n_blocks)
+        
+        # Create the bootstrap sample by concatenating blocks
+        sample = np.concatenate([data[i:i + block_size] for i in start_indices])
+        
+        # Calculate kurtosis (Fisher’s definition: normal = 0)
+        # Use fisher=False if you want the Pearson definition (normal = 3)
+        boot_kurtosis.append(kurtosis(sample, fisher=True))
+        
+    return np.array(boot_kurtosis)
+
+def autocorrelation_map(da, max_lag=36):
+    # 1. Calculate weights based on latitude
+    # This assumes your latitude dimension is named 'LATITUDE'
+    weights = np.cos(np.deg2rad(da.LATITUDE))
+    
+    # 2. Center the data and calculate variance across TIME
+    da_centered = da - da.mean('TIME')
+    variance = (da_centered**2).sum('TIME')
+    
+    avg_acf = []
+    lags = np.arange(max_lag + 1)
+    
+    for lag in lags:
+        # Calculate covariance map for this lag
+        covariance_map = (da_centered * da_centered.shift(TIME=lag)).sum('TIME')
+        
+        # Calculate correlation map (Pearson r at every grid point)
+        correlation_map = covariance_map / variance
+        
+        # 3. Compute the AREA-WEIGHTED spatial mean
+        # We apply weights to the correlation map, masking where data is NaN
+        weighted_map = correlation_map.weighted(weights.fillna(0))
+        global_mean_cor = weighted_map.mean(dim=['LATITUDE', 'LONGITUDE'], skipna=True).values
+        
+        avg_acf.append(global_mean_cor)
+    
+    return lags, avg_acf
+
