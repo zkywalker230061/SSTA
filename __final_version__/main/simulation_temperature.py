@@ -179,6 +179,7 @@ t_m_a_simulated = t_m_a_simulated.drop_vars('MONTH')
 
 # t_m_a_simulated.to_netcdf("datasets/Simulation-TA.nc")
 
+
 # rms plots
 # ----------------------------------------------------------------------------
 print("simulated (max, min, mean, abs mean):")
@@ -309,6 +310,7 @@ plt.colorbar(
 
 plt.show()
 
+
 # corr plot
 # ----------------------------------------------------------------------------
 corr = xr.corr(t_m_a_reynolds, t_m_a_simulated, dim='TIME')
@@ -348,6 +350,7 @@ plt.colorbar(
 )
 
 plt.show()
+
 
 # fraction plot
 # ----------------------------------------------------------------------------
@@ -417,7 +420,6 @@ for month_num in t_m_a['TIME'].values:
             / total.sel(TIME=month_num).where(mask == mask_numer)
         ).weighted(weights).mean().item()
     )
-
 
 plt.figure(figsize=(5, 5), dpi=600)
 plt.plot(
@@ -500,6 +502,7 @@ plt.show()
 
 
 # # spatial mean plot
+# # ----------------------------------------------------------------------------
 # t_m_a_simulated = t_m_a_simulated.where(
 #     (t_m_a_simulated['LATITUDE'] > 15) | (t_m_a_simulated['LATITUDE'] < -15), 0
 # )
@@ -513,48 +516,6 @@ plt.show()
 # plt.legend()
 # plt.show()
 
-# # QQ plot
-# # t_m_a_simulated = t_m_a_simulated.where(
-# #     (t_m_a_simulated['LATITUDE'] > 20) & (t_m_a_simulated['LATITUDE'] < 60), 0
-# # )
-# # t_m_a_simulated = t_m_a_simulated.where(
-# #     (t_m_a_simulated['LONGITUDE'] > -100) & (t_m_a_simulated['LONGITUDE'] < 0), 0
-# # )
-# # t_m_a_reynolds = t_m_a_reynolds.where(
-# #     (t_m_a_reynolds['LATITUDE'] > 20) & (t_m_a_reynolds['LATITUDE'] < 60), 0
-# # )
-# # t_m_a_reynolds = t_m_a_reynolds.where(
-# #     (t_m_a_reynolds['LONGITUDE'] > -100) & (t_m_a_reynolds['LONGITUDE'] < 0), 0
-# # )
-
-# # t_m_a_simulated = t_m_a_simulated.where(
-# #     ((t_m_a_simulated['LATITUDE'] < -20) & (t_m_a_simulated['LATITUDE'] > -60)), 0
-# # )
-# # t_m_a_simulated = t_m_a_simulated.where(
-# #     ((t_m_a_simulated['LONGITUDE'] > -180) & (t_m_a_simulated['LONGITUDE'] < -55)), 0
-# # )
-# # t_m_a_reynolds = t_m_a_reynolds.where(
-# #     ((t_m_a_reynolds['LATITUDE'] < -20) & (t_m_a_reynolds['LATITUDE'] > -60)), 0
-# # )
-# # t_m_a_reynolds = t_m_a_reynolds.where(
-# #     ((t_m_a_reynolds['LONGITUDE'] > -180) & (t_m_a_reynolds['LONGITUDE'] < -55)), 0
-# # )
-
-# t_m_a_simulated.sel(TIME=0.5).plot()
-# plt.figure(figsize=(6, 6))
-# for lon, lat in zip(t_m_a_simulated['LONGITUDE'], t_m_a_simulated['LATITUDE']):
-#     plt.plot(
-#         t_m_a_reynolds.sel(LONGITUDE=lon, LATITUDE=lat).values,
-#         t_m_a_simulated.sel(LONGITUDE=lon, LATITUDE=lat).values,
-#         ','
-#     )
-# x = np.linspace(-5, 5, 100)
-# plt.plot(x, x, 'r--')
-# plt.xlim(-5, 5)
-# plt.ylim(-5, 5)
-# # plt.yscale('log', base=2)
-# # plt.xscale('log', base=2)
-# plt.show()
 
 # autocorrelation plot
 # ----------------------------------------------------------------------------

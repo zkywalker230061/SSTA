@@ -178,6 +178,7 @@ s_m_a_simulated = s_m_a_simulated.drop_vars('MONTH')
 
 # s_m_a_simulated.to_netcdf("datasets/Simulation-SA.nc")
 
+
 # rms plots
 # ----------------------------------------------------------------------------
 print("simulated (max, min, mean, abs mean):")
@@ -308,6 +309,7 @@ plt.colorbar(
 
 plt.show()
 
+
 # corr plot
 # ----------------------------------------------------------------------------
 corr = xr.corr(s_m_a, s_m_a_simulated, dim='TIME')
@@ -348,13 +350,13 @@ plt.colorbar(
 
 plt.show()
 
+
 # fraction plot
 # ----------------------------------------------------------------------------
 surface_fraction = []
 entrainment_fraction = []
 ekman_fraction = []
 geo_fraction = []
-wind_fraction = []
 
 total = (
     abs(q_surface)
@@ -394,7 +396,6 @@ for month_num in s_m_a['TIME'].values:
         ).weighted(weights).mean().item()
     )
 
-
 plt.figure(figsize=(5, 5), dpi=600)
 plt.plot(
     s_m_a['TIME'], surface_fraction,
@@ -426,7 +427,6 @@ surface_fraction_monthly_mean = [np.mean(surface_fraction[i::12]) for i in range
 entrainment_fraction_monthly_mean = [np.mean(entrainment_fraction[i::12]) for i in range(12)]
 ekman_fraction_monthly_mean = [np.mean(ekman_fraction[i::12]) for i in range(12)]
 geo_fraction_monthly_mean = [np.mean(geo_fraction[i::12]) for i in range(12)]
-wind_fraction_monthly_mean = [np.mean(wind_fraction[i::12]) for i in range(12)]
 
 plt.figure(figsize=(5, 5), dpi=600)
 months = np.arange(1, 13)
@@ -453,7 +453,9 @@ plt.legend(frameon=False, ncols=2, fontsize=8)
 plt.title('North Atlantic', fontsize=15, loc='left')
 plt.show()
 
+
 # # spatial mean plot
+# # ----------------------------------------------------------------------------
 # s_m_a_simulated = s_m_a_simulated.where(
 #     (s_m_a_simulated['LATITUDE'] > 15) | (s_m_a_simulated['LATITUDE'] < -15), 0
 # )
@@ -467,48 +469,6 @@ plt.show()
 # plt.legend()
 # plt.show()
 
-# # QQ plot
-# # s_m_a_simulated = s_m_a_simulated.where(
-# #     (s_m_a_simulated['LATITUDE'] > 20) & (s_m_a_simulated['LATITUDE'] < 70), 0
-# # )
-# # s_m_a_simulated = s_m_a_simulated.where(
-# #     (s_m_a_simulated['LONGITUDE'] > -100) & (s_m_a_simulated['LONGITUDE'] < 0), 0
-# # )
-# # s_m_a = s_m_a.where(
-# #     (s_m_a['LATITUDE'] > 20) & (s_m_a['LATITUDE'] < 70), 0
-# # )
-# # s_m_a = s_m_a.where(
-# #     (s_m_a['LONGITUDE'] > -100) & (s_m_a['LONGITUDE'] < 0), 0
-# # )
-
-# # s_m_a_simulated = s_m_a_simulated.where(
-# #     ((s_m_a_simulated['LATITUDE'] < -20) & (s_m_a_simulated['LATITUDE'] > -60)), 0
-# # )
-# # s_m_a_simulated = s_m_a_simulated.where(
-# #     ((s_m_a_simulated['LONGITUDE'] > -180) & (s_m_a_simulated['LONGITUDE'] < -55)), 0
-# # )
-# # s_m_a = s_m_a.where(
-# #     ((s_m_a['LATITUDE'] < -20) & (s_m_a['LATITUDE'] > -60)), 0
-# # )
-# # s_m_a = s_m_a.where(
-# #     ((s_m_a['LONGITUDE'] > -180) & (s_m_a['LONGITUDE'] < -55)), 0
-# # )
-
-# # s_m_a_simulated.sel(TIME=0.5).plot()
-# plt.figure(figsize=(6, 6))
-# for lon, lat in zip(s_m_a_simulated['LONGITUDE'], s_m_a_simulated['LATITUDE']):
-#     plt.plot(
-#         s_m_a.sel(LONGITUDE=lon, LATITUDE=lat).values,
-#         s_m_a_simulated.sel(LONGITUDE=lon, LATITUDE=lat).values,
-#         ','
-#     )
-# x = np.linspace(-1, 1, 100)
-# plt.plot(x, x, 'r--')
-# plt.xlim(-1, 1)
-# plt.ylim(-1, 1)
-# # plt.yscale('log', base=2)
-# # plt.xscale('log', base=2)
-# plt.show()
 
 # autocorrelation plot
 # ----------------------------------------------------------------------------
@@ -557,31 +517,3 @@ plt.legend(frameon=False)
 plt.title(r'$\gamma$'+f' = {GAMMA}, 15°N-15°S Excluded', fontsize=15, loc='left')
 
 plt.show()
-
-
-# something todo
-# precipitation_a = -q_surface_ds['ANOMALY_avg_tprate'].where(
-#     ~np.isnan(s_m_monthly_mean)
-# )
-# evaporation_a = -q_surface_ds['ANOMALY_avg_ie'].where(
-#     ~np.isnan(s_m_monthly_mean)
-# )
-# plt.plot(precipitation_a.mean(dim=['LONGITUDE', 'LATITUDE']), label='Precipitation Anomaly')
-# plt.plot(evaporation_a.mean(dim=['LONGITUDE', 'LATITUDE']), label='Evaporation Anomaly')
-# plt.legend()
-# plt.show()
-
-# plt.plot(
-#     evaporation_a.mean(dim=['LONGITUDE', 'LATITUDE']) + precipitation_a.mean(dim=['LONGITUDE', 'LATITUDE']),
-#     label="E'-P'"
-# )
-# plt.legend()
-# plt.show()
-
-# # for each month, plot the range of SSSA: max-min
-# s_m_a_simulated_range = s_m_a_simulated.max(dim=['LONGITUDE', 'LATITUDE']) - s_m_a_simulated.min(dim=['LONGITUDE', 'LATITUDE'])
-# s_m_a_range = s_m_a.max(dim=['LONGITUDE', 'LATITUDE']) - s_m_a.min(dim=['LONGITUDE', 'LATITUDE'])
-# plt.plot(s_m_a_simulated_range, label='Simulated SSSA Range')
-# plt.plot(s_m_a_range, label='Observed SSSA Range')
-# plt.legend()
-# plt.show()
