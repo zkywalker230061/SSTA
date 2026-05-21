@@ -12,6 +12,8 @@ from utilities import load_and_prepare_dataset
 from utilities import get_monthly_mean, get_anomaly
 from utilities import save_file
 
+import calculate_maxgradsub
+
 
 RHO_O = 1025  # kg / m^3
 C_O = 4100  # J / (kg K)
@@ -449,6 +451,8 @@ def main():
 
     save_entrainment_anomaly_temperature()
     save_entrainment_anomaly_salinity()
+
+    calculate_maxgradsub.main()
 
     save_entrainment_anomaly_temperature_maxgrad()
 
