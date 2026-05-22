@@ -76,7 +76,7 @@ def save_regridded_reynolds_anomalies():
         ds_year = xr.open_dataset(
             f"datasets/Reynolds/sst.day.anom.{year}.nc"
         )
-        ds_year_monthly = ds_year.resample(time="1M").mean()
+        ds_year_monthly = ds_year.resample(time="1ME").mean()
         ds_year_monthly['time'] = pd.to_datetime(
             ds_year_monthly['time'].values
         ).to_period('M').to_timestamp()
@@ -101,7 +101,7 @@ def save_regridded_reynolds_ltm():
         reynolds_sst_ltm_day['time'].values+657073, unit='D', origin=pd.Timestamp('1970-01-01')
     )
 
-    reynolds_sst_ltm = reynolds_sst_ltm_day.resample(time="1M").mean()
+    reynolds_sst_ltm = reynolds_sst_ltm_day.resample(time="1ME").mean()
     reynolds_sst_ltm['time'] = pd.to_datetime(
         reynolds_sst_ltm['time'].values
     ).to_period('M').to_timestamp()
