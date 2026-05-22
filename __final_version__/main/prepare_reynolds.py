@@ -230,7 +230,7 @@ def save_reynolds_sst_anomalies_no_2004():
 
 
 def main():
-    """Main function to prepare datasets from RGARGO."""
+    """Main function to prepare datasets from OISST."""
 
     save_regridded_reynolds_anomalies()
     save_regridded_reynolds_ltm()
