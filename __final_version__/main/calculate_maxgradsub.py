@@ -18,6 +18,10 @@ SECONDS_MONTH = 30 * 24 * 60 * 60  # seconds in a month
 def save_sub_temperature_maxgrad():
     """Save the sub-layer temperature dataset from max-gradient method."""
 
+    with open("logs/datasets.txt", "r", encoding="utf-8") as logs_datasets:
+        if "datasets/Sub_Layer_Temperature_Max_Gradient_Method-(2004-2025).nc" in logs_datasets.read():
+            return
+
     # TODO
 
 
