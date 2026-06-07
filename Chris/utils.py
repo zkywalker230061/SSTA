@@ -15,6 +15,8 @@ from scipy.linalg import svd
 #from wpca import EMPCA
 #import wpca
 #from ppca import PPCA
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 matplotlib.use('TkAgg')
 
@@ -391,6 +393,12 @@ def get_eof_from_ppca_py(dataset, mask, modes, monthly_mean_ds=None, time_name="
 #     return components, explained_variance, scores
 
 
+def normalised_rmse(model, obs):
+    rmse = np.sqrt(((model - obs)**2).mean(dim="TIME"))
+    nrmse = rmse / np.sqrt((obs**2).mean(dim="TIME"))
+    return nrmse
+
+
 def make_movie(dataset, vmin, vmax, colorbar_label=None, ENSO_ds=None, savepath=None, cmap='RdBu_r'):
     times = dataset.TIME.values
 
@@ -559,7 +567,7 @@ def compute_gradient_lon(
     return grad
 
 
-def get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH=False, gamma0=10, INCLUDE_GEOSTROPHIC_DISPLACEMENT=False, INCLUDE_EKMAN_MEAN_ADVECTION=False, OTHER_MLD=False, MAX_GRAD_TSUB=False, ENTRAINMENT_VEL_ANOM_FORC=False, LOG_ENTRAINMENT_VELOCITY=False, SPLIT_SURFACE=False, INCLUDE_RADIATIVE_SURFACE=False, INCLUDE_TURBULENT_SURFACE=False, DATA_TO_2025=False):
+def get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC, USE_DOWNLOADED_SSH=False, gamma0=10, INCLUDE_GEOSTROPHIC_DISPLACEMENT=False, INCLUDE_EKMAN_MEAN_ADVECTION=False, OTHER_MLD=False, MAX_GRAD_TSUB=False, ENTRAINMENT_VEL_ANOM_FORC=False, LOG_ENTRAINMENT_VELOCITY=False, SPLIT_SURFACE=False, INCLUDE_RADIATIVE_SURFACE=False, INCLUDE_TURBULENT_SURFACE=False, DATA_TO_2025=False, adjust_mld=0.0):
     save_name = ""
     if INCLUDE_SURFACE:
         save_name = save_name + "1"
@@ -600,6 +608,8 @@ def get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN, INCLUDE_ENTRAINMENT, INCLUDE_G
             save_name += "_turbsurf"
     if DATA_TO_2025:
         save_name += "_upto2025"
+    if adjust_mld != 0.0:
+        save_name += "_mldadjust" + str(adjust_mld)
     return save_name
 
 
@@ -619,18 +629,28 @@ def get_month_from_time(time):
 
 
 def plot_eof_for_regional_analysis(EOFs, number, save_name=None):
-    fig, axs = plt.subplots(number, 1)
-    fig.tight_layout()
+    fig, axs = plt.subplots(number, 1, subplot_kw={'projection': ccrs.PlateCarree()})
     norm = colors.TwoSlopeNorm(vmin=-2, vcenter=0, vmax=2)
     for k in range(number):
         axs[k].grid()
         pcolormesh = axs[k].pcolormesh(EOFs.LONGITUDE.values, EOFs.LATITUDE.values, EOFs.isel(MODE=k), cmap='RdBu_r', norm=norm)
         if k == number - 1:
             axs[k].set_xlabel("Longitude")
+            axs[k] = format_cartopy(axs[k])
+        else:
+            axs[k] = format_cartopy(axs[k], no_bottom_labels=True)
         axs[k].set_ylabel("Latitude")
+        #axs[k].patch.set_alpha(0)
+        axs[k].set_extent([EOFs.LONGITUDE.min(), EOFs.LONGITUDE.max(), EOFs.LATITUDE.min(), EOFs.LATITUDE.max()], crs=ccrs.PlateCarree())
+
     cbar = fig.colorbar(pcolormesh, ax=axs, label="EOF spatial pattern (standardised)")
+
+    fig.patch.set_alpha(0)
+    cbar.ax.patch.set_alpha(0)
+    for ax in fig.axes:
+        ax.patch.set_alpha(0)
     if save_name is not None:
-        plt.savefig(save_name, dpi=400)
+        plt.savefig(save_name, dpi=400, transparent=True, bbox_inches='tight')
     # plt.show()
 
 def get_eofs(model, start_mode, end_mode, map_mask, invert=True, standardise=True):
@@ -648,12 +668,12 @@ def get_eofs(model, start_mode, end_mode, map_mask, invert=True, standardise=Tru
     return [EOFs, PCs, eof_modes, explained_variance]
 
 
-def get_eof(model, obs=False, obs_da=None, save_folder=None, map_mask=None):
+def get_eof(model, obs=False, obs_da=None, save_folder=None, map_mask=None, invert=False):
     if obs:
-        EOFsPCs = get_eofs(obs_da, 0, 3, map_mask)
+        EOFsPCs = get_eofs(obs_da, 0, 3, map_mask, invert=invert)
         save_name = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/" + save_folder + "EOFs_obs.jpg"
     else:
-        EOFsPCs = get_eofs(model, 0, 3, map_mask)
+        EOFsPCs = get_eofs(model, 0, 3, map_mask, invert=invert)
         save_name = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/" + save_folder + "EOFs.jpg"
     EOFs = EOFsPCs[0]
     PCs = EOFsPCs[1]
@@ -701,7 +721,7 @@ def plot_explained_variance(explained_variance, start_mode, save_name):
     plt.show()
 
 
-def format_cartopy(ax):     # from Julia's code
+def format_cartopy(ax, no_bottom_labels=False):     # from Julia's code
     ax.add_feature(cfeature.COASTLINE, linewidth=0.5)
     ax.add_feature(cfeature.LAND, facecolor='lightgray', edgecolor='none', zorder=1)
     gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, linewidth=0.5, color='gray', alpha=0.5)
@@ -709,6 +729,8 @@ def format_cartopy(ax):     # from Julia's code
     gl.right_labels = False
     gl.xlabel_style = {'size': 10}
     gl.ylabel_style = {'size': 10}
+    if no_bottom_labels:
+        gl.bottom_labels = False
     return ax
 
 
@@ -741,7 +763,7 @@ def start_at_month(da, month):
             data_at_this_month.append(da.sel(TIME=time))
     return xr.concat(data_at_this_month, dim="TIME")
 
-def plot_autocorrelation(acf, lag, model_name, acf_obs=None, show=True, label=None):
+def plot_autocorrelation(acf, lag, model_name, acf_obs=None, show=True, label=None, blackline=False, thicken=False, save_path=None, add_exponential=False):
     if lag is not None:
         plt.figure()
         acf.sel(LAG=lag).plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=-1, vmax=1)
@@ -749,19 +771,112 @@ def plot_autocorrelation(acf, lag, model_name, acf_obs=None, show=True, label=No
         plt.show()
 
     mean_autocorrelation = acf.mean(("LATITUDE", "LONGITUDE"))
-    # print(mean_autocorrelation.sel(LAG=3).values)
-    # print(mean_autocorrelation.sel(LAG=6).values)
-    # plt.figure()
+    if save_path is not None:
+        fig, ax = plt.subplots()
     plt.grid()
-    plt.plot(mean_autocorrelation.LAG.values, mean_autocorrelation.values, label=label)
+    if blackline and thicken:
+        plt.plot(mean_autocorrelation.LAG.values, mean_autocorrelation.values, label=label, color="black", linewidth=3)
+    elif blackline:
+        plt.plot(mean_autocorrelation.LAG.values, mean_autocorrelation.values, label=label, color="black")
+    elif thicken:
+        plt.plot(mean_autocorrelation.LAG.values, mean_autocorrelation.values, label=label, linewidth=3)
+    else:
+        plt.plot(mean_autocorrelation.LAG.values, mean_autocorrelation.values, label=label)
     if acf_obs is not None:
         mean_autocorrelation_obs = acf_obs.mean(("LATITUDE", "LONGITUDE"))
         plt.plot(mean_autocorrelation_obs.LAG.values, mean_autocorrelation_obs.values, label="Observations")
-        plt.title("Autocorrelation Mean of " + str(model_name))
+        # plt.title("Autocorrelation Mean of " + str(model_name))
         plt.legend()
     # else:
     #     plt.title("Autocorrelation Mean of " + str(model_name))
     plt.xlabel("Lag (months)")
     plt.ylabel("Autocorrelation")
+    if add_exponential:
+        x_test_list = np.linspace(1, 37, 36)
+        y1_test_list = 1 * np.exp(-0.35 * x_test_list) / 0.7 * 0.45
+        y2_test_list = 1 / (1 + 0.35 * x_test_list)
+        plt.plot(x_test_list, y1_test_list, label="Exponential decay", linestyle="--")
+        #plt.plot(x_test_list, y2_test_list, label="Implicit decay")
+        plt.legend()
+    if save_path is not None:
+        ax.set_title('')
+        fig.patch.set_alpha(0)
+        ax.patch.set_alpha(0)
+        plt.savefig(save_path, dpi=400, transparent=True)
     if show:
         plt.show()
+
+
+def plot_lagged_correlation(da1, da2, minlag, maxlag, save_path=None):
+    lags = np.arange(minlag, maxlag)
+    month_name_list = {1: 'January', 2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June', 7: 'July', 8: 'August',
+                       9: 'September', 10: 'October', 11: 'November', 12: 'December'}
+
+    fig, axs = plt.subplots(4, 3, figsize=(15, 12), sharey=True, sharex=True)
+    axs = axs.flatten()
+
+    for ax, (month, month_name) in zip(axs, month_name_list.items()):
+        lagged_correlations = []
+
+        for lag in lags:
+            da1_shifted = da1.shift(TIME=lag)
+            da1_month = da1_shifted.isel(TIME=(da1.MONTH == month))
+            da2_month = da2.isel(TIME=(da2.MONTH == month))
+            corr_map = xr.corr(da1_month, da2_month, dim='TIME')
+            weights = np.cos(np.deg2rad(corr_map.LATITUDE))
+            corr_mean = float(corr_map.weighted(weights).mean(dim=['LATITUDE', 'LONGITUDE']))
+            lagged_correlations.append(corr_mean)
+
+        lagged_correlations = np.array(lagged_correlations)
+        ax.plot(lags, lagged_correlations, marker='x')
+        ax.set_title(month_name)
+        ax.set_xlim(-5, 5)
+        ax.set_ylim(-0.6, 0.6)
+        ax.grid()
+
+    fig.supxlabel('Lag (months)')
+    fig.supylabel('Pearson Correlation Coefficient')
+    plt.tight_layout()
+    plt.show()
+
+def plot_lagged_correlation_not_monthly(da1, da2, minlag, maxlag, save_path=None, obs=None, xlabel=None):
+    lags = np.arange(minlag, maxlag)
+
+    fig, ax = plt.subplots()
+    lagged_correlations = []
+    for lag in lags:
+        da1_shifted = da1.shift(TIME=lag)
+        corr_map = xr.corr(da1_shifted, da2, dim='TIME')
+        weights = np.cos(np.deg2rad(corr_map.LATITUDE))
+        corr_mean = float(corr_map.weighted(weights).mean(dim=['LATITUDE', 'LONGITUDE']))
+        lagged_correlations.append(corr_mean)
+    lagged_correlations = np.array(lagged_correlations)
+    ax.plot(lags, lagged_correlations, marker='x', label="Model")
+
+    if obs is not None:
+        lagged_correlations_obs = []
+        for lag in lags:
+            da1_shifted = da1.shift(TIME=lag)
+            corr_map_obs = xr.corr(da1_shifted, obs, dim='TIME')
+            weights = np.cos(np.deg2rad(corr_map_obs.LATITUDE))
+            corr_mean_obs = float(corr_map_obs.weighted(weights).mean(dim=['LATITUDE', 'LONGITUDE']))
+            lagged_correlations_obs.append(corr_mean_obs)
+        ax.plot(lags, lagged_correlations_obs, marker='x', label="Observations")
+
+    ax.set_title("")
+    ax.set_xlim(minlag, maxlag-1)
+    ax.set_ylim(-0.6, 0.6)
+    ax.grid()
+
+    if xlabel is None:
+        fig.supxlabel('Lag (months)')
+    else:
+        fig.supxlabel(xlabel)
+    fig.supylabel('Pearson Correlation Coefficient')
+    plt.legend()
+    plt.tight_layout()
+    fig.patch.set_alpha(0)
+    ax.patch.set_alpha(0)
+    if save_path is not None:
+        plt.savefig(save_path, dpi=400, transparent=True)
+    plt.show()

@@ -2,7 +2,9 @@ import xarray as xr
 import pandas as pd
 import matplotlib.pyplot as plt
 from Chris.utils import make_movie, load_and_prepare_dataset, compute_gradient_lat, compute_gradient_lon, \
-    get_monthly_mean, get_anomaly, coriolis_parameter
+    get_monthly_mean, get_anomaly, coriolis_parameter, format_cartopy
+import cartopy.crs as ccrs
+
 
 DOWNLOADED = False
 DATA_TO_2025 = True
@@ -26,6 +28,20 @@ if not DATA_TO_2025:
 monthly_mean_sla = get_monthly_mean(sea_surface_ds[var_name])
 sea_surface_ds[var_name + '_ANOMALY'] = get_anomaly(sea_surface_ds, var_name, monthly_mean_sla)[var_name + "_ANOMALY"]
 sea_surface_ds[var_name + '_ANOMALY'].attrs['units'] = ''
+
+def plot_snapshot():
+    snapshot = sea_surface_ds[var_name].mean(dim="TIME")
+    fig, ax = plt.subplots(subplot_kw={'projection': ccrs.Robinson()})
+    snapshot.plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=-2.5, vmax=2.5, transform=ccrs.PlateCarree(), ax=ax, cbar_kwargs={'orientation': 'horizontal', 'label': 'Mean Sea Surface Height (dbar)', 'shrink': 0.75})
+    ax = format_cartopy(ax)
+    ax.set_xlabel("Longitude (º)")
+    ax.set_ylabel("Latitude (º)")
+    ax.set_title('')
+    fig.patch.set_alpha(0)
+    ax.patch.set_alpha(0)
+    plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_report/seasurfaceheight.png", dpi=400, transparent=True, bbox_inches='tight')
+    plt.show()
+# plot_snapshot()
 
 sea_surface_ds[var_name + '_anomaly_grad_lat'] = compute_gradient_lat(sea_surface_ds[var_name + '_ANOMALY'])
 sea_surface_ds[var_name + '_anomaly_grad_long'] = compute_gradient_lon(sea_surface_ds[var_name + '_ANOMALY'])

@@ -10,17 +10,18 @@ ssl._create_default_https_context = ssl._create_unverified_context
 
 from Chris.correlation_significance import get_significance
 from Chris.utils import make_movie, get_eof, get_eof_with_nan_consideration, get_eof_from_ppca_py, get_save_name, \
-    get_month_from_time, format_cartopy, mask_dataset, get_autocorrelation, start_at_month, plot_autocorrelation
+    get_month_from_time, format_cartopy, mask_dataset, get_autocorrelation, start_at_month, plot_autocorrelation, \
+    normalised_rmse
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from correlation_significance import mutual_information
 
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN_ANOM_ADVECTION = True
-INCLUDE_EKMAN_MEAN_ADVECTION = False
+INCLUDE_EKMAN_MEAN_ADVECTION = True
 INCLUDE_ENTRAINMENT = True
 INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING = False
 INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
-INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = False
+INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
 
 SPLIT_SURFACE = True
 INCLUDE_RADIATIVE_SURFACE = True
@@ -34,10 +35,10 @@ gamma_0 = 15.0
 
 IMPLICIT_MODEL = True
 
-MASK_TROPICS = True
+MASK_TROPICS = False
 MASK_TROPICS_LATITUDE = 15
 
-MASK_SOME_REGIONS = True
+MASK_SOME_REGIONS = False
 
 CONSIDER_OBSERVATIONS = True
 USE_REYNOLDS = True
@@ -63,13 +64,13 @@ MASK_REGIONS = [(slice(15, 25), slice(-75, -65)), (slice(-50, -30), slice(125, 1
 
 save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE_ENTRAINMENT, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION,
                           USE_DOWNLOADED_SSH=USE_DOWNLOADED_SSH, gamma0=gamma_0,
-                          INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION=INCLUDE_EKMAN_MEAN_ADVECTION ,OTHER_MLD=USE_OTHER_MLD, MAX_GRAD_TSUB=USE_MAX_GRADIENT_METHOD, ENTRAINMENT_VEL_ANOM_FORC=INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, LOG_ENTRAINMENT_VELOCITY=USE_LOG_FOR_ENTRAINMENT, SPLIT_SURFACE=SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE=INCLUDE_RADIATIVE_SURFACE, INCLUDE_TURBULENT_SURFACE=INCLUDE_TURBULENT_SURFACE, DATA_TO_2025=DATA_TO_2025)
+                          INCLUDE_GEOSTROPHIC_DISPLACEMENT=INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, INCLUDE_EKMAN_MEAN_ADVECTION=INCLUDE_EKMAN_MEAN_ADVECTION ,OTHER_MLD=USE_OTHER_MLD, MAX_GRAD_TSUB=USE_MAX_GRADIENT_METHOD, ENTRAINMENT_VEL_ANOM_FORC=INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, LOG_ENTRAINMENT_VELOCITY=USE_LOG_FOR_ENTRAINMENT, SPLIT_SURFACE=SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE=INCLUDE_RADIATIVE_SURFACE, INCLUDE_TURBULENT_SURFACE=INCLUDE_TURBULENT_SURFACE, DATA_TO_2025=DATA_TO_2025, adjust_mld=0.0)
 ALL_SCHEMES_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/all_anomalies/" + save_name + ".nc"
 IMPLICIT_SCHEME_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/" + save_name + ".nc"
 DENOISED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/cur_prev_denoised.nc"
 OBSERVATIONS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/RG_ArgoClim_Temperature_2019.nc"
 OBSERVATIONS_JJ_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/observed_anomaly_JJ.nc"
-OBSERVATIONS_2025_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Mixed_Layer_Temperature_Anomalies-(2004-2025).nc"
+OBSERVATIONS_2025_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/reynolds_sst_Anomalies-(2004-2025)_no_2004.nc"
 REYNOLDS_OBS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sst_anomalies-(2004-2018).nc"
 ENSO_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/nina34.anom.nc"
 
@@ -87,7 +88,7 @@ if CONSIDER_OBSERVATIONS:
     if USE_REYNOLDS:
         if DATA_TO_2025:
             obs_ds = xr.open_dataset(OBSERVATIONS_2025_DATA_PATH, decode_times=False)
-            observed_anomaly = obs_ds['ANOMALY_ML_TEMPERATURE']
+            observed_anomaly = obs_ds['ANOMALY_SST']
         else:
             obs_ds = xr.open_dataset(REYNOLDS_OBS_DATA_PATH, decode_times=False)
             observed_anomaly = obs_ds['anom']
@@ -103,8 +104,7 @@ if CONSIDER_OBSERVATIONS:
         observed_anomaly = processed_observations_ds["__xarray_dataarray_variable___ANOMALY"]  # worse name...
 
     if MASK_TROPICS:
-        observed_anomaly = observed_anomaly.where((observed_anomaly.LATITUDE > MASK_TROPICS_LATITUDE) | (
-                    observed_anomaly.LATITUDE < -1 * MASK_TROPICS_LATITUDE), np.nan)
+        observed_anomaly = observed_anomaly.where((observed_anomaly.LATITUDE > MASK_TROPICS_LATITUDE) | (observed_anomaly.LATITUDE < -1 * MASK_TROPICS_LATITUDE), np.nan)
     if MASK_SOME_REGIONS:
         observed_anomaly = mask_dataset(observed_anomaly, MASK_REGIONS)
 
@@ -122,8 +122,22 @@ enso_indices_ds = enso_indices_ds.assign_coords(time=np.arange(len(enso_indices_
 
 """Plot results"""
 
+def plot_snapshot(to_plot="EXPLICIT", time=50.5):
+    snapshot = all_schemes_ds[to_plot].sel(TIME=time)
+    fig, ax = plt.subplots(subplot_kw={'projection': ccrs.Robinson()})
+    snapshot.plot(x='LONGITUDE', y='LATITUDE', cmap='RdBu_r', vmin=-2, vmax=2, transform=ccrs.PlateCarree(), ax=ax, cbar_kwargs={'orientation': 'horizontal', 'label': 'February 2008 SSTA (K)', 'shrink': 0.75})
+    ax = format_cartopy(ax)
+    ax.set_xlabel("Longitude (º)")
+    ax.set_ylabel("Latitude (º)")
+    ax.set_title('')
+    fig.patch.set_alpha(0)
+    ax.patch.set_alpha(0)
+    #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/final_results/model_snapshot.png", dpi=400, transparent=True)
+    plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_report/explicit_model_snapshot.png", dpi=400, transparent=True, bbox_inches='tight')
+    plt.show()
 
-def plot_full_model(to_plot="IMPLICIT", obs=False, save_path=None):
+
+def plot_full_model(to_plot="EXPLICIT", obs=False, save_path=None):
     if NORTH_ATLANTIC:
         all_schemes_ds[to_plot] = all_schemes_ds[to_plot].sel(LATITUDE=NA_LAT_BOUNDS).sel(LONGITUDE=NA_LONG_BOUNDS)  # only take north atlantic
     if obs:
@@ -148,7 +162,7 @@ def plot_full_model(to_plot="IMPLICIT", obs=False, save_path=None):
 """EOF analysis"""
 # get EOF modes and PCs for a given model
 start_mode = 0
-end_mode = 3
+end_mode = 2
 to_plot_name = "IMPLICIT"
 to_plot = all_schemes_ds[to_plot_name]
 if MASK_SOME_REGIONS:
@@ -236,9 +250,21 @@ def explained_variance_from_each_mode():  # plot explained variance from each mo
     # plt.savefig("../results/explained_variance_" + to_plot_name + ".jpg", dpi=400)
     plt.show()
 
+    fig, ax1 = plt.subplots()
+    ax1.grid()
+    ax1.plot(modes[:max_limit], explained_variance[:max_limit], marker='x', label="Model")
+    ax1.plot(modes[:max_limit], explained_variance_obs[:max_limit], marker='x', label="Observations")
+    ax1.set_ylabel("Explained variance")
+    plt.xlim(0, 20)
+    plt.legend()
+    fig.patch.set_alpha(0)
+    ax1.patch.set_alpha(0)
+    plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/final_results/explained_variance.png", dpi=400, transparent=True)
+    plt.show()
+
 
 def plot_spatial_pattern_EOFs():  # plot EOFs (spatial patterns) for the first k modes
-    k_range = 3
+    k_range = 2
     fig, axs = plt.subplots(k_range, 1)
     fig.suptitle("EOF of " + to_plot_name + " scheme")
     fig.tight_layout()
@@ -409,21 +435,21 @@ def track_warming_effects():
         print("TRACK_WARMING_EFFECTS requires CONSIDER_OBSERVATIONS=True")
 
 
-def track_anomaly_persistence(lag, start_month=None):
+def track_anomaly_persistence(lag, start_month=None, savepath=None, add_exponential=False):
     to_plot_no_unchanging_cells = to_plot.where(to_plot.std("TIME") != 0)     # remove parts where there is no change to avoid spuriously strong autocorrelation signals
 
     if start_month is None:
         autocorrelation_functions_ds = get_autocorrelation(to_plot_no_unchanging_cells, max_lag=36)  # all time
     else:
-        autocorrelation_functions_ds = get_autocorrelation(start_at_month(to_plot_no_unchanging_cells, start_month), lag_da=to_plot_no_unchanging_cells, max_lag=12)
+        autocorrelation_functions_ds = get_autocorrelation(start_at_month(to_plot_no_unchanging_cells, start_month), lag_da=to_plot_no_unchanging_cells, max_lag=24)
 
     if CONSIDER_OBSERVATIONS:
         obs_no_unchanging_cells = observed_anomaly.where(to_plot.std("TIME") != 0)
         if start_month is None:
             obs_autocorrelation_functions_ds = get_autocorrelation(obs_no_unchanging_cells, max_lag=36)  # all time
         else:
-            obs_autocorrelation_functions_ds = get_autocorrelation(start_at_month(obs_no_unchanging_cells, start_month), lag_da=obs_no_unchanging_cells, max_lag=12)
-        plot_autocorrelation(autocorrelation_functions_ds, lag, "Implicit Model", obs_autocorrelation_functions_ds)
+            obs_autocorrelation_functions_ds = get_autocorrelation(start_at_month(obs_no_unchanging_cells, start_month), lag_da=obs_no_unchanging_cells, max_lag=24)
+        plot_autocorrelation(autocorrelation_functions_ds, lag, "Implicit Model", obs_autocorrelation_functions_ds, label="Model", save_path=savepath, add_exponential=add_exponential)
         #plot_autocorrelation(obs_autocorrelation_functions_ds, lag, "observations")
     else:
         plot_autocorrelation(autocorrelation_functions_ds, lag, "implicit model")
@@ -431,19 +457,25 @@ def track_anomaly_persistence(lag, start_month=None):
 
 def plot_correlation():
     if CONSIDER_OBSERVATIONS:
-        fig, ax = plt.subplots(subplot_kw={'projection': ccrs.PlateCarree()})
+        fig, ax = plt.subplots(subplot_kw={'projection': ccrs.Robinson()})
         correlation = xr.corr(to_plot, observed_anomaly, dim='TIME')
+        print("Correlation is:")
         print(correlation.mean().values)
-        correlation.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
+        correlation.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1, transform=ccrs.PlateCarree(), ax=ax, cbar_kwargs={'orientation': 'horizontal', 'label': 'Pearson Correlation Coefficient', 'shrink': 0.75})
         plt.title("")
         plt.xlabel("Longitude (º)")
         plt.ylabel("Latitude (º)")
         cbar = plt.gcf().axes[-1]
-        cbar.set_ylabel('Pearson Correlation Coefficient', rotation=90)
-        plt.title("Correlation between model and SST observation")
+        #cbar.set_ylabel('Pearson Correlation Coefficient', rotation=90)
+        plt.title("")
+        # plt.title("Correlation between model and SST observation")
         ax = format_cartopy(ax)
+        fig.patch.set_alpha(0)
+        ax.patch.set_alpha(0)
         #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/correlations/" + save_name + "_correlation.jpg")
         #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_poster/full_model_correlation.png", dpi=400)
+        plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_report/implicit_correlation.png", dpi=400, transparent=True, bbox_inches='tight')
+
         plt.show()
 
     else:
@@ -460,8 +492,8 @@ def plot_mutual_information():
         plt.xlabel("Longitude (º)")
         plt.ylabel("Latitude (º)")
         cbar = plt.gcf().axes[-1]
-        cbar.set_ylabel('Pearson Correlation Coefficient', rotation=90)
-        plt.title("Mutual Information between model and SST observation")
+        cbar.set_ylabel('Mutual Information', rotation=90)
+        plt.title("")
         #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/correlations/" + save_name + "_correlation.jpg")
         #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_poster/full_model_correlation.png", dpi=400)
         plt.show()
@@ -470,24 +502,46 @@ def plot_mutual_information():
         print("PLOT_MUTUAL_INFORMATION requires CONSIDER_OBSERVATIONS=True")
 
 def plot_significant_correlation():
-    correlation, significant_correlation = get_significance(to_plot, observed_anomaly, resamples=1000, test_statistic="PEARSON")
-    fig, ax = plt.subplots(subplot_kw={'projection': ccrs.PlateCarree()})
-    correlation.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
+    correlation, significant_correlation = get_significance(to_plot, observed_anomaly, resamples=1000, test_statistic="PEARSON", alpha=0.05)
+    print("Correlation is:")
+    print(correlation.mean().values)
+    fig, ax = plt.subplots(subplot_kw={'projection': ccrs.Robinson()})
+    correlation.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1, transform=ccrs.PlateCarree(), ax=ax, cbar_kwargs={'orientation': 'horizontal', 'label': 'Pearson Correlation', 'shrink': 0.75})
     lons = significant_correlation.LONGITUDE.values
     lats = significant_correlation.LATITUDE.values
     lon_grid, lat_grid = np.meshgrid(lons, lats)
-    ax.contourf(lon_grid, lat_grid, significant_correlation.values.astype(float), levels=[0.5, 1.5], hatches=['///'], colors='none')
+    ax.contourf(lon_grid, lat_grid, significant_correlation.values.astype(float), levels=[0.5, 1.5], hatches=['xxx'], colors='none', transform=ccrs.PlateCarree())
     ax = format_cartopy(ax)
-    plt.title("")
-    cbar = plt.gcf().axes[-1]
-    cbar.set_ylabel('Pearson Correlation Coefficient', rotation=90)
     ax.set_xlabel("Longitude (º)")
     ax.set_ylabel("Latitude (º)")
+    ax.set_title('')
+    fig.patch.set_alpha(0)
+    ax.patch.set_alpha(0)
+    # plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/final_results/full_model_mutual_information2.png", dpi=400, transparent=True)
+    plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_report/implicit_correlation_with_significance.png", dpi=400, transparent=True, bbox_inches='tight')
+    plt.show()
+
+def get_normalised_rmse():
+    nrmse = normalised_rmse(to_plot, observed_anomaly)
+    #nrmse = (np.abs(to_plot) - np.abs(observed_anomaly)).mean(dim="TIME") / np.sqrt((observed_anomaly**2).mean(dim="TIME"))
+    print("NRMSE is:")
+    print(nrmse.mean().values)
+    fig, ax = plt.subplots(subplot_kw={'projection': ccrs.Robinson()})
+    nrmse.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-0.5, vmax=0.5, transform=ccrs.PlateCarree(), ax=ax, cbar_kwargs={'orientation': 'horizontal', 'label': 'Normalised RMSE', 'shrink': 0.75})
+    ax = format_cartopy(ax)
+    ax.set_xlabel("Longitude (º)")
+    ax.set_ylabel("Latitude (º)")
+    ax.set_title('')
+    fig.patch.set_alpha(0)
+    ax.patch.set_alpha(0)
+    # plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/final_results/full_model_nrmse.png", dpi=400, transparent=True)
+    #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_report/implicit_nrmse.png", dpi=400, transparent=True, bbox_inches='tight')
     plt.show()
 
 # plot_full_model(save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/" + save_name + ".mp4")
 # plot_full_model(obs=True, save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/videos/Reynolds_observations.mp4")
 
+# plot_snapshot()
 # plot_full_model()
 # plot_enso()
 # eof_movie()
@@ -496,7 +550,8 @@ def plot_significant_correlation():
 # plot_PCs_over_time()
 # regression_map()
 # track_warming_effects()
-track_anomaly_persistence(6, 9)
+track_anomaly_persistence(6, None, "/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_report/full_model_autocorrelation_with_ME.png", add_exponential=True)
 # plot_correlation()
 # plot_mutual_information()
 # plot_significant_correlation()
+# get_normalised_rmse()

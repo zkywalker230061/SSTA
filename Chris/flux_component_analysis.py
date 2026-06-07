@@ -6,7 +6,7 @@ from matplotlib.animation import FuncAnimation
 import matplotlib
 
 from Chris.utils import compute_gradient_lat, compute_gradient_lon, get_month_from_time, get_anomaly, format_cartopy, \
-    get_autocorrelation, plot_autocorrelation
+    get_autocorrelation, plot_autocorrelation, plot_lagged_correlation, plot_lagged_correlation_not_monthly
 from utils import get_monthly_mean, make_movie, get_save_name
 import cartopy.crs as ccrs
 import ssl
@@ -16,11 +16,11 @@ matplotlib.use('TkAgg')
 
 INCLUDE_SURFACE = True
 INCLUDE_EKMAN_ANOM_ADVECTION = True
-INCLUDE_EKMAN_MEAN_ADVECTION = True
+INCLUDE_EKMAN_MEAN_ADVECTION = False
 INCLUDE_ENTRAINMENT = True
 INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING = False
 INCLUDE_GEOSTROPHIC_ANOM_ADVECTION = True
-INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = True
+INCLUDE_GEOSTROPHIC_MEAN_ADVECTION = False
 
 SPLIT_SURFACE = True
 INCLUDE_RADIATIVE_SURFACE = True
@@ -41,6 +41,7 @@ save_name = get_save_name(INCLUDE_SURFACE, INCLUDE_EKMAN_ANOM_ADVECTION, INCLUDE
 FLUX_CONTRIBUTIONS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/" + save_name + "_flux_components.nc"
 IMPLICIT_SCHEME_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/" + save_name + ".nc"
 REYNOLDS_OBS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sst_anomalies-(2004-2018).nc"
+#OBSERVATIONS_2025_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/reynolds_sst_Anomalies-(2004-2025)_no_2004.nc"
 OBSERVATIONS_2025_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Mixed_Layer_Temperature_Anomalies-(2004-2025).nc"
 
 if DATA_TO_2025:
@@ -197,6 +198,7 @@ def get_surface_flux_proportion(component, save_file=False):
 
 
 def plot_proportions_over_time(plot_list, readable_list, signed=False):
+    fig, ax = plt.subplots()
     plt.grid()
     for i in range(len(plot_list)):
         if signed:
@@ -205,17 +207,26 @@ def plot_proportions_over_time(plot_list, readable_list, signed=False):
             plt.ylabel("Proportion of Each Contribution to Total Flux")
         else:
             plt.plot(all_components[plot_list[i]].TIME / 12 + 2004, (abs(all_components[plot_list[i]]) / all_components['TOTAL_FLUX_ANOMALY']).mean(dim="LATITUDE").mean(dim="LONGITUDE"), label=readable_list[i])
-            plt.ylabel("Proportion of Each Contribution to Total Flux Magnitude")
+            plt.ylabel("Proportion of Total Flux Magnitude")
     plt.xlabel("Year")
-    plt.legend()
+    #plt.legend()
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.12), ncol=2)
+    plt.tight_layout()
+    fig.patch.set_alpha(0)
+    ax.patch.set_alpha(0)
+    ax.set_xlim(left=2015, right=2020)
+    #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/final_results/full_model_midlat_components.png", dpi=400,transparent=True)
+    plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_report/full_model_sh_midlat_components_20152020.png", dpi=400, transparent=True, bbox_inches='tight')
     plt.show()
 
 def plot_over_time(plot_list, readable_list):
+    fig, ax = plt.subplots()
     plt.grid()
     for i in range(len(plot_list)):
         plt.plot(all_components[plot_list[i]].TIME / 12 + 2004, (all_components[plot_list[i]]).mean(dim="LATITUDE").mean(dim="LONGITUDE"), label=readable_list[i])
     plt.ylabel("Contribution to Total Flux")
     plt.xlabel("Year")
+    ax.set_xlim(left=2015, right=2020)
     plt.legend()
     plt.show()
 
@@ -250,35 +261,26 @@ def covariance_ratio(component_list, component_names, make_plots=False):
     if make_plots:
         for i, forcing in enumerate(component_list):
             name = component_names[i]
-            ratios[forcing].plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=1)
-            plt.title("")
+            fig, ax = plt.subplots(subplot_kw={'projection': ccrs.Robinson()})
+            ratios[forcing] = ratios[forcing].where(ratios[forcing] > 0, 0).where(ratios[forcing] < 1, 1)
+            #ratios[forcing].plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=1, ax=ax, transform=ccrs.PlateCarree(), cbar_kwargs={'orientation': 'horizontal', 'label': 'Covariance of ' + name, 'shrink': 0.75})
+            if name == "Entrainment":
+                ratios[forcing].plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=1, ax=ax, transform=ccrs.PlateCarree(), cbar_kwargs={'orientation': 'horizontal', 'label': 'Covariance Ratio', 'shrink': 0.75})
+            else:
+                ratios[forcing].plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=0, vmax=1, ax=ax, transform=ccrs.PlateCarree(), add_colorbar=False)#, cbar_kwargs={'orientation': 'horizontal', 'label': '', 'shrink': 0.75})
             plt.xlabel("Longitude (º)")
             plt.ylabel("Latitude (º)")
-            cbar = plt.gcf().axes[-1]
-            cbar.set_ylabel('Covariance of ' + name, rotation=90)
-            plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/covariances/" + save_name + "_covariances_" + forcing + ".jpg", dpi=400)
+            ax = format_cartopy(ax)
+            ax.set_title('')
+            fig.patch.set_alpha(0)
+            ax.patch.set_alpha(0)
+            #plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/covariances/" + save_name + "_covariances_" + forcing + ".png", dpi=400, transparent=True, bbox_inches='tight')
+            plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_report/covariance_ratios/covarianceratio_" + forcing + ".png", dpi=400, transparent=True, bbox_inches='tight')
             plt.show()
 
 def correlate_mld_to_fluxes(component, mld):
     if DATA_TO_2025:
         flux = all_components[component]
-        print(flux)
-        print(mld)
-
-        print(flux.dims)
-        print(mld.dims)
-
-        # fig, ax = plt.subplots(subplot_kw={'projection': ccrs.PlateCarree()})
-        # correlation = xr.corr(flux, mld, dim='TIME')
-        # correlation.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1)
-        # plt.title("")
-        # plt.xlabel("Longitude (º)")
-        # plt.ylabel("Latitude (º)")
-        # cbar = plt.gcf().axes[-1]
-        # cbar.set_ylabel('Pearson Correlation Coefficient', rotation=90)
-        # plt.title("Correlation between a heat flux and MLD")
-        # ax = format_cartopy(ax)
-        # plt.show()
 
         # assign MONTH coordinate to MLD
         times = mld.TIME.values
@@ -288,52 +290,51 @@ def correlate_mld_to_fluxes(component, mld):
             months.append(month)
         mld = mld.assign_coords(MONTH=("TIME", months))
 
-        lags = np.arange(-5, 6)
-        month_name_list = {1: 'January', 2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June', 7: 'July', 8: 'August', 9: 'September', 10: 'October', 11: 'November', 12: 'December'}
+        plot_lagged_correlation(mld, flux, -5, 6)
 
-        fig, axs = plt.subplots(4, 3, figsize=(15, 12), sharey=True, sharex=True)
-        axs = axs.flatten()
+    else:
+        print("Only valid for 2025 data")
 
-        for ax, (month, month_name) in zip(axs, month_name_list.items()):
-            lagged_correlations = []
 
-            for lag in lags:
-                flux_shifted = flux.shift(TIME=lag)
-                flux_month = flux_shifted.isel(TIME=(flux.MONTH == month))
-                mld_month = mld.isel(TIME=(mld.MONTH == month))
-                corr_map = xr.corr(flux_month, mld_month, dim='TIME')
-                weights = np.cos(np.deg2rad(corr_map.LATITUDE))
-                corr_mean = float(corr_map.weighted(weights).mean(dim=['LATITUDE', 'LONGITUDE']))
-                lagged_correlations.append(corr_mean)
+def correlate_surface_flux_to_tendency(surface_flux, tendency, obs):
+    if DATA_TO_2025:
 
-            lagged_correlations = np.array(lagged_correlations)
-            ax.plot(lags, lagged_correlations, marker='x')
-            ax.set_title(month_name)
-            ax.set_xlim(-5, 5)
-            ax.set_ylim(-0.3, 0.3)
-            ax.grid()
+        # assign MONTH coordinates
+        times = tendency.TIME.values
+        months = []
+        for time in times:
+            month = get_month_from_time(time)
+            months.append(month)
+        surface_flux = surface_flux.assign_coords(MONTH=("TIME", months))
+        tendency = tendency.assign_coords(MONTH=("TIME", months))
+        obs = obs.assign_coords(MONTH=("TIME", months))
 
-        fig.supxlabel('Lag (months)')
-        fig.supylabel('Pearson Correlation Coefficient')
-        plt.tight_layout()
-        plt.show()
+        plot_lagged_correlation_not_monthly(surface_flux, tendency, -5, 6, save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/final_results/surfaceflux_tendency_lagged_corr.png", xlabel='Lag (months forcing leads SSTA)')
+        plot_lagged_correlation_not_monthly(surface_flux, obs, -5, 6, save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/final_results/surfaceflux_tendency_lagged_corr_obs.png", xlabel='Lag (months forcing leads SSTA)')
+
+        plot_lagged_correlation_not_monthly(surface_flux, tendency, -5, 6, save_path="/Volumes/G-DRIVE ArmorATD/Extension/datasets/final_results/surfaceflux_tendency_lagged_corr_obs_combined.png", obs=obs, xlabel='Lag (months forcing leads SSTA)')
+
 
     else:
         print("Only valid for 2025 data")
 
 def get_each_forcing_persistence(full_model, obs, components, readable_components):
-    def individual_forcing(to_plot, name):
+    def individual_forcing(to_plot, name, blackline=False, thicken=False):
         print(name)
         print(type(to_plot))
         print(to_plot)
         to_plot_no_unchanging_cells = to_plot.where(to_plot.std("TIME") != 0)
         autocorrelation_functions_ds = get_autocorrelation(to_plot_no_unchanging_cells, min_lag=-3, max_lag=15)  # all time
-        plot_autocorrelation(autocorrelation_functions_ds, lag=None, model_name=name, show=False, label=name)
-    individual_forcing(full_model, "Full model")
-    individual_forcing(obs, "Observations")
+        plot_autocorrelation(autocorrelation_functions_ds, lag=None, model_name=name, show=False, label=name, blackline=blackline, thicken=thicken)
+    fig, ax = plt.subplots()
+    individual_forcing(full_model, "Full model", thicken=True)
+    individual_forcing(obs, "Observations", blackline=True, thicken=True)
     for i, component in enumerate(components):
         individual_forcing(all_components[component], readable_components[i])
     plt.legend()
+    fig.patch.set_alpha(0)
+    ax.patch.set_alpha(0)
+    plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/final_results/forcing_persistence.png", dpi=400, transparent=True)
     plt.show()
 
 
@@ -348,22 +349,25 @@ SO_LONG_BOUNDS = slice(50, 120)
 SEP_LAT_BOUNDS = slice(-60, -40)
 SEP_LONG_BOUNDS = slice(-180, -80)
 
-all_components = all_components.where(((all_components.LATITUDE >= 20) & (all_components.LATITUDE <= 60)) | ((all_components.LATITUDE >= -60) & (all_components.LATITUDE <= -20)), drop=True)
-model = model.where(((model.LATITUDE >= 20) & (model.LATITUDE <= 60)) | ((model.LATITUDE >= -60) & (model.LATITUDE <= -20)), drop=True)
-obs_da = obs_da.where(((obs_da.LATITUDE >= 20) & (obs_da.LATITUDE <= 60)) | ((obs_da.LATITUDE >= -60) & (obs_da.LATITUDE <= -20)), drop=True)
+# midlatitudes only
+# all_components = all_components.where(((all_components.LATITUDE >= 20) & (all_components.LATITUDE <= 60)) | ((all_components.LATITUDE >= -60) & (all_components.LATITUDE <= -20)), drop=True)
+# model = model.where(((model.LATITUDE >= 20) & (model.LATITUDE <= 60)) | ((model.LATITUDE >= -60) & (model.LATITUDE <= -20)), drop=True)
+# obs_da = obs_da.where(((obs_da.LATITUDE >= 20) & (obs_da.LATITUDE <= 60)) | ((obs_da.LATITUDE >= -60) & (obs_da.LATITUDE <= -20)), drop=True)
 
 
-#all_components = all_components.sel(LATITUDE=NA_LAT_BOUNDS).sel(LONGITUDE=NA_LONG_BOUNDS)
 # all_components = all_components.sel(LATITUDE=NEP_LAT_BOUNDS).sel(LONGITUDE=NEP_LONG_BOUNDS)
 # all_components = all_components.sel(LATITUDE=SO_LAT_BOUNDS).sel(LONGITUDE=SO_LONG_BOUNDS)
 # all_components = all_components.sel(LATITUDE=SEP_LAT_BOUNDS).sel(LONGITUDE=SEP_LONG_BOUNDS)
+
+# all_components = all_components.sel(LATITUDE=NA_LAT_BOUNDS).sel(LONGITUDE=NA_LONG_BOUNDS)
+# model = model.sel(LATITUDE=NA_LAT_BOUNDS).sel(LONGITUDE=NA_LONG_BOUNDS)
 # obs_da = obs_da.sel(LATITUDE=NA_LAT_BOUNDS).sel(LONGITUDE=NA_LONG_BOUNDS)
 
 
 # all_components = all_components.sel(LATITUDE=slice(0, 90))      # NH
 # all_components = all_components.sel(LATITUDE=slice(-90, 0))     # SH
 # all_components = all_components.sel(LATITUDE=slice(20, 60))      # NH midlat
-# all_components = all_components.sel(LATITUDE=slice(-60, -20))     # SH  midlat
+all_components = all_components.sel(LATITUDE=slice(-60, -20))     # SH  midlat
 
 # get_flux_proportion("SURFACE_FLUX_ANOMALY", save_file=True)
 # get_flux_proportion("EKMAN_ANOM_ADVECTION_ANOMALY", save_file=False)
@@ -380,7 +384,7 @@ obs_da = obs_da.where(((obs_da.LATITUDE >= 20) & (obs_da.LATITUDE <= 60)) | ((ob
 # get_surface_flux_proportion("RADIATIVE_FLUX_ANOMALY", save_file=False)
 # get_surface_flux_proportion("TURBULENT_FLUX_ANOMALY", save_file=False)
 
-# plot_proportions_over_time(component_list, readable_component_list, signed=False)
+plot_proportions_over_time(component_list, readable_component_list, signed=False)
 # plot_over_time(component_list, readable_component_list)
 
 
@@ -390,5 +394,5 @@ obs_da = obs_da.where(((obs_da.LATITUDE >= 20) & (obs_da.LATITUDE <= 60)) | ((ob
 
 # correlate_mld_to_fluxes("SURFACE_FLUX_ANOMALY_SUM", h_da)
 # correlate_mld_to_fluxes("EKMAN_MEAN_ADVECTION_ANOMALY", h_da)
-get_each_forcing_persistence(model, obs_da, component_list, readable_component_list)
-
+# get_each_forcing_persistence(model, obs_da, component_list, readable_component_list)
+# correlate_surface_flux_to_tendency(all_components["TURBULENT_FLUX_ANOMALY"], model, obs_da)

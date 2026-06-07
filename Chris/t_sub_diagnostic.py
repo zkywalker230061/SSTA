@@ -1,11 +1,13 @@
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
 
-from SSTA.Chris.utils import get_month_from_time
+from Chris.correlation_significance import get_significance
+from Chris.utils import get_month_from_time, format_cartopy
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 
-T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub.nc"
+T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub_by_mld.nc"
 ARGO_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/RG_ArgoClim_Temperature_2019.nc"
 OBSERVATIONS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Temperature-(2004-2018).nc"
 OBSERVATIONS_JJ_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/observed_anomaly_JJ.nc"
@@ -137,24 +139,32 @@ def correlate_tsub(observations_ds, tm_observed, hbar_ds, month_to_check, nh=Tru
         mean_max_grad_depth = np.nanmean(max_grad_depth_monthly_mean.sel(MONTH=month).values[np.isfinite(max_grad_depth_monthly_mean.sel(MONTH=month).values)])
 
         fig, ax1 = plt.subplots()
-        ax1.plot(depths, mean_correlations, label="Mean correlation of Argo Temperature with Tm")
-        ax1.axvline(mean_hbar, color='red', label="Mean hbar")
-        ax1.axvline(mean_other_hbar, color='green', label="Mean `other` hbar")
-        ax1.axvline(mean_max_grad_depth, color='orange', label="Depth of Max. Gradient Tsub")
-        ax1.set_ylabel("Mean correlation of Argo Temperature with Tm")
+        ax1.plot(depths, mean_correlations, label="Mean Correlation of Argo and ML Temperatures")
+        ax1.axvline(mean_hbar, color='red', label="Mean MLD")
+        #ax1.axvline(mean_other_hbar, color='green', label="Mean `other` hbar")
+        ax1.axvline(mean_max_grad_depth, color='orange', label="Mean Tsub Depth")
+        ax1.set_ylabel("Mean Correlation of Argo and ML Temperatures")
         ax1.set_ylim([0, 1])
         ax1.grid()
         ax2 = ax1.twinx()
         ax2.plot(depths, mean_temperatures, color="purple", label="Mean Argo Temperature")
         ax2.set_ylabel("Mean Argo Temperature (ºC)")
         ax1.set_xlabel("Depth (dbar)")
-        fig.legend()
+        #fig.legend()
+        handle1, label1 = ax1.get_legend_handles_labels()
+        handle2, label2 = ax2.get_legend_handles_labels()
+        handles = handle1 + handle2
+        labels = label1 + label2
+        #ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.12), ncol=1)
+        ax1.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, -0.12), ncol=2)
         fig.tight_layout()
         if nh:
             title = "Northern Hemisphere, month " + str(month)
         else:
             title = "Southern Hemisphere, month " + str(month)
+            title = ""
         plt.title(title)
+        plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_report/max_grad_tsub_depth_april_sh.png", dpi=400, bbox_inches='tight')
         plt.show()
 
         # plt.grid()
@@ -201,15 +211,52 @@ def compare_tsub():
     mld = mld.where(np.isfinite(mld))
     mld_mean = mld.mean(dim=['LATITUDE', 'LONGITUDE'])
     plt.grid()
-    plt.plot((max_grad_mean_depth['TIME'] - 0.5) / 12 + 2004, max_grad_mean_depth, label="Max Gradient Tsub depth")
+    plt.plot((max_grad_mean_depth['TIME'] - 0.5) / 12 + 2004, max_grad_mean_depth, label="Tsub Depth")
     #plt.plot((t_sub_mean_depth['TIME'] - 0.5) / 12 + 2004, t_sub_mean_depth, label="Regular Tsub depth")
-    plt.plot((mld_mean['TIME'] - 0.5) / 12 + 2004, mld_mean, label="Actual MLD")
+    plt.plot((mld_mean['TIME'] - 0.5) / 12 + 2004, mld_mean, label="MLD Base")
     plt.xlabel('Time (year)')
-    plt.ylabel('Mean Depth of Tsub')
+    plt.ylabel('Depth (dbar)')
     plt.legend()
     plt.show()
 
 
-#correlate_tsub(observations_ds, tm_observed, hbar_ds, nh=False, month_to_check=7)
-compare_tsub()
+def raw_correlation_significance(tm_observed, tsub):
+    correlation, significant_correlation = get_significance(tm_observed, tsub, resamples=1, test_statistic="PEARSON", alpha=0.05)
+    print("Correlation is:")
+    print(correlation.mean().values)
+    fig, ax = plt.subplots(subplot_kw={'projection': ccrs.Robinson()})
+    correlation.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1, transform=ccrs.PlateCarree(), ax=ax, cbar_kwargs={'orientation': 'horizontal', 'label': 'Pearson Correlation', 'shrink': 0.75})
+    lons = significant_correlation.LONGITUDE.values
+    lats = significant_correlation.LATITUDE.values
+    lon_grid, lat_grid = np.meshgrid(lons, lats)
+    ax.contourf(lon_grid, lat_grid, significant_correlation.values.astype(float), levels=[0.5, 1.5], hatches=['xxx'], colors='none', transform=ccrs.PlateCarree())
+    ax = format_cartopy(ax)
+    ax.set_xlabel("Longitude (º)")
+    ax.set_ylabel("Latitude (º)")
+    ax.set_title('')
+    fig.patch.set_alpha(0)
+    ax.patch.set_alpha(0)
+    plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_report/tm_correlation_to_mld_temp.png", dpi=400, transparent=True, bbox_inches='tight')
+    plt.show()
+
+def raw_correlation(tm_observed, tsub):
+    fig, ax = plt.subplots(subplot_kw={'projection': ccrs.Robinson()})
+    correlation = xr.corr(tm_observed, tsub, dim='TIME')
+    print("Correlation is:")
+    print(correlation.mean().values)
+    correlation.plot(x='LONGITUDE', y='LATITUDE', cmap='nipy_spectral', vmin=-1, vmax=1, transform=ccrs.PlateCarree(), ax=ax, cbar_kwargs={'orientation': 'horizontal', 'label': 'Pearson Correlation Coefficient', 'shrink': 0.75})
+    plt.title("")
+    plt.xlabel("Longitude (º)")
+    plt.ylabel("Latitude (º)")
+    cbar = plt.gcf().axes[-1]
+    plt.title("")
+    ax = format_cartopy(ax)
+    fig.patch.set_alpha(0)
+    ax.patch.set_alpha(0)
+    plt.savefig("/Volumes/G-DRIVE ArmorATD/Extension/datasets/results_for_report/tm_correlation_to_mld_temp.png", dpi=400, transparent=True, bbox_inches='tight')
+    plt.show()
+
+# correlate_tsub(observations_ds, tm_observed, hbar_ds, nh=False, month_to_check=4)
+# compare_tsub()
+raw_correlation(observations_ds.sel(PRESSURE=2.5)["TEMPERATURE"], t_sub_ds['T_sub'])
 

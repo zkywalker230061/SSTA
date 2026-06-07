@@ -9,7 +9,7 @@ import pandas as pd
 from Chris.correlation_significance import get_significance
 from Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, get_save_name, \
     coriolis_parameter, get_month_from_time, plot_eof_for_regional_analysis, get_eofs, get_eof, get_monthly_eof, \
-    get_seasonal_eof, plot_lagged_correlation
+    get_seasonal_eof, plot_lagged_correlation, plot_lagged_correlation_not_monthly
 from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
 import matplotlib
@@ -48,6 +48,7 @@ IMPLICIT_SCHEME_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/implic
 ARGO_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/RG_ArgoClim_Temperature_2019.nc"
 REYNOLDS_OBS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sst_anomalies-(2004-2018).nc"
 OBSERVATIONS_2025_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/reynolds_sst_Anomalies-(2004-2025)_no_2004.nc"
+
 
 model_da = xr.open_dataset(IMPLICIT_SCHEME_DATA_PATH, decode_times=False)["IMPLICIT"]
 model_da = model_da.sel(LATITUDE=NA_LAT_BOUNDS).sel(LONGITUDE=NA_LONG_BOUNDS)   # only take north atlantic
@@ -120,16 +121,14 @@ def read_nao(file):
     nao_list = (nao_list - nao_list.mean()) / nao_list.std()
     return nao_list
 
-
-
 def get_nat_index(model, is_obs=False):
-    first_eof = get_eofs(model, 0, 1, map_mask=map_mask)[2]
-    second_eof = get_eofs(model, 1, 2, map_mask=map_mask)[2]
+    first_eof = get_eofs(model, 0, 1, map_mask=map_mask, invert=False)[2]
+    second_eof = get_eofs(model, 1, 2, map_mask=map_mask, invert=False)[2]
     # make_movie(first_eof, -2, 2)
     upper_long_range = slice(-45, -30)
     upper_lat_range = slice(40, 52)
     lower_long_range = slice(-70, -50)
-    lower_lat_range = slice(20, 40)
+    lower_lat_range = slice(20, 35)
     # if is_obs:
     #     upper_long_range = slice(-40, -20)
     #     upper_lat_range = slice(45, 55)
@@ -141,6 +140,8 @@ def get_nat_index(model, is_obs=False):
     #     upper_long_range = slice(-40, -20)
     #     upper_lat_range = slice(35, 60)
 
+
+
     lower_region_first_eof = first_eof.sel(LONGITUDE=lower_long_range).sel(LATITUDE=lower_lat_range)
     upper_region_first_eof = first_eof.sel(LONGITUDE=upper_long_range).sel(LATITUDE=upper_lat_range)
     lower_region_second_eof = second_eof.sel(LONGITUDE=lower_long_range).sel(LATITUDE=lower_lat_range)
@@ -151,16 +152,29 @@ def get_nat_index(model, is_obs=False):
         lower_max_first_eof = lower_region_first_eof.sel(TIME=time).mean().values
         upper_max_second_eof = upper_region_second_eof.sel(TIME=time).mean().values
         lower_max_second_eof = lower_region_second_eof.sel(TIME=time).mean().values
-        first_eof_index = float(upper_max_first_eof - lower_max_first_eof)
-        second_eof_index = float(upper_max_second_eof - lower_max_second_eof)
-        if first_eof_index > second_eof_index:
-            nat_index = first_eof_index
+        first_eof_index = float(lower_max_first_eof - upper_max_first_eof)
+        second_eof_index = float(lower_max_second_eof - upper_max_second_eof)
+        # if is_obs:
+        #     nat_index = first_eof_index
+        if abs(first_eof_index) > abs(second_eof_index):
+            nat_index = (first_eof_index)
         else:
-            nat_index = second_eof_index
+            nat_index = (second_eof_index)
         indices.append(nat_index)
     indices = np.array(indices)
     indices = (indices - indices.mean()) / indices.std()
     return indices
+
+    # lower_region_eof = first_eof.sel(LONGITUDE=lower_long_range).sel(LATITUDE=lower_lat_range)
+    # upper_region_eof = first_eof.sel(LONGITUDE=upper_long_range).sel(LATITUDE=upper_lat_range)
+    # indices = []
+    # for time in model.TIME.values:
+    #     upper_max = upper_region_eof.sel(TIME=time).mean().values
+    #     lower_max = lower_region_eof.sel(TIME=time).mean().values
+    #     indices.append(float(upper_max - lower_max))
+    # indices = np.array(indices)
+    # indices = (indices - indices.mean()) / indices.std()
+    # return indices
 
 def compare_nat(time, model_nat, obs_nat):
     correlation = pearsonr(model_nat, obs_nat)
@@ -173,7 +187,43 @@ def compare_nat(time, model_nat, obs_nat):
     plt.legend()
     plt.show()
 
-def compare_nat_nao(nat, nao, savepath):
+
+def compare_nat_nao_not_monthly(time, nat, nao, savepath):
+    dates = pd.date_range('2003-12', periods=len(nat), freq='MS')  # use datetime format for lags
+    df = pd.DataFrame({'nat': nat, 'nao': nao}, index=dates)
+    df = df.rolling(2, center=True).mean().dropna()     # smooth with rolling mean
+    print(df)
+
+    lags = np.arange(-15, 16)
+    nat_vals_all, nao_vals_all = [], []
+    lagged_correlations = []
+
+    for lag in lags:
+        nat_vals, nao_vals = [], []
+        for idx in df.index:
+            nao_date = idx - pd.DateOffset(months=lag)
+            if nao_date in df.index:
+                nat_vals.append(df.loc[idx, 'nat'])
+                nao_vals.append(df.loc[nao_date, 'nao'])
+        corr = np.corrcoef(nat_vals, nao_vals)[0, 1] if len(nat_vals) > 5 else np.nan
+        lagged_correlations.append(corr)
+
+    lagged_correlations = np.array(lagged_correlations)
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+    plt.grid()
+    ax.plot(lags, lagged_correlations, marker='x')
+    ax.set_xlim(-15, 15)
+    ax.set_ylim(-0.5, 0.5)
+    ax.set_xlabel('Lag (months)  [negative = NAT leads, positive = NAO leads]')
+    ax.set_ylabel('Pearson r')
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig(savepath, dpi=400)
+    plt.show()
+
+
+def compare_nat_nao(time, nat, nao, savepath, plot_four_months=False):
     # plt.grid()
     # plt.plot(time, nat, label="NA Tripole Index")
     # plt.plot(time, nao, label="NA Oscillation Index")
@@ -182,22 +232,23 @@ def compare_nat_nao(nat, nao, savepath):
     # plt.legend()
     # plt.show()
 
-    dates = pd.date_range('2004-01', periods=len(nat), freq='MS')   # use datetime format for lags
+    dates = pd.date_range('2003-12', periods=len(nat), freq='MS')   # use datetime format for lags
     df = pd.DataFrame({'nat': nat, 'nao': nao}, index=dates)
     df = df.rolling(2, center=True).mean().dropna()     # smooth with rolling mean
 
-    # plot_lagged_correlation(df['nao'], df['nat'])
-
     month_name_list = {1: 'January', 2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June', 7: 'July', 8: 'August', 9: 'September', 10: 'October', 11: 'November', 12: 'December'}
-
     lags = np.arange(-15, 16)
 
-    fig, axs = plt.subplots(4, 3, figsize=(15, 12), sharey=True, sharex=True)
+    if plot_four_months:
+        fig, axs = plt.subplots(2, 2, sharey=True, sharex=True)
+    else:
+        fig, axs = plt.subplots(3, 4, sharey=True, sharex=True)
     axs = axs.flatten()
     # get correlation at various lags for every month
     for ax, (month, month_name) in zip(axs, month_name_list.items()):
         nat_month = df[df.index.month == month]['nat']
         lagged_correlations = []
+
         for lag in lags:
             nao_shifted = df['nao'].shift(lag)
             nao_month = nao_shifted[nao_shifted.index.month == month]
@@ -206,29 +257,40 @@ def compare_nat_nao(nat, nao, savepath):
             lagged_correlations.append(corr)
         lagged_correlations = np.array(lagged_correlations)
 
-        ax.plot(lags, lagged_correlations, marker='x')
-        ax.set_title(month_name)
-        ax.set_xlim(-15, 15)
-        ax.set_ylim(-0.8, 0.8)
-        ax.grid()
+        if plot_four_months:
+            if month_name in ["January", "February", "March", "April"]:
+                ax.plot(lags, lagged_correlations, marker='x')
+                ax.set_title(month_name)
+                ax.set_xlim(-15, 15)
+                ax.set_ylim(-0.8, 0.8)
+                ax.grid()
+        else:
+            ax.plot(lags, lagged_correlations, marker='x')
+            ax.set_title(month_name)
+            ax.set_xlim(-15, 15)
+            ax.set_ylim(-0.8, 0.8)
+            ax.grid()
 
-    fig.supxlabel('Lag (months)')
+    fig.supxlabel('Lag (months NAO leads NAT)')
     fig.supylabel('Pearson Correlation Coefficient')
     plt.suptitle("")
     plt.tight_layout()
+    #plt.subplots_adjust(left=0.06)
     plt.savefig(savepath, dpi=400)
     plt.show()
 
 nao_list = read_nao(NAO_DATA_PATH)
-# get_eof(model_da, obs=False, obs_da=obs_da, save_folder="final_results/north_atlantic_analysis/", map_mask=map_mask)
-# get_eof(model_da, obs=True, obs_da=obs_da, save_folder="final_results/north_atlantic_analysis/", map_mask=map_mask)
+get_eof(model_da, obs=False, obs_da=obs_da, save_folder="results_for_report/", map_mask=map_mask, invert=True)
+# get_eof(model_da, obs=True, obs_da=obs_da, save_folder="final_results/north_atlantic_analysis/", map_mask=map_mask, invert=False)
 # get_monthly_eof(model_da, obs=False, obs_da=obs_da, save_folder="final_results/north_atlantic_analysis/", map_mask=map_mask)
 # get_seasonal_eof(model_da, obs=False, obs_da=obs_da, save_folder="final_results/north_atlantic_analysis/", map_mask=map_mask)
 nat_list = get_nat_index(model_da)
 nat_list_obs = get_nat_index(obs_da, is_obs=True)
-compare_nat((model_da.TIME.values / 12) + 2004, nat_list, nat_list_obs)
-compare_nat_nao(nat_list, nao_list, "/Volumes/G-DRIVE ArmorATD/Extension/datasets/final_results/north_atlantic_analysis/nat_nao_corr.jpg")
-compare_nat_nao(nat_list, nat_list_obs, "/Volumes/G-DRIVE ArmorATD/Extension/datasets/final_results/north_atlantic_analysis/nat_nao_corr_obs.jpg")
+
+# compare_nat((model_da.TIME.values / 12) + 2004, nat_list, nat_list_obs)
+
+compare_nat_nao((model_da.TIME.values / 12) + 2004, nat_list, nao_list, "/Volumes/G-DRIVE ArmorATD/Extension/datasets/final_results/north_atlantic_analysis/nat_nao_corr.jpg", plot_four_months=True)
+compare_nat_nao((model_da.TIME.values / 12) + 2004, nat_list, nat_list_obs, "/Volumes/G-DRIVE ArmorATD/Extension/datasets/final_results/north_atlantic_analysis/nat_nao_corr_obs.jpg")
 
 
 

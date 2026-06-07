@@ -2,7 +2,7 @@ import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 
-from SSTA.Chris.utils import make_movie
+from Chris.utils import make_movie
 
 H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Mixed_Layer_Depth_Pressure_uncapped-Seasonal_Cycle_Mean.nc"
 T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub.nc"
