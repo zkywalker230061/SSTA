@@ -34,18 +34,36 @@ q_surface_ds = load_and_prepare_dataset(
     "datasets/Simulation-Surface_Water_Rate-(2004-2025).nc"
 )  # negative for evaporation, positive for precipitation
 
+q_surface_monthly_mean_ds = load_and_prepare_dataset(
+    "datasets/Surface_Water_Rate-Clim_Mean.nc"
+)
+
+q_surface_monthly_mean = xr.concat(
+    [q_surface_monthly_mean_ds] * 22, dim='MONTH'
+).reset_coords(drop=True)
+q_surface_monthly_mean = q_surface_monthly_mean.rename({'MONTH': 'TIME'})
+q_surface_monthly_mean['TIME'] = q_surface_ds.TIME
+
+s_m_a = load_and_prepare_dataset(
+    "datasets/Mixed_Layer_Salinity_Anomalies-(2004-2025).nc"
+)['ANOMALY_ML_SALINITY']
+s_m_a = s_m_a.drop_vars('MONTH')
+
 s_m_monthly_mean = load_and_prepare_dataset(
     'datasets/Mixed_Layer_Salinity-Clim_Mean.nc'
 )['MONTHLY_MEAN_ML_SALINITY']
 
 s_m_monthly_mean = xr.concat([s_m_monthly_mean] * 22, dim='MONTH').reset_coords(drop=True)
 s_m_monthly_mean = s_m_monthly_mean.rename({'MONTH': 'TIME'})
-s_m_monthly_mean['TIME'] = q_surface_ds.TIME
+s_m_monthly_mean['TIME'] = s_m_a.TIME
 
-q_surface = (
-    - q_surface_ds['ANOMALY_avg_ie']  # negative sign to retrive E'
-    - q_surface_ds['ANOMALY_avg_tprate']  # negative to subtract P'
-) * s_m_monthly_mean  # (E' - P') * S_bar
+q_surface = -(
+    (q_surface_ds['ANOMALY_avg_ie'] + q_surface_ds['ANOMALY_avg_tprate'])
+    * s_m_monthly_mean  # (E' + P') * S_bar
+    + (q_surface_monthly_mean['MONTHLY_MEAN_avg_ie']
+       + q_surface_monthly_mean['MONTHLY_MEAN_avg_tprate'])
+    * s_m_a  # (E + P) * S'
+)
 
 q_surface = q_surface.drop_vars('MONTH')
 q_surface.name = 'ANOMALY_SURFACE_WATER_RATE'
@@ -79,11 +97,6 @@ w_e_monthly_mean = load_and_prepare_dataset(
 if not ENTRAINMENT:
     q_entrainment = q_entrainment - q_entrainment
     w_e_monthly_mean = w_e_monthly_mean - w_e_monthly_mean
-
-s_m_a = load_and_prepare_dataset(
-    "datasets/Mixed_Layer_Salinity_Anomalies-(2004-2025).nc"
-)['ANOMALY_ML_SALINITY']
-s_m_a = s_m_a.drop_vars('MONTH')
 
 s_sub_a = load_and_prepare_dataset(
     "datasets/Sub_Layer_Salinity_Anomalies-(2004-2025).nc"
@@ -416,25 +429,25 @@ geo_fraction_monthly_mean = [np.mean(geo_fraction[i::12]) for i in range(12)]
 wind_fraction_monthly_mean = [np.mean(wind_fraction[i::12]) for i in range(12)]
 
 plt.figure(figsize=(5, 5), dpi=600)
-x = np.arange(1, 13)
+months = np.arange(1, 13)
 plt.plot(
-    x, surface_fraction_monthly_mean,
+    months, surface_fraction_monthly_mean,
     label='Surface', color='#d8031c', alpha=0.8
 )
 plt.plot(
-    x, entrainment_fraction_monthly_mean,
+    months, entrainment_fraction_monthly_mean,
     label='Entrainment', color='#66CCFF', alpha=0.8
 )
 plt.plot(
-    x, ekman_fraction_monthly_mean,
+    months, ekman_fraction_monthly_mean,
     label='Ekman', color='#39C5BB', alpha=0.8
 )
 plt.plot(
-    x, geo_fraction_monthly_mean,
+    months, geo_fraction_monthly_mean,
     label='Geostrophic', color='#ffb703', alpha=0.8
 )
 plt.xlabel('Month', loc='right')
-plt.ylim(0, 0.5)
+plt.ylim(0, 0.7)
 plt.ylabel('Fractional Contribution')
 plt.legend(frameon=False, ncols=2, fontsize=8)
 plt.title('North Atlantic', fontsize=15, loc='left')
@@ -442,11 +455,11 @@ plt.show()
 
 # # spatial mean plot
 # s_m_a_simulated = s_m_a_simulated.where(
-#     (s_m_a_simulated['LATITUDE'] > 20) | (s_m_a_simulated['LATITUDE'] < -20), 0
+#     (s_m_a_simulated['LATITUDE'] > 15) | (s_m_a_simulated['LATITUDE'] < -15), 0
 # )
 # s_m_a_simulated_spatial_mean = s_m_a_simulated.mean(dim=['LONGITUDE', 'LATITUDE'])
 # s_m_a = s_m_a.where(
-#     (s_m_a['LATITUDE'] > 20) | (s_m_a['LATITUDE'] < -20), 0
+#     (s_m_a['LATITUDE'] > 15) | (s_m_a['LATITUDE'] < -15), 0
 # )
 # s_m_a_spatial_mean = s_m_a.mean(dim=['LONGITUDE', 'LATITUDE'])
 # plt.plot(s_m_a_simulated_spatial_mean['TIME'], s_m_a_simulated_spatial_mean, label='Simulated')
@@ -497,27 +510,56 @@ plt.show()
 # # plt.xscale('log', base=2)
 # plt.show()
 
-# # autocorrelation plot
-# autocorr_points_simulated = []
-# autocorr_points_observed = []
-# for lon, lat in zip(s_m_a_simulated['LONGITUDE'], s_m_a_simulated['LATITUDE']):
-#     # if lat > 0:
-#     #     continue  # only plot for southern hemisphere
-#     # if lat < 0:
-#     #     continue  # only plot for northern hemisphere
-#     autocorr_point_simulated = acf(s_m_a_simulated.sel(LONGITUDE=lon, LATITUDE=lat), nlags=36)
-#     autocorr_point_observed = acf(s_m_a.sel(LONGITUDE=lon, LATITUDE=lat), nlags=36)
-#     if not np.isnan(autocorr_point_simulated).all():
-#         autocorr_points_simulated.append(autocorr_point_simulated)
-#     if not np.isnan(autocorr_point_observed).all():
-#         autocorr_points_observed.append(autocorr_point_observed)
-# autocorr_points_simulated = np.array(autocorr_points_simulated)
-# autocorr_points_observed = np.array(autocorr_points_observed)
-# plt.plot(autocorr_points_simulated.mean(axis=0), label='Simulated')
-# plt.plot(autocorr_points_observed.mean(axis=0), label='Observed')
-# plt.legend()
-# plt.show()
+# autocorrelation plot
+# ----------------------------------------------------------------------------
+s_m_a_simulated = s_m_a_simulated.where(
+    (s_m_a_simulated['LATITUDE'] > 15) | (s_m_a_simulated['LATITUDE'] < -15), 0
+)
+s_m_a_ = s_m_a.where(
+    (s_m_a['LATITUDE'] > 15) | (s_m_a['LATITUDE'] < -15), 0
+)
 
+basins = regionmask.defined_regions.natural_earth_v5_1_2.ocean_basins_50
+mask = basins.mask(s_m_a['LONGITUDE'], s_m_a['LATITUDE'])
+mask_numer = 2
+test_region = s_m_a_simulated.where(mask == mask_numer)
+
+autocorr_points_simulated = []
+autocorr_points_observed = []
+# for lon, lat in zip(test_region['LONGITUDE'], test_region['LATITUDE']):
+for lon, lat in zip(s_m_a_simulated['LONGITUDE'], s_m_a_simulated['LATITUDE']):
+    autocorr_point_simulated = acf(s_m_a_simulated.sel(LONGITUDE=lon, LATITUDE=lat), nlags=25)
+    autocorr_point_observed = acf(s_m_a_.sel(LONGITUDE=lon, LATITUDE=lat), nlags=25)
+    if not np.isnan(autocorr_point_simulated).all():
+        autocorr_points_simulated.append(autocorr_point_simulated)
+    if not np.isnan(autocorr_point_observed).all():
+        autocorr_points_observed.append(autocorr_point_observed)
+autocorr_points_simulated = np.array(autocorr_points_simulated)
+autocorr_points_observed = np.array(autocorr_points_observed)
+
+plt.figure(figsize=(5, 5), dpi=600)
+plt.plot(
+    autocorr_points_simulated.mean(axis=0),
+    label='Simulated (2005-2025 LTM)',
+    color='#EE0000', alpha=0.8
+)
+plt.plot(
+    autocorr_points_observed.mean(axis=0),
+    label='Observed (2005-2025 LTM)',
+    color='#66CCFF', alpha=0.8
+)
+
+plt.xlim(0, 25)
+plt.xlabel('lag (months)', loc='right')
+plt.ylim(-0.2, 1)
+
+plt.legend(frameon=False)
+plt.title(r'$\gamma$'+f' = {GAMMA}, 15°N-15°S Excluded', fontsize=15, loc='left')
+
+plt.show()
+
+
+# something todo
 # precipitation_a = -q_surface_ds['ANOMALY_avg_tprate'].where(
 #     ~np.isnan(s_m_monthly_mean)
 # )
