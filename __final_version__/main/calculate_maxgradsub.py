@@ -88,9 +88,9 @@ def main():
     t_sub_monthly_mean.to_netcdf("datasets/Sub_Layer_Temperature_Max_Gradient_Method-Clim_Mean.nc")
     t_sub_anomaly.to_netcdf("datasets/Sub_Layer_Temperature_Max_Gradient_Method_Anomalies-(2004-2025).nc")
 
-    save_sub_temperature_maxgrad()
-    save_monthly_mean_sub_temperature_maxgrad()
-    save_sub_temperature_anomalies_maxgrad()
+    # save_sub_temperature_maxgrad()
+    # save_monthly_mean_sub_temperature_maxgrad()
+    # save_sub_temperature_anomalies_maxgrad()
 
 
 if __name__ == "__main__":
