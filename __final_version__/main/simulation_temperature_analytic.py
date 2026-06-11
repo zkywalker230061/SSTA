@@ -174,10 +174,10 @@ t_m_a_simulated = t_m_a_simulated.drop_vars('MONTH')
 #     vmin=-3, vmax=3,
 #     cmap='RdBu_r', unit='°C',
 #     title=['Observed SSTA', 'Simulated SSTA'],
-#     save_path="SSTA-compare.mp4"
+#     save_path="datasets/analytic_model/SSTA-compare.mp4"
 # )
 
-# t_m_a_simulated.to_netcdf("datasets/Simulation-TA.nc")
+# t_m_a_simulated.to_netcdf("datasets/analytic_model/Simulation-TA.nc")
 
 
 # rms plots

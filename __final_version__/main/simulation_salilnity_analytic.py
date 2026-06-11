@@ -173,10 +173,10 @@ s_m_a_simulated = s_m_a_simulated.drop_vars('MONTH')
 #     vmin=-0.5, vmax=0.5,
 #     cmap='RdBu_r', unit='PSU',
 #     title=['Observed SSSA', 'Simulated SSSA'],
-#     save_path="SSSA-compare.mp4"
+#     save_path="datasets/analytic_model/SSSA-compare.mp4"
 # )
 
-# s_m_a_simulated.to_netcdf("datasets/Simulation-SA.nc")
+# s_m_a_simulated.to_netcdf("datasets/analytic_model/Simulation-SA.nc")
 
 
 # rms plots

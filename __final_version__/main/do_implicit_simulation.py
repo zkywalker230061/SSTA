@@ -1,9 +1,16 @@
+"""
+Simulate Sea Surface Temperature Anomalies (SSTA) - implicit scheme.
+
+Christopher O'Sullivan
+2026-6-10
+"""
+
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
-from Chris.utils import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, get_save_name, \
+from utilities_chris import make_movie, get_eof_with_nan_consideration, remove_empty_attributes, get_save_name, \
     coriolis_parameter, get_month_from_time
-from utils import get_monthly_mean, get_anomaly, load_and_prepare_dataset
+from utilities_chris import get_monthly_mean, get_anomaly, load_and_prepare_dataset
 from matplotlib.animation import FuncAnimation
 import matplotlib
 matplotlib.use('TkAgg')
@@ -15,7 +22,7 @@ def run_model(INCLUDE_SURFACE, SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE, INCLUDE
               INCLUDE_ENTRAINMENT_VEL_ANOMALY_FORCING, INCLUDE_GEOSTROPHIC_ANOM_ADVECTION,
               INCLUDE_GEOSTROPHIC_MEAN_ADVECTION, USE_DOWNLOADED_SSH=False, USE_OTHER_MLD=False,
               USE_MAX_GRADIENT_METHOD=True, USE_LOG_FOR_ENTRAINMENT=False, gamma_0=15.0, DATA_TO_2025=True,
-              adjust_mld=0.0):
+              adjust_mld=0.0, rho_0=1025.0, c_0=4100.0):
     """Calculate the SSTA for every month.
     Args:
         INCLUDE_SURFACE (bool): whether any (radiative or turbulent) air-sea heat flux term should be included
@@ -56,26 +63,32 @@ def run_model(INCLUDE_SURFACE, SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE, INCLUDE
     """Gather filepaths of all required datasets. If data to 2025 is required, load those datasets. Otherwise, load datasets that only contain data up to 2019."""
 
     if DATA_TO_2025:
-        HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Surface_Heat_Flux-(2004-2025).nc"  # contains air-sea heat flux data
-        EKMAN_ANOMALY_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Simulation-Ekman_Heat_Flux-(2004-2025).nc"  # contains Ekman anomalous advection data
-        TEMP_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/RG_ArgoClim_Temperature_2019.nc"  # contains Argo measured temperature data
-        GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Simulation-Geostrophic_Heat_Flux-(2004-2025).nc"  # contains geostrophic anomalous advection data
-        EKMAN_MEAN_ADVECTION_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/2025_ekman_mean_advection.nc"  # contains Ekman mean advection data
-        ENTRAINMENT_VEL_ANOMALY_FORCING_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/entrainment_velocity_anomaly_forcing.nc"  # contains monthly anomalous entrainment velocity data
-        ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Mixed_Layer_Entrainment_Velocity-(2004-2025).nc"  # contains monthly mean entrainment velocity data
+        HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "datasets/Surface_Heat_Flux-(2004-2025).nc"  # contains air-sea heat flux data
+        EKMAN_ANOMALY_DATA_PATH = "datasets/Simulation-Ekman_Heat_Flux-(2004-2025).nc"  # contains Ekman anomalous advection data
+        TEMP_DATA_PATH = "datasets/RGARGO/RG_ArgoClim_Temperature_2019.nc"  # contains Argo measured temperature data
+        GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH = "datasets/Simulation-Geostrophic_Heat_Flux-(2004-2025).nc"  # contains geostrophic anomalous advection data
+        EKMAN_MEAN_ADVECTION_DATA_PATH = "datasets/2025_ekman_mean_advection.nc"  # contains Ekman mean advection data
+        ENTRAINMENT_VEL_ANOMALY_FORCING_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/entrainment_velocity_anomaly_forcing.nc"  # contains monthly anomalous entrainment velocity data
+        ENTRAINMENT_VEL_DATA_PATH = "datasets/Mixed_Layer_Entrainment_Velocity-(2004-2025).nc"  # contains monthly mean entrainment velocity data
 
         if USE_OTHER_MLD:
+            """
+            CHENGYUN comment: don't turn this on, I didn't give you these files.
+            """
             H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_h_bar.nc"  # contains MLD when determined by the `other` method (the Argo layer above potential density the threshold)
             T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_t_sub_anomaly.nc"  # contains anomalous Tsub when determined by the `other` method (the Argo layer below the potential density threshold)
 
         else:
-            H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Mixed_Layer_Depth-(2004-2025).nc"  # contains MLD at the potential density threshold
-            T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Sub_Layer_Temperature_Anomalies-(2004-2025).nc"  # contains anomalous temperature (Tsub) at the potential density threshold
+            H_BAR_DATA_PATH = "datasets/Mixed_Layer_Depth-(2004-2025).nc"  # contains MLD at the potential density threshold
+            T_SUB_DATA_PATH = "datasets/Sub_Layer_Temperature_Anomalies-(2004-2025).nc"  # contains anomalous temperature (Tsub) at the potential density threshold
 
         if USE_MAX_GRADIENT_METHOD:
-            T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/Sub_Layer_Temperature_Max_Gradient_Method-(2004-2025).nc"  # contains Tsub at the point of maximum thermocline gradient
+            T_SUB_DATA_PATH = "datasets/Sub_Layer_Temperature_Max_Gradient_Method-(2004-2025).nc"  # contains Tsub at the point of maximum thermocline gradient
 
     else:
+        """
+        CHENGYUN comment: don't turn this on, I didn't give you these files.
+        """
         # data paths contain data as explained above
         HEAT_FLUX_ALL_CONTRIBUTIONS_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/heat_flux_interpolated_all_contributions.nc"
         EKMAN_ANOMALY_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/Ekman_Current_Anomaly.nc"
@@ -87,14 +100,23 @@ def run_model(INCLUDE_SURFACE, SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE, INCLUDE
         ENTRAINMENT_VEL_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/Entrainment_Vel_h.nc"
 
         if USE_OTHER_MLD:
+            """
+            CHENGYUN comment: don't turn this on, I didn't give you these files.
+            """
             H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_h_bar.nc"
             T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/other_t_sub_anomaly.nc"
 
         else:
+            """
+            CHENGYUN comment: don't turn this on, I didn't give you these files.
+            """
             H_BAR_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/hbar.nc"
             T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/t_sub.nc"
 
         if USE_MAX_GRADIENT_METHOD:
+            """
+            CHENGYUN comment: don't turn this on, I didn't give you these files.
+            """
             T_SUB_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/mld_other_method/Tsub_Max_Gradient_Method_h.nc"
 
     """Load data from each dataset from each of the filepaths above, formatting where necessary."""
@@ -147,8 +169,14 @@ def run_model(INCLUDE_SURFACE, SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE, INCLUDE
         min=2.5)  # require the minimum MLD to be 2.5 m (by default it will be, but if an adjustment to MLD is made, we need to prevent MLD<0)
 
     # entrainment velocity anomaly
-    entrainment_vel_anomaly_forcing_ds = xr.open_dataset(ENTRAINMENT_VEL_ANOMALY_FORCING_DATA_PATH, decode_times=False)
-    entrainment_vel_anomaly_forcing = entrainment_vel_anomaly_forcing_ds["ENTRAINMENT_VEL_ANOMALY_FORCING"]
+
+    """
+    CHENGYUN comment: I commented the following two lines and assigned a None,
+    because they only applies to -2019 simulation.
+    """
+    # entrainment_vel_anomaly_forcing_ds = xr.open_dataset(ENTRAINMENT_VEL_ANOMALY_FORCING_DATA_PATH, decode_times=False)
+    # entrainment_vel_anomaly_forcing = entrainment_vel_anomaly_forcing_ds["ENTRAINMENT_VEL_ANOMALY_FORCING"]
+    entrainment_vel_anomaly_forcing = None
 
     # tsub, containing the sub-layer temperature for every month
     t_sub_ds = xr.open_dataset(T_SUB_DATA_PATH, decode_times=False)
@@ -171,15 +199,21 @@ def run_model(INCLUDE_SURFACE, SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE, INCLUDE
 
     # filepaths of sea surface height depending on approach (downloaded or simulated SSH data)
     if USE_DOWNLOADED_SSH:  # kept for completion, but there are limited (no?) cases when the downloaded SSH data should be used. It is always better to calculate SSH ourselves.
+        """
+        CHENGYUN comment: don't turn this on, I didn't give you these files.
+        """
         geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_DOWNLOADED_DATA_PATH, decode_times=False)
         SEA_SURFACE_GRAD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_interpolated_grad.nc"
         SEA_SURFACE_MONTHLY_MEAN_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_monthly_mean_interpolated_grad.nc"
     else:  # get SSH gradients (in the horizontal and vertical direction), and monthly mean
         geostrophic_anomaly_ds = xr.open_dataset(GEOSTROPHIC_ANOMALY_CALCULATED_DATA_PATH, decode_times=False)
         if DATA_TO_2025:
-            SEA_SURFACE_GRAD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/2025_sea_surface_calculated_grad.nc"
-            SEA_SURFACE_MONTHLY_MEAN_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/datasets2025/2025_sea_surface_monthly_mean_calculated_grad.nc"
+            SEA_SURFACE_GRAD_DATA_PATH = "datasets/2025_sea_surface_calculated_grad.nc"
+            SEA_SURFACE_MONTHLY_MEAN_DATA_PATH = "datasets/2025_sea_surface_monthly_mean_calculated_grad.nc"
         else:
+            """
+            CHENGYUN comment: don't turn this on, I didn't give you these files.
+            """
             SEA_SURFACE_GRAD_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_calculated_grad.nc"
             SEA_SURFACE_MONTHLY_MEAN_DATA_PATH = "/Volumes/G-DRIVE ArmorATD/Extension/datasets/sea_surface_monthly_mean_calculated_grad.nc"
 
@@ -409,7 +443,7 @@ def run_model(INCLUDE_SURFACE, SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE, INCLUDE
     # save the SST dataset into a NETCDF file
     model_anomalies_ds = remove_empty_attributes(
         model_anomalies_ds)  # when doing the seasonality removal, some units are None
-    model_anomalies_ds.to_netcdf("/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/" + save_name + ".nc")
+    model_anomalies_ds.to_netcdf("datasets/implicit_model/" + save_name + ".nc")
 
     # save contributions from each forcing
     if INCLUDE_ENTRAINMENT:
@@ -478,4 +512,4 @@ def run_model(INCLUDE_SURFACE, SPLIT_SURFACE, INCLUDE_RADIATIVE_SURFACE, INCLUDE
     flux_components_ds = remove_empty_attributes(flux_components_ds)
     print(flux_components_ds)
     flux_components_ds.to_netcdf(
-        "/Volumes/G-DRIVE ArmorATD/Extension/datasets/implicit_model/" + save_name + "_flux_components.nc")
+        "datasets/implicit_model/" + save_name + "_flux_components.nc")
